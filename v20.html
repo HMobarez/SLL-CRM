@@ -1,0 +1,3127 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STRAIGHT LINE LOGISTICS (CRM)</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#07090F;--bg2:#0C0E16;--bg3:#11131C;--bg4:#161923;
+  --surface:#181C28;--surface2:#1D2235;--surface3:#232840;
+  --border:rgba(255,255,255,0.055);--border2:rgba(255,255,255,0.1);--border3:rgba(255,255,255,0.17);
+  --text:#E8ECFF;--text2:#6B72A0;--text3:#3D4368;--text4:#252945;
+  --blue:#4B7CF5;--blue2:#7AA0FF;--blue-bg:rgba(75,124,245,0.11);--blue-glow:rgba(75,124,245,0.22);
+  --green:#22C997;--green2:#4DDBA8;--green-bg:rgba(34,201,151,0.11);
+  --orange:#F5924A;--orange2:#FFB27A;--orange-bg:rgba(245,146,74,0.11);
+  --red:#F55252;--red2:#FF8080;--red-bg:rgba(245,82,82,0.11);
+  --purple:#A855F7;--purple2:#C084FC;--purple-bg:rgba(168,85,247,0.11);
+  --amber:#F5C84A;--cyan:#22D4F5;--cyan-bg:rgba(34,212,245,0.11);
+  --coord-bg:var(--green-bg);--sales-bg:var(--orange-bg);--admin-bg:var(--purple-bg);
+  --r:10px;--r-sm:7px;--r-lg:14px;--r-xl:20px;
+  --shadow:0 4px 20px rgba(0,0,0,0.45);--shadow-lg:0 8px 40px rgba(0,0,0,0.55);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:"Cairo",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px;}
+input,select,textarea,button{font-family:"Cairo",sans-serif;}
+/* LOGIN */
+#login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse 70% 60% at 15% 50%,rgba(75,124,245,0.08) 0%,transparent 55%),
+  radial-gradient(ellipse 50% 40% at 85% 20%,rgba(168,85,247,0.06) 0%,transparent 55%),var(--bg);
+  position:relative;overflow:hidden;}
+#login-page::before{content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 59px,rgba(75,124,245,0.025) 60px),
+  repeating-linear-gradient(90deg,transparent,transparent 59px,rgba(75,124,245,0.025) 60px);}
+.login-box{position:relative;z-index:1;width:460px;background:var(--surface);
+  border:1px solid var(--border2);border-radius:var(--r-xl);
+  box-shadow:0 24px 80px rgba(0,0,0,0.6);overflow:hidden;}
+.login-top{padding:40px 40px 28px;}
+.login-brand{display:flex;align-items:center;gap:12px;margin-bottom:30px;}
+.brand-mark{width:42px;height:42px;background:var(--blue);border-radius:11px;display:flex;align-items:center;justify-content:center;font-family:"Outfit",sans-serif;font-weight:800;font-size:16px;color:#fff;box-shadow:0 0 28px var(--blue-glow);flex-shrink:0;}
+.brand-name{font-family:"Outfit",sans-serif;font-size:14px;font-weight:800;letter-spacing:-.2px;line-height:1.1;}
+.brand-sub{font-size:11px;color:var(--text3);margin-top:1px;}
+.login-title{font-size:20px;font-weight:700;margin-bottom:4px;}
+.login-sub{font-size:12px;color:var(--text2);margin-bottom:22px;}
+.lf{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;}
+.lf label{font-size:11px;font-weight:600;color:var(--text2);letter-spacing:.04em;}
+.lf input{height:42px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 12px;color:var(--text);font-size:13px;outline:none;transition:all .2s;}
+.lf input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(75,124,245,0.13);}
+.btn-login{width:100%;height:42px;background:var(--blue);border:none;border-radius:var(--r-sm);color:#fff;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;transition:all .2s;box-shadow:0 4px 16px rgba(75,124,245,0.28);}
+.btn-login:hover{background:var(--blue2);transform:translateY(-1px);}
+.login-err{background:var(--red-bg);border:1px solid rgba(245,82,82,.3);border-radius:var(--r-sm);padding:8px 12px;font-size:11px;color:var(--red2);margin-top:8px;display:none;}
+.login-demos{padding:14px 40px 26px;border-top:1px solid var(--border);background:rgba(255,255,255,0.015);}
+.demo-lbl{font-size:10px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.1em;margin-bottom:9px;}
+.demo-btns{display:flex;gap:6px;flex-wrap:wrap;}
+.demo-btn{flex:1;min-width:75px;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:var(--r-sm);padding:8px 9px;cursor:pointer;transition:all .18s;text-align:center;}
+.demo-btn:hover{background:rgba(255,255,255,0.08);border-color:var(--border3);transform:translateY(-1px);}
+.db-role{font-size:10px;font-weight:700;margin-bottom:2px;}
+.db-name{font-size:11px;color:var(--text2);}
+/* APP */
+#app{display:none;min-height:100vh;}
+.sidebar{position:fixed;top:0;right:0;width:228px;height:100vh;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:100;}
+.sb-top{padding:15px 14px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--border);}
+.sb-logo-icon{width:30px;height:30px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:"Outfit",sans-serif;font-weight:800;font-size:12px;color:#fff;flex-shrink:0;}
+.sb-logo-text{font-family:"Outfit",sans-serif;font-size:13px;font-weight:800;letter-spacing:-.2px;}
+.sb-user{padding:11px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);}
+.sb-av{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;font-family:"Outfit",sans-serif;flex-shrink:0;}
+.sb-uname{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-urole{font-size:10px;margin-top:1px;font-weight:500;}
+.sb-nav{flex:1;padding:5px 0;overflow-y:auto;}
+.sb-item{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;transition:all .12s;color:var(--text2);font-size:12px;font-weight:500;border-right:2px solid transparent;user-select:none;}
+.sb-item:hover{background:rgba(255,255,255,0.025);color:var(--text);}
+.sb-item.active{background:rgba(75,124,245,0.08);color:var(--blue2);border-right-color:var(--blue);}
+.sb-icon{font-size:13px;width:15px;text-align:center;flex-shrink:0;}
+.sb-foot{padding:11px 14px;border-top:1px solid var(--border);}
+.logout-btn{display:flex;align-items:center;gap:6px;color:var(--text3);font-size:11px;cursor:pointer;padding:6px 0;background:none;border:none;font-weight:500;transition:color .2s;}
+.logout-btn:hover{color:var(--red);}
+.main{margin-right:228px;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{height:54px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:11px;position:sticky;top:0;z-index:80;flex-shrink:0;}
+.topbar-title{font-size:14px;font-weight:700;flex:1;}
+.topbar-acts{display:flex;align-items:center;gap:7px;}
+/* NOTIF */
+.nw{position:relative;}
+.nb{width:32px;height:32px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s;}
+.nb:hover{border-color:var(--border3);background:var(--surface2);}
+.nc{position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:7px;font-family:"Outfit",sans-serif;display:none;min-width:14px;text-align:center;}
+.nc.on{display:block;}
+.nd{position:absolute;top:40px;left:0;width:310px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);z-index:200;display:none;overflow:hidden;}
+.nd.open{display:block;animation:fdwn .18s ease;}
+@keyframes fdwn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
+.nd-hdr{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.nd-hdr h3{font-size:12px;font-weight:700;}
+.nd-clear{font-size:10px;color:var(--blue2);cursor:pointer;}
+.ni{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;display:flex;gap:8px;}
+.ni:hover{background:var(--surface2);}
+.ni:last-child{border-bottom:none;}
+.ni-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.ni-t{font-size:11px;font-weight:500;line-height:1.4;}
+.ni-s{font-size:10px;color:var(--text3);margin-top:2px;}
+.nd-empty{padding:20px;text-align:center;color:var(--text3);font-size:11px;}
+/* BUTTONS */
+.btn{height:32px;padding:0 13px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px;}
+.btn:hover{background:var(--surface2);border-color:var(--border3);}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 2px 10px rgba(75,124,245,.22);}
+.btn.primary:hover{background:var(--blue2);}
+.btn.sm{height:27px;padding:0 10px;font-size:11px;}
+.btn.lg{height:40px;padding:0 18px;font-size:13px;}
+/* PAGES */
+.page{display:none;padding:20px;animation:pgin .18s ease;}
+.page.active{display:block;}
+@keyframes pgin{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:15px;}
+.card-title{font-size:12px;font-weight:700;margin-bottom:2px;}
+.card-sub{font-size:10px;color:var(--text3);margin-bottom:11px;}
+/* KPI */
+.kpi-row{display:grid;gap:11px;margin-bottom:16px;}
+.kpi-row.c4{grid-template-columns:repeat(4,1fr);}
+.kpi-row.c3{grid-template-columns:repeat(3,1fr);}
+.kpi-row.c5{grid-template-columns:repeat(5,1fr);}
+.kc{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 13px;position:relative;overflow:hidden;transition:border-color .2s;}
+.kc:hover{border-color:var(--border2);}
+.kc-acc{position:absolute;top:0;left:0;right:0;height:2px;border-radius:var(--r) var(--r) 0 0;}
+.kc-lbl{font-size:10px;font-weight:600;color:var(--text2);letter-spacing:.04em;text-transform:uppercase;}
+.kc-val{font-size:24px;font-weight:700;line-height:1;margin:4px 0 3px;font-family:"Outfit",sans-serif;}
+.kc-sub{font-size:10px;color:var(--text3);}
+.kc-sub.up{color:var(--green);}
+.kc-sub.dn{color:var(--red);}
+.kc-sub.warn{color:var(--orange);}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;white-space:nowrap;}
+.b-new{background:rgba(34,212,245,0.15);color:var(--cyan);border:1px solid rgba(34,212,245,0.3);}
+.b-follow{background:var(--blue-bg);color:var(--blue2);}
+.b-revisit{background:var(--orange-bg);color:var(--orange2);}
+.b-active{background:var(--green-bg);color:var(--green2);}
+.b-cancelled{background:var(--red-bg);color:var(--red2);}
+.b-noreply{background:rgba(107,114,160,.1);color:var(--text2);}
+.b-restored{background:rgba(168,85,247,.15);color:#C490FB;}
+.b-hot{background:rgba(245,82,82,.14);color:#FF8080;}
+.b-warm{background:rgba(245,146,74,.14);color:#FFB27A;}
+.b-cold{background:rgba(75,124,245,.14);color:#7AA0FF;}
+.b-urgent{background:rgba(245,82,82,.14);color:#FF8080;}
+.b-normal{background:rgba(107,114,160,.12);color:var(--text2);}
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;margin-bottom:13px;}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:11px;margin-bottom:13px;}
+/* SEC HDR */
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
+.sh-t{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;}
+.sh-t::before{content:"";width:2px;height:12px;background:var(--blue);border-radius:1px;}
+/* BARS */
+.bar-list{display:flex;flex-direction:column;gap:7px;}
+.bar-row{display:flex;align-items:center;gap:7px;}
+.bar-nm{font-size:11px;color:var(--text2);width:95px;flex-shrink:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar-track{flex:1;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;transition:width .7s cubic-bezier(.4,0,.2,1);}
+.bar-v{font-size:11px;font-weight:600;width:26px;text-align:left;font-family:"Outfit",sans-serif;}
+/* TABLE */
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.tbl-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{background:var(--bg3);padding:9px 11px;text-align:right;font-weight:600;color:var(--text2);font-size:10px;white-space:nowrap;border-bottom:1px solid var(--border);letter-spacing:.03em;}
+th.ch{border-top:2px solid var(--green);}
+th.sh2{border-top:2px solid var(--orange);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:hover{background:var(--surface2);}
+tbody tr:last-child{border-bottom:none;}
+tbody td{padding:9px 11px;vertical-align:middle;}
+.td-m{color:var(--text2);font-size:11px;}
+.td-mono{font-family:"Outfit",sans-serif;}
+tr.sla1-row{background:rgba(245,82,82,.04);}
+tr.sla1-row:hover{background:rgba(245,82,82,.08);}
+tr.late-row{background:rgba(245,146,74,.04);}
+tr.new-row{background:rgba(34,212,245,.03);}
+/* PAGINATION */
+.pag{padding:10px 13px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);}
+.pag-info{font-size:11px;color:var(--text2);}
+.pag-btns{display:flex;gap:4px;}
+.pag-btn{width:27px;height:27px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;color:var(--text2);font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .12s;font-family:"Outfit",sans-serif;}
+.pag-btn:hover{border-color:var(--blue);color:var(--blue2);}
+.pag-btn.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+/* FILTER BAR */
+.fbar{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 13px;margin-bottom:11px;display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
+.fsearch{flex:1;min-width:150px;height:31px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 9px 0 28px;color:var(--text);font-size:12px;outline:none;transition:border-color .18s;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B72A0' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
+.fsearch:focus{border-color:var(--blue);}
+.fsel{height:31px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;color:var(--text);font-size:12px;outline:none;min-width:105px;transition:border-color .18s;}
+.fsel:focus{border-color:var(--blue);}
+.fsel option{background:var(--bg3);}
+.fdate{height:31px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;color:var(--text);font-size:12px;outline:none;transition:border-color .18s;}
+.fdate:focus{border-color:var(--blue);}
+/* MODAL */
+.mov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:300;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px);}
+.mov.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-xl);width:100%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.7);animation:mdin .22s cubic-bezier(.34,1.4,.64,1);}
+@keyframes mdin{from{opacity:0;transform:scale(.95);}to{opacity:1;transform:scale(1);}}
+.mhdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.mhdr h2{font-size:14px;font-weight:700;}
+.mx{width:26px;height:26px;border-radius:7px;background:var(--surface);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:16px;transition:all .12s;}
+.mx:hover{background:var(--red-bg);color:var(--red);border-color:var(--red);}
+.mbody{padding:18px;overflow-y:auto;flex:1;}
+.mftr{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:6px;justify-content:flex-end;flex-shrink:0;}
+/* FORM */
+.fsec{margin-bottom:16px;border:1px solid var(--border);border-radius:var(--r);padding:14px;}
+.fsec.coord{border-color:rgba(34,201,151,.18);background:rgba(34,201,151,.018);}
+.fsec.sales{border-color:rgba(245,146,74,.18);background:rgba(245,146,74,.018);}
+.fsec-ttl{font-size:11px;font-weight:700;margin-bottom:11px;display:flex;align-items:center;gap:5px;letter-spacing:.04em;}
+.fdot{width:6px;height:6px;border-radius:2px;flex-shrink:0;}
+.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+.fg2{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}
+.ff{display:flex;flex-direction:column;gap:4px;}
+.ff.s2{grid-column:span 2;}
+.ff.s3{grid-column:span 3;}
+.ff label{font-size:10px;font-weight:600;color:var(--text2);letter-spacing:.04em;}
+.ff input,.ff select,.ff textarea{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 9px;height:33px;color:var(--text);font-size:12px;outline:none;transition:border-color .18s;width:100%;}
+.ff input:focus,.ff select:focus,.ff textarea:focus{border-color:var(--blue);}
+.ff textarea{height:58px;padding:7px 9px;resize:vertical;}
+.ff select option{background:var(--bg3);}
+.ff input:disabled,.ff select:disabled,.ff textarea:disabled{opacity:.35;cursor:not-allowed;}
+.auto-disp{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:0 9px;height:33px;display:flex;align-items:center;font-size:12px;color:var(--text3);gap:5px;}
+.rr-box{background:var(--blue-bg);border:1px solid rgba(75,124,245,.25);border-radius:var(--r-sm);padding:8px 11px;display:flex;align-items:center;gap:8px;margin-top:6px;}
+.rr-name{font-size:13px;font-weight:700;color:var(--blue2);}
+.perm-note{border-radius:var(--r-sm);padding:7px 10px;font-size:11px;margin-bottom:10px;display:flex;align-items:center;gap:5px;}
+.pn-sales{background:var(--orange-bg);color:var(--orange);border:1px solid rgba(245,146,74,.2);}
+/* MULTI SELECT */
+.ms-pos{position:relative;}
+.ms-wrap{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:5px 9px;display:flex;flex-wrap:wrap;gap:4px;min-height:33px;cursor:pointer;transition:border-color .18s;align-items:center;}
+.ms-wrap.open,.ms-wrap:focus-within{border-color:var(--blue);}
+.ms-chip{background:var(--blue-bg);color:var(--blue2);border:1px solid rgba(75,124,245,.25);border-radius:11px;padding:2px 7px;font-size:10px;font-weight:600;display:flex;align-items:center;gap:3px;white-space:nowrap;}
+.ms-chip-x{cursor:pointer;font-size:11px;opacity:.7;}
+.ms-chip-x:hover{opacity:1;}
+.ms-ph{font-size:11px;color:var(--text3);}
+.ms-drop{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:5px;display:none;position:absolute;z-index:150;min-width:220px;box-shadow:var(--shadow-lg);max-height:200px;overflow-y:auto;top:calc(100% + 4px);right:0;}
+.ms-drop.open{display:block;}
+.ms-opt{padding:7px 9px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:7px;transition:background .12s;}
+.ms-opt:hover{background:var(--surface2);}
+.ms-opt.sel{background:var(--blue-bg);}
+.ms-chk{width:14px;height:14px;border-radius:3px;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;transition:all .12s;}
+.ms-opt.sel .ms-chk{background:var(--blue);border-color:var(--blue);color:#fff;}
+/* FOLLOW-UP */
+.fu-wrap{display:none;margin-top:7px;}
+.fu-wrap.show{display:block;}
+.fu-box{background:var(--orange-bg);border:1px solid rgba(245,146,74,.25);border-radius:var(--r-sm);padding:9px 11px;}
+.fu-lbl{font-size:10px;font-weight:600;color:var(--orange);margin-bottom:5px;}
+.fu-box input[type=date]{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 9px;height:32px;color:var(--text);font-size:12px;outline:none;width:100%;}
+.fu-box input[type=date]:focus{border-color:var(--orange);}
+/* CALL SECTION */
+.call-sec{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;margin-bottom:7px;}
+.call-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.call-lbl{font-size:11px;font-weight:700;color:var(--text2);}
+.call-time{font-size:10px;color:var(--orange);font-weight:600;}
+/* PIPELINE */
+.pipeline{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;overflow-x:auto;padding-bottom:6px;}
+.pipe-col{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);min-width:172px;overflow:hidden;}
+.pipe-hdr{padding:9px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.pipe-title{font-size:11px;font-weight:700;}
+.pipe-cnt{background:var(--bg4);border-radius:5px;font-size:10px;font-weight:700;padding:2px 6px;font-family:"Outfit",sans-serif;}
+.pipe-cards{padding:7px;display:flex;flex-direction:column;gap:6px;min-height:90px;}
+.pipe-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-sm);padding:9px;cursor:pointer;transition:all .12s;}
+.pipe-card:hover{border-color:var(--border3);transform:translateY(-1px);box-shadow:var(--shadow);}
+.pipe-card.new-card{border-color:rgba(34,212,245,.25);background:rgba(34,212,245,.03);}
+.pipe-card.late-card{border-color:rgba(245,82,82,.25);background:rgba(245,82,82,.03);}
+.pc-nm{font-size:11px;font-weight:600;margin-bottom:3px;}
+.pc-meta{font-size:10px;color:var(--text2);}
+.pc-foot{display:flex;align-items:center;gap:4px;margin-top:6px;flex-wrap:wrap;}
+/* QUICK PANEL */
+.qp{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:11px;margin-top:7px;display:none;animation:pgin .18s ease;}
+.qp.open{display:block;}
+/* SALES CARD */
+.qlc{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;transition:border-color .15s;}
+.qlc:hover{border-color:var(--border3);}
+.qlc-hdr{padding:11px 13px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--border);}
+.qlc-av{width:32px;height:32px;border-radius:9px;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:var(--blue2);flex-shrink:0;}
+.qlc-nm{font-size:12px;font-weight:700;}
+.qlc-meta{font-size:10px;color:var(--text2);margin-top:2px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.qlc-body{padding:9px 13px;font-size:11px;color:var(--text2);}
+.qlc-foot{padding:8px 13px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;}
+/* SLA */
+.sla-t{font-size:9px;font-weight:600;padding:2px 6px;border-radius:8px;font-family:"Outfit",sans-serif;white-space:nowrap;}
+.sla-ok{background:var(--green-bg);color:var(--green);}
+.sla-w{background:var(--orange-bg);color:var(--orange);}
+.sla-b{background:var(--red-bg);color:var(--red);}
+.sla-late{background:rgba(245,82,82,.2);color:var(--red2);border:1px solid rgba(245,82,82,.3);}
+/* SCORE */
+.sc-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:9px;font-size:9px;font-weight:700;white-space:nowrap;}
+/* ALERTS */
+.alert-banner{border-radius:var(--r);padding:9px 13px;margin-bottom:13px;display:flex;align-items:center;gap:8px;font-size:12px;}
+.ab-red{background:var(--red-bg);border:1px solid rgba(245,82,82,.28);}
+.ab-orange{background:var(--orange-bg);border:1px solid rgba(245,146,74,.28);}
+/* TODAY FU */
+.today-fu{background:linear-gradient(135deg,rgba(245,146,74,.1),rgba(245,200,74,.07));border:1px solid rgba(245,146,74,.25);border-radius:var(--r);padding:13px;margin-bottom:13px;}
+.today-fu-title{font-size:12px;font-weight:700;color:var(--orange);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.fu-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(245,146,74,.15);cursor:pointer;}
+.fu-item:last-child{border-bottom:none;}
+.fu-nm{font-size:12px;font-weight:600;}
+.fu-meta{font-size:10px;color:var(--text2);margin-top:2px;}
+.fu-acts{display:flex;gap:5px;align-items:center;}
+/* ROW ACTIONS */
+.racts{display:flex;gap:4px;}
+.ract{width:23px;height:23px;border-radius:5px;border:1px solid var(--border2);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .1s;color:var(--text2);text-decoration:none;}
+.ract:hover{background:var(--surface2);color:var(--text);border-color:var(--border3);}
+.ract.wa:hover{border-color:var(--green);color:var(--green);}
+.ract.ed:hover{border-color:var(--blue);color:var(--blue2);}
+.ract.vw:hover{border-color:var(--purple);color:var(--purple2);}
+/* COL LEGEND */
+.col-leg{display:flex;gap:11px;flex-wrap:wrap;}
+.cleg{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2);}
+.cleg-dot{width:7px;height:7px;border-radius:2px;}
+/* VIEW TABS */
+.vtabs{display:flex;gap:5px;margin-bottom:11px;}
+.vtab{padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;font-weight:500;cursor:pointer;transition:all .12s;}
+.vtab.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+.vt-toggle{display:flex;border:1px solid var(--border2);border-radius:7px;overflow:hidden;}
+.vt-btn{padding:5px 10px;font-size:11px;font-weight:500;cursor:pointer;background:transparent;border:none;color:var(--text2);transition:all .12s;}
+.vt-btn.on{background:var(--blue);color:#fff;}
+/* LOG */
+.log-item{display:flex;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);}
+.log-item:last-child{border-bottom:none;}
+.log-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.log-text{font-size:11px;line-height:1.5;}
+.log-time{font-size:10px;color:var(--text3);margin-top:2px;}
+/* TOAST */
+.toast{position:fixed;bottom:16px;left:16px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-lg);z-index:9999;font-size:12px;font-weight:500;transform:translateY(60px);opacity:0;transition:all .3s cubic-bezier(.34,1.4,.64,1);max-width:300px;}
+.toast.on{transform:translateY(0);opacity:1;}
+/* SETTINGS */
+.set-grid{display:grid;grid-template-columns:182px 1fr;gap:16px;}
+.set-nav{display:flex;flex-direction:column;gap:2px;}
+.sn-item{padding:8px 10px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;font-weight:500;color:var(--text2);transition:all .12s;display:flex;align-items:center;gap:6px;}
+.sn-item:hover{background:var(--surface2);color:var(--text);}
+.sn-item.on{background:var(--blue-bg);color:var(--blue2);}
+.set-content{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;}
+.st-sec{display:none;}
+.st-sec.on{display:block;}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);}
+.set-row:last-child{border-bottom:none;}
+.si-ttl{font-size:12px;font-weight:600;}
+.si-sub{font-size:11px;color:var(--text2);margin-top:2px;}
+.toggle-sw{position:relative;width:38px;height:21px;flex-shrink:0;}
+.toggle-sw input{opacity:0;width:0;height:0;}
+.tsl{position:absolute;inset:0;background:var(--bg4);border-radius:21px;cursor:pointer;transition:.28s;}
+.tsl:before{content:"";position:absolute;width:15px;height:15px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.28s;}
+.toggle-sw input:checked+.tsl{background:var(--green);}
+.toggle-sw input:checked+.tsl:before{transform:translateX(17px);}
+/* MONTHLY TABLE */
+.monthly-tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.monthly-tbl th{background:var(--bg3);padding:7px 9px;text-align:center;font-weight:600;color:var(--text2);font-size:10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.monthly-tbl th:first-child{text-align:right;}
+.monthly-tbl td{padding:5px 7px;border-bottom:1px solid var(--border);text-align:center;}
+.monthly-tbl td:first-child{text-align:right;font-weight:600;}
+.monthly-tbl tr:last-child td{border-bottom:none;}
+.monthly-inp{width:66px;height:25px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:0 5px;color:var(--text);font-size:11px;outline:none;text-align:center;}
+.monthly-inp:focus{border-color:var(--blue);}
+/* EMPTY */
+.empty-st{text-align:center;padding:36px 16px;}
+.empty-icon{font-size:34px;margin-bottom:10px;opacity:.2;}
+.empty-ttl{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;}
+.empty-sub{font-size:11px;color:var(--text3);}
+</style>
+</head>
+<body>
+<!-- LOGIN -->
+<div id="login-page">
+  <div class="login-box">
+    <div class="login-top">
+      <div class="login-brand">
+        <div class="brand-mark" style="padding:0;background:transparent;border:none;width:60px;height:60px"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAAZ30lEQVR42u3de5Ad1X0n8O/vnO57Z0YzoxcIYZaXQzAaC/OQeRrTAmNZjggkQIvsJrFdrl1iO+tKNsTUllP46mZdRZyNqfU6ZlPGlfI6sRWpeRq00RrZmpsiPDU8xXgBYRB2QAwgaZ537u0+57d/3DtIwiPQaO7M3Jn5fqqmBNJoNHP6nG+f8+vu0wAREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREc1y0ozfVAEwGwqFudfYxaIC0CP99EKh0PDjUywW/Vxoy0KhYKagbSZyfKiRY2NzHNvtURRok4YSEWcADaaAdEeRvbxUyvSg7+iPLrv8hE9UdXmLiDrVWR8IVkRHVaV77xvP39bbO1Rvd32PY6Lr1q1bfMwxx3wwyzLVSbaBiKiqivfev/hi586enu+ms7k9V115ZdsHOztX5Oo/12S/XpZlGgSt0tc3smvbtqT/fY7PnBLMVPBsjyIrpVKGUinDl9fm/9cT5YtOH6pcucS5S9tf27+iA9J+2MTScaJLDx4+7zqEcvgEOuI/P5KvqcC7u6MCMKrIbICXpfVyANs3Izbrkbjx/skoimypVMrUmLVigh9BFMZMto8rjBj4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" alt="SLL" style="width:100%;height:100%;object-fit:contain"></div>
+        <div><div class="brand-name">STRAIGHT LINE LOGISTICS</div><div class="brand-tag" style="font-size:10px;color:var(--text3);font-family:Outfit;letter-spacing:.1em;font-weight:600">(CRM)</div><div class="brand-sub">بوابة إدارة العملاء والمبيعات</div></div>
+      </div>
+      <div class="login-title">أهلاً بك 👋</div>
+      <div class="login-sub">ادخل بياناتك للوصول إلى النظام</div>
+      <div class="lf"><label>البريد الإلكتروني</label><input type="email" id="l-email" placeholder="example@company.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="lf"><label>Password</label><input type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn-login" onclick="doLogin()">دخول ←</button>
+      <div class="login-err" id="l-err">البريد أو الـ Password غلط</div>
+    </div>
+  </div>
+</div>
+<!-- APP -->
+<div id="app">
+  <aside class="sidebar">
+    <div class="sb-top"><div class="sb-logo-icon" style="background:transparent;padding:0;border:none"><img src="data:image/png;base64,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" alt="SLL" style="width:100%;height:100%;object-fit:contain"></div><div class="sb-logo-text" style="font-size:11px;line-height:1.2">STRAIGHT LINE<br>LOGISTICS<span style="font-size:9px;color:var(--text3);margin-right:4px">(CRM)</span></div></div>
+    <div class="sb-user"><div class="sb-av" id="sb-av"></div><div><div class="sb-uname" id="sb-uname"></div><div class="sb-urole" id="sb-urole"></div></div></div>
+    <nav class="sb-nav" id="sb-nav"></nav>
+    <div class="sb-foot"><button class="logout-btn" onclick="doLogout()">⎋ تسجيل الخروج</button></div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-acts">
+        <div id="topbar-extra"></div>
+        <div class="nw">
+          <div class="nb" onclick="toggleNotif()" id="nb-btn">🔔<div class="nc" id="nc">0</div></div>
+          <div class="nd" id="nd">
+            <div class="nd-hdr"><h3>Notifications</h3><span class="nd-clear" onclick="clearNotifs()">مسح الكل</span></div>
+            <div id="nd-list"><div class="nd-empty">لا توجد إشعارات</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="page active" id="pg-dashboard"></div>
+    <div class="page" id="pg-leads"></div>
+    <div class="page" id="pg-reports"></div>
+    <div class="page" id="pg-myreports"></div>
+    <div class="page" id="pg-settings"></div>
+  </div>
+</div>
+<!-- MODALS -->
+<div class="mov" id="lead-modal">
+  <div class="modal" style="max-width:880px">
+    <div class="mhdr"><h2 id="lm-ttl">New Lead</h2><button class="mx" onclick="closeM('lead-modal')">×</button></div>
+    <div class="mbody" id="lm-body"></div>
+    <div class="mftr"><button class="btn" onclick="closeM('lead-modal')">إلغاء</button><button class="btn primary" onclick="saveLead()">💾 حفظ</button></div>
+  </div>
+</div>
+<div class="mov" id="view-modal">
+  <div class="modal">
+    <div class="mhdr"><h2 id="vm-ttl">تفاصيل العميل</h2><button class="mx" onclick="closeM('view-modal')">×</button></div>
+    <div class="mbody" id="vm-body"></div>
+    <div class="mftr"><button class="btn" onclick="closeM('view-modal')">إغلاق</button><button class="btn primary" id="vm-edit" style="display:none" onclick="editFV()">✏️ تعديل</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"><span id="t-ic">✓</span><span id="t-msg"></span></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+// SUPABASE CLIENT
+// ═══════════════════════════════════════════════════════════
+const SUPABASE_URL = "https://ipqsooxypeaursxvygmq.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwcXNvb3h5cGVhdXJzeHZ5Z21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwMDcxMjEsImV4cCI6MjA5MzU4MzEyMX0.imsbRww24Y3ePxaB9_tW5aB_Ew_Y3fr8g3QkMKuOE4g";
+let supa = null;
+if(typeof supabase !== "undefined") {
+  try {
+    supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    console.log("[Supabase] Client created successfully");
+  } catch(e) {
+    console.error("[Supabase] Client creation failed:", e);
+  }
+} else {
+  console.error("[Supabase] supabase global not found - CDN may not have loaded");
+}
+let supaSession = null;
+
+
+const $=id=>document.getElementById(id);
+const MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+let USERS=[];
+let SALES_USERS=[];
+let COORD_USERS=[];
+const DD={
+  source:["Whatsapp","Phone call","Facebook","Google","Website","FB Lead Generation","IG Lead Generation","Google map","Google Ch","China","Turkiye","Germany"],
+  nat:["مصر","السعودية","الامارات","العراق","اليمن","الاردن","سوريا","المغرب","عمان","ليبيا","الكويت","قطر","البحرين","تونس","الجزائر"],
+  country:["مصر","السعودية","الامارات","العراق","اليمن","الاردن","سوريا","المغرب","عمان","ليبيا","الكويت","قطر","البحرين","تونس","الجزائر","الصين","تركيا","ألمانيا","فرنسا","إيطاليا","الهند","أمريكا","أوروبا","إفريقيا","أخرى"],
+  ie:["مستورد فعلي","يرغب في الاستيراد","مصدر فعلي","يرغب في التصدير","Canton Fair visit"],
+  supply:["متوفر","غير متوفر"],
+  services:["شحن بحري","شحن جوي","شحن بري","تخليص جمركي","توفير موردين","السفر للصين","السفر لتركيا","فحص منتجات","CargoX","خدمة شاملة"],
+  spec:["Machinery & Equipment","Electronics & Electrical","Household & Kitchenware","Clothing & Fabrics","Medical Supplies","Office & Stationery","Furniture & Decor","Raw Materials","Sanitary Ware","قطع غيار سيارات","أجهزة طبية","اطارات","خط انتاج","ماكينات","معدات","كيماويات","ورق","ادوية","اخرى"],
+  status:["تحت المتابعة","لم يتم الرد","عميل فعلي","لاغي"],
+  priority:["مستعجل","عادي"],
+  cancelR:["مغلق-لايرد","مرفوض من الإدارة","لايوجد رد واضح","تكلفة الشحن عالية","نسبة الشركة عالية","رافض دفع جدية التعاقد","شحن مع شركة تانية","تكاليف السفر عالية","تكلفة الفحص عالية","تكلفة المنتج عالية","مكرر","أجل - لغى الموضوع","قيمة الفاتورة قليلة"],
+};
+// Manual monthly data
+let MC={coords:{},channels:{},daily:{}};
+COORD_USERS.forEach(c=>{MC.coords[c.name]={};MONTHS.forEach((_,i)=>{MC.coords[c.name][i]=0;});MC.daily[c.name]={};});
+DD.source.forEach(s=>{MC.channels[s]={};MONTHS.forEach((_,i)=>{MC.channels[s][i]=0;});});
+// Seed sample data
+const seedC={"A'laa":[693,693,693,694,111,0,0,0,0,0,0,0],"Fatma":[594,594,594,594,95,0,0,0,0,0,0,0],"Mayar":[684,684,684,683,109,0,0,0,0,0,0,0],"Rawda":[700,700,700,702,112,0,0,0,0,0,0,0],"Ahlam":[654,654,654,653,105,0,0,0,0,0,0,0],"Sama":[0,0,0,0,0,0,0,0,0,0,0,0],"Soha":[0,0,0,0,0,0,0,0,0,0,0,0]};
+Object.entries(seedC).forEach(([nm,arr])=>{if(MC.coords[nm])arr.forEach((v,i)=>{MC.coords[nm][i]=v;});});
+const seedCh={"Whatsapp":[6950,7200,6800,6500,7100,6900,7300,6600,7000,6800,7200,6998],"Facebook":[1600,1700,1650,1580,1620,1590,1640,1610,1660,1570,1680,1607],"Google":[420,440,410,400,430,415,445,405,435,395,450,427],"Phone call":[620,640,610,600,630,615,645,605,635,595,650,601]};
+Object.entries(seedCh).forEach(([ch,arr])=>{if(MC.channels[ch])arr.forEach((v,i)=>{MC.channels[ch][i]=v;});});
+
+let LEADS=[];
+let nextId=9419,rrIdx=0,curUser=null,curLeadId=null,pgLeads=1,PER=10,lView="table",NOTIFS=[],charts={};
+let dashPeriod="all", coordRptPeriod="month", salesRptPeriod="month";
+let msSelected={};
+// ═══ HELPERS ═══
+const today=()=>new Date().toISOString().slice(0,10);
+const nowTime=()=>new Date().toTimeString().slice(0,5);
+const nowDT=()=>new Date().toLocaleString("ar-EG");
+const pct=(a,b)=>b?Math.round(a/b*100*100)/100:0;
+const pctStr=(a,b)=>{
+  if(!b)return "0.00";
+  const v=a/b*100;
+  return v.toFixed(2);
+};
+const fmtPct=v=>{
+  // Format any number value as XX.XX
+  if(typeof v!=="number"||isNaN(v))return "0.00";
+  return v.toFixed(2);
+};
+const isNew=l=>!l.st||l.st==="";
+const needsAction=l=>isNew(l)||l.st==="مسترد بعد الإلغاء";
+// Sales can only set these statuses; reactivation is coordinator-only
+const SALES_STATUSES=["تحت المتابعة","عميل فعلي","لاغي","لم يتم الرد"];
+const isReactivated=l=>l&&l.reactivated&&l.reactivated!=="";
+const svcStr=l=>Array.isArray(l.svc)?l.svc.join("، "):(l.svc||"");
+const stDisplay=l=>isNew(l)?"جديد":l.st;
+
+function score(l){
+  let s=0;
+  const cap=parseInt(l.cap)||0;
+  if(cap>=20000)s+=35;else if(cap>=10000)s+=25;else if(cap>=5000)s+=15;else if(cap>0)s+=5;
+  if(["مستورد فعلي","مصدر فعلي"].includes(l.ie))s+=25;
+  if(l.sup==="متوفر")s+=20;
+  const sv=svcStr(l);
+  if(sv.includes("السفر"))s+=15;
+  else if(sv.includes("شحن"))s+=10;
+  if(l.priority==="مستعجل")s+=10;
+  return Math.min(s,100);
+}
+function scoreLbl(s){return s>=70?"Hot":s>=40?"Warm":"Cold";}
+function scoreBadge(s){
+  const l=scoreLbl(s),cls=l==="Hot"?"b-hot":l==="Warm"?"b-warm":"b-cold";
+  return`<span class="sc-badge ${cls}">${l==="Hot"?"🔴":l==="Warm"?"🟡":"🔵"} ${l} ${s}</span>`;
+}
+// SLA #1 — 24h without any status
+function sla1Hrs(l){
+  if(l.st)return 0;
+  const reg=new Date(l.dt+"T"+(l.tm||"00:00"));
+  return Math.round((new Date()-reg)/3600000);
+}
+function sla1St(l){
+  if(l.st)return "ok";
+  const h=sla1Hrs(l);
+  return h>48?"breach":h>24?"warn":"ok";
+}
+// SLA #2 — follow-up date passed
+function sla2St(l){
+  if(!l.fuDate)return "ok";
+  if(["عميل فعلي","لاغي","لم يتم الرد"].includes(l.st))return "ok";
+  const fu=new Date(l.fuDate+"T00:00"),t=new Date();t.setHours(0,0,0,0);
+  if(fu.getTime()===t.getTime())return "today";
+  if(fu<t)return "late";
+  return "ok";
+}
+function slaBadge1(l){
+  const st=sla1St(l),h=sla1Hrs(l);
+  if(st==="ok")return "";
+  return`<span class="sla-t ${st==="breach"?"sla-b":"sla-w"}">${h}h</span>`;
+}
+function slaBadge2(l){
+  const st=sla2St(l);
+  if(st==="ok")return "";
+  if(st==="today")return`<span class="sla-t sla-w">📅 اليوم</span>`;
+  const days=Math.round((new Date()-new Date(l.fuDate+"T00:00"))/86400000);
+  return`<span class="sla-t sla-late">⚠ متأخر ${days}د</span>`;
+}
+function waLink(mob){
+  let m=String(mob).replace(/\D/g,"");
+  if(m.startsWith("01")&&m.length===11)m="20"+m.slice(1);
+  return`https://wa.me/${m}`;
+}
+function stBadge(l){
+  const st=stDisplay(l);
+  const m={"جديد":"b-new","تحت المتابعة":"b-follow","لم يتم الرد":"b-noreply","مسترد بعد الإلغاء":"b-restored","عميل فعلي":"b-active","لاغي":"b-cancelled"};
+  return`<span class="badge ${m[st]||"b-new"}">${st}</span>`;
+}
+function priBadge(p){
+  return p==="مستعجل"?`<span class="badge b-urgent">⚡ مستعجل</span>`:`<span class="badge b-normal">🕐 عادي</span>`;
+}
+function myLeads(){
+  const u=curUser;
+  if(u.role==="admin")return LEADS;
+  if(u.role==="coordinator")return LEADS.filter(l=>l.byId===u.id);
+  return LEADS.filter(l=>l.repId===u.id);
+}
+function todayFU(){return myLeads().filter(l=>sla2St(l)==="today");}
+function lateFU(){return myLeads().filter(l=>sla2St(l)==="late");}
+function newLeads(){return myLeads().filter(l=>isNew(l));}
+function priorityLeads(){return myLeads().filter(l=>needsAction(l));}
+function getNextRR(){
+  const a=SALES_USERS.filter(u=>u.inRotation!==false);
+  if(!a.length)return SALES_USERS[0];
+  const u=a[rrIdx%a.length];rrIdx++;return u;
+}
+// ═══ AUTH ═══
+function ql(r){
+  const m={admin:"hesham.mobarez@sllcrm.com",coord:"fatma@sllcrm.com",coord2:"alaa@sllcrm.com",sales:"ahmed.yousry@sllcrm.com",sales2:"ahmed.sobhy@sllcrm.com",sales3:"dina.khaled@sllcrm.com"};
+  const p={admin:"Admin123!",coord:"Coord123!",coord2:"Coord123!",sales:"Sales123!",sales2:"Sales123!",sales3:"Sales123!"};
+  $("l-email").value=m[r];$("l-pass").value=p[r];doLogin();
+}
+async function doLogin(){
+  console.log("[Login] doLogin called");
+  const email=$("l-email").value.trim();
+  const pass=$("l-pass").value.trim();
+  console.log("[Login] Email:", email);
+  if(!email||!pass){$("l-err").textContent="املأ البريد و الباسوورد";$("l-err").style.display="block";return;}
+  if(!supa){
+    console.error("[Login] Supabase not initialized! window.supabase =", typeof supabase);
+    $("l-err").textContent="فشل الاتصال بالسيرفر — تأكد من الإنترنت";
+    $("l-err").style.display="block";
+    return;
+  }
+  console.log("[Login] Supabase client OK, attempting signin...");
+  
+  // Show loading
+  $("l-err").style.display="none";
+  const btn=document.querySelector(".btn-login");
+  const oldBtnText=btn.textContent;
+  btn.disabled=true;btn.textContent="جاري الدخول...";
+  
+  try{
+    // Sign in via Supabase
+    const {data, error} = await supa.auth.signInWithPassword({email, password:pass});
+    console.log("[Login] signInWithPassword response:", {data, error});
+    if(error)throw error;
+    supaSession = data.session;
+    console.log("[Login] Session created, fetching profile for user:", data.user.id);
+    
+    // Fetch profile
+    const profileResp = await supa.from("profiles").select("*").eq("id", data.user.id).single();
+    console.log("[Login] Profile fetch response:", profileResp);
+    const profile = profileResp.data;
+    const perr = profileResp.error;
+    if(perr||!profile){
+      console.error("[Login] Profile error:", perr);
+      throw perr||new Error("لم يتم العثور على ملف المستخدم");
+    }
+    console.log("[Login] Profile loaded:", profile.name, profile.role);
+    
+    // Set curUser
+    curUser = {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      role: profile.role,
+      av: profile.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase(),
+      clr: profile.role==="admin"?"var(--purple2)":profile.role==="coordinator"?"var(--green2)":"var(--orange2)",
+      bg: profile.role==="admin"?"var(--admin-bg)":profile.role==="coordinator"?"var(--coord-bg)":"var(--sales-bg)"
+    };
+    console.log("[Login] curUser set, calling loadAllData...");
+    
+    // Load all data from Supabase
+    try {
+      await loadAllData();
+      console.log("[Login] loadAllData completed");
+    } catch(loadErr) {
+      console.error("[Login] loadAllData failed:", loadErr);
+      // Continue anyway - we can still show the app
+    }
+    
+    // Initialize app
+    btn.disabled=false;btn.textContent=oldBtnText;
+    console.log("[Login] Calling initApp...");
+    try {
+      initApp();
+      console.log("[Login] initApp completed - LOGIN SUCCESS");
+    } catch(initErr) {
+      console.error("[Login] initApp failed:", initErr);
+      $("l-err").textContent = "خطأ في تحميل التطبيق: " + initErr.message;
+      $("l-err").style.display = "block";
+    }
+  } catch(err) {
+    btn.disabled=false;btn.textContent=oldBtnText;
+    console.error("Login error:", err);
+    $("l-err").textContent = err.message==="Invalid login credentials" ? "البريد أو الباسوورد غلط" : ("خطأ: "+err.message);
+    $("l-err").style.display="block";
+  }
+}
+
+async function doLogout(){
+  if(_slaCheckInterval){clearInterval(_slaCheckInterval);_slaCheckInterval=null;}
+  unsubscribeFromChanges();
+  if(supa)await supa.auth.signOut();
+  curUser=null;supaSession=null;
+  $("app").style.display="none";
+  $("login-page").style.display="flex";
+  $("l-email").value="";$("l-pass").value="";
+  // Clear data
+  LEADS=[];USERS=[];COORD_USERS=[];SALES_USERS=[];
+  MC={coords:{},channels:{},daily:{}};
+  NOTIFS=[];
+}
+async function loadAllData(){
+  if(!supa){console.warn("[loadAllData] supa not initialized");return;}
+  console.log("[loadAllData] Starting...");
+  try {
+    // Load all profiles (users)
+    console.log("[loadAllData] Fetching profiles...");
+    const {data:profiles, error:perr} = await supa.from("profiles").select("*").order("name");
+    if(perr){console.error("[loadAllData] Profiles error:", perr);throw perr;}
+    console.log("[loadAllData] Got", profiles.length, "profiles");
+    USERS = profiles.map(p => ({
+      id: p.id,
+      name: p.name,
+      email: p.email,
+      role: p.role,
+      av: p.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase(),
+      clr: p.role==="admin"?"var(--purple2)":p.role==="coordinator"?"var(--green2)":"var(--orange2)",
+      bg: p.role==="admin"?"var(--admin-bg)":p.role==="coordinator"?"var(--coord-bg)":"var(--sales-bg)",
+      active: p.active!==false,
+      inRotation: p.in_rotation!==false
+    }));
+    COORD_USERS = USERS.filter(u=>u.role==="coordinator");
+    SALES_USERS = USERS.filter(u=>u.role==="sales");
+    
+    // Initialize MC structure
+    MC = {coords:{}, channels:{}, daily:{}};
+    COORD_USERS.forEach(c => {
+      MC.coords[c.name] = {};
+      MC.daily[c.name] = {};
+      MONTHS.forEach((_,i) => MC.coords[c.name][i] = 0);
+    });
+    DD.source.forEach(s => {
+      MC.channels[s] = {};
+      MONTHS.forEach((_,i) => MC.channels[s][i] = 0);
+    });
+    
+    // Load monthly contacted
+    const {data:mc} = await supa.from("monthly_contacted").select("*");
+    if(mc) mc.forEach(m => {
+      if(MC.coords[m.coord_name]) MC.coords[m.coord_name][m.month] = m.count;
+    });
+    
+    // Load channel monthly
+    const {data:cm} = await supa.from("channel_monthly").select("*");
+    if(cm) cm.forEach(m => {
+      if(MC.channels[m.channel]) MC.channels[m.channel][m.month] = m.count;
+    });
+    
+    // Load daily contacted
+    const {data:dc} = await supa.from("daily_contacted").select("*");
+    if(dc) dc.forEach(d => {
+      if(!MC.daily[d.coord_name]) MC.daily[d.coord_name] = {};
+      MC.daily[d.coord_name][d.date] = d.count;
+    });
+    
+    // Load all leads (RLS will filter based on role)
+    const {data:leads, error:lerr} = await supa.from("leads").select("*").order("dt", {ascending:false}).order("tm", {ascending:false});
+    if(lerr)throw lerr;
+    
+    LEADS = (leads||[]).map(l => ({
+      id: l.id,
+      _supaId: l.id,  // Keep track of Supabase ID
+      cc: l.cc || ("CLT-"+l.id),
+      by: l.by_name || "",
+      byId: l.by_id,
+      rep: l.rep_name || "",
+      repId: l.rep_id,
+      src: l.src||"",
+      dt: l.dt||"",
+      tm: l.tm ? l.tm.slice(0,5) : "",
+      nm: l.nm||"",
+      company: l.company||"",
+      mob: l.mob||"",
+      nat: l.nat||"",
+      imp: l.imp||"",
+      exp: l.exp||"",
+      spec: l.spec||"",
+      prod: l.prod||"",
+      qty: l.qty||"",
+      unit: l.unit||"",
+      cap: l.cap||"",
+      ie: l.ie||"",
+      sup: l.sup||"",
+      svc: l.svc||[],
+      priority: l.priority||"عادي",
+      cnotes: l.cnotes||"",
+      fcd: l.fcd||"",
+      fct: l.fct ? l.fct.slice(0,5) : "",
+      fuDate: l.fu_date||"",
+      c1: l.c1||"", c1t: l.c1t||"",
+      c2: l.c2||"", c2t: l.c2t||"",
+      c3: l.c3||"", c3t: l.c3t||"",
+      lcd: l.lcd||"",
+      st: l.st||"",
+      cr: l.cr||"",
+      snotes: l.snotes||"",
+      reactivated: l.reactivated||"",
+      reactivatedDate: l.reactivated_date||"",
+      reactivatedBy: l.reactivated_by||"",
+      reactivatedNote: l.reactivated_note||"",
+      log: []
+    }));
+    
+    // Load notifications for current user
+    const {data:notifs} = await supa.from("notifications")
+      .select("*")
+      .eq("user_id", curUser.id)
+      .order("created_at", {ascending:false})
+      .limit(50);
+    NOTIFS = (notifs||[]).map(n => ({
+      text: n.text, sub: n.sub, clr: n.color,
+      lid: n.lead_id, kind: n.kind, read: n.read,
+      _supaId: n.id
+    }));
+    
+    nextId = LEADS.length > 0 ? Math.max(...LEADS.map(l=>l.id)) + 1 : 100;
+    
+    console.log("[loadAllData] DONE: ", USERS.length, "users,", LEADS.length, "leads");
+  } catch(err) {
+    console.error("[loadAllData] FATAL error:", err);
+    if(typeof showToast === "function") showToast("⚠", "خطأ في تحميل البيانات: " + (err.message||"unknown"));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// REAL-TIME SUBSCRIPTIONS - Listen for changes from other users
+// ═══════════════════════════════════════════════════════════
+let _realtimeChannel = null;
+let _realtimeReloadTimeout = null;
+
+function debounceReload(){
+  // Debounce: if many changes happen in 1 sec, only reload once
+  if(_realtimeReloadTimeout) clearTimeout(_realtimeReloadTimeout);
+  _realtimeReloadTimeout = setTimeout(async () => {
+    try {
+      console.log("[Realtime] Change detected, reloading data...");
+      await loadAllData();
+      // Re-render current page
+      if($("pg-dashboard")?.classList.contains("active")) renderDash();
+      if($("pg-leads")?.classList.contains("active")) renderLeadsContent();
+      if($("pg-myreports")?.classList.contains("active") && typeof renderMyReports==="function") renderMyReports();
+      if($("pg-reports")?.classList.contains("active") && typeof renderReports==="function") renderReports();
+      renderNotifs();
+      console.log("[Realtime] Re-render complete");
+    } catch(err) {
+      console.error("[Realtime] Reload failed:", err);
+    }
+  }, 1000);
+}
+
+function subscribeToChanges(){
+  if(!supa || !curUser) return;
+  if(_realtimeChannel) {
+    supa.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+  }
+  
+  console.log("[Realtime] Subscribing to changes...");
+  _realtimeChannel = supa
+    .channel("crm-realtime")
+    .on("postgres_changes", {event:"*", schema:"public", table:"leads"}, payload => {
+      console.log("[Realtime] leads changed:", payload.eventType);
+      debounceReload();
+    })
+    .on("postgres_changes", {event:"*", schema:"public", table:"daily_contacted"}, payload => {
+      console.log("[Realtime] daily_contacted changed:", payload.eventType);
+      debounceReload();
+    })
+    .on("postgres_changes", {event:"*", schema:"public", table:"profiles"}, payload => {
+      console.log("[Realtime] profiles changed:", payload.eventType);
+      debounceReload();
+    })
+    .on("postgres_changes", {event:"INSERT", schema:"public", table:"notifications", filter:"user_id=eq."+curUser.id}, payload => {
+      console.log("[Realtime] new notification");
+      debounceReload();
+      // Show toast for new notification
+      if(payload.new && typeof showToast==="function"){
+        showToast("🔔", payload.new.text||"إشعار جديد");
+      }
+    })
+    .subscribe(status => {
+      console.log("[Realtime] subscription status:", status);
+    });
+}
+
+function unsubscribeFromChanges(){
+  if(_realtimeChannel && supa){
+    supa.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+    console.log("[Realtime] Unsubscribed");
+  }
+}
+
+
+function initApp(){
+  console.log("[initApp] Starting...");
+  const u=curUser;
+  if(!u){console.error("[initApp] No curUser!");return;}
+  // Show app, hide login
+  $("login-page").style.display="none";
+  $("app").style.display="block";
+  console.log("[initApp] Switched to app view");
+  const av=$("sb-av");av.style.background=u.bg;av.style.color=u.clr;av.textContent=u.av;
+  $("sb-uname").textContent=u.name;
+  const rl={admin:"Admin",coordinator:"Coordinator",sales:"Sales"};
+  const rc={admin:"var(--purple2)",coordinator:"var(--green2)",sales:"var(--orange2)"};
+  $("sb-urole").textContent=rl[u.role];$("sb-urole").style.color=rc[u.role];
+  const nav=[{id:"dashboard",icon:"⊞",lbl:"Dashboard"},{id:"leads",icon:"☰",lbl:"Leads"},
+    ...((u.role==="coordinator"||u.role==="sales")?[{id:"myreports",icon:"📊",lbl:"My Reports"}]:[]),
+    ...(u.role==="admin"?[{id:"reports",icon:"📊",lbl:"Reports"},{id:"settings",icon:"⚙",lbl:"Settings"}]:[])];
+  const nb=$("sb-nav");nb.innerHTML="";
+  nav.forEach(n=>{
+    const el=document.createElement("div");el.className="sb-item";el.dataset.pg=n.id;
+    el.innerHTML=`<span class="sb-icon">${n.icon}</span><span>${n.lbl}</span>`;
+    el.onclick=()=>showPg(n.id);nb.appendChild(el);
+  });
+  NOTIFS=[];
+  if(u.role==="sales"){
+    newLeads().slice(0,3).forEach(l=>addNotif(`🆕 Lead جديد — ${l.nm}`,`${l.dt} ${l.tm}`,"var(--cyan)",l.id));
+    lateFU().slice(0,2).forEach(l=>addNotif(`⚠ متأخر — ${l.nm}`,`تاريخ المتابعة: ${l.fuDate}`,"var(--red)",l.id));
+  } else if(u.role==="admin"){
+    LEADS.filter(x=>sla1St(x)==="breach").slice(0,3).forEach(l=>addNotif(`SLA #1 — ${l.nm}`,`${sla1Hrs(l)}h بدون حالة`,"var(--red)",l.id));
+  }
+  showPg("dashboard");
+  startSLAChecks();
+  checkDailyContactedReminders();
+  subscribeToChanges();
+}
+function showPg(id){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".sb-item").forEach(n=>n.classList.remove("active"));
+  $("pg-"+id)?.classList.add("active");
+  document.querySelector(`.sb-item[data-pg="${id}"]`)?.classList.add("active");
+  const ttls={dashboard:"Dashboard",leads:"Leads",reports:"Reports",settings:"Settings"};
+  $("topbar-title").textContent=ttls[id]||id;
+  const ex=$("topbar-extra");ex.innerHTML="";
+  if(id==="leads"&&curUser.role!=="sales"){
+    const b=document.createElement("button");b.className="btn primary";b.innerHTML="+ New Lead";b.onclick=openAddLead;ex.appendChild(b);
+  }
+  if(id==="dashboard")renderDash();
+  if(id==="leads"){pgLeads=1;renderLeadsPage();}
+  if(id==="reports")renderReports();
+  if(id==="myreports")renderMyReports();
+  if(id==="settings")renderSettings();
+}
+// ═══ NOTIFS ═══
+function renderNotifs(){
+  const u=NOTIFS.filter(n=>!n.read).length;
+  $("nc").textContent=u;$("nc").className="nc"+(u>0?" on":"");
+  const list=$("nd-list");
+  if(!NOTIFS.length){list.innerHTML=`<div class="nd-empty">لا توجد إشعارات</div>`;return;}
+  list.innerHTML=NOTIFS.map(n=>`<div class="ni" onclick="goLead(${n.lid})">
+    <div class="ni-dot" style="background:${n.clr}"></div>
+    <div><div class="ni-t">${n.text}</div><div class="ni-s">${n.sub}</div></div>
+  </div>`).join("");
+}
+function toggleNotif(){$("nd").classList.toggle("open");}
+function clearNotifs(){NOTIFS=[];renderNotifs();$("nd").classList.remove("open");}
+function addNotif(text,sub,clr,lid){NOTIFS.unshift({text,sub,clr,read:false,lid});renderNotifs();}
+function goLead(id){$("nd").classList.remove("open");showPg("leads");if(id)setTimeout(()=>viewLead(id),280);}
+document.addEventListener("click",e=>{
+  if(!e.target.closest("#nb-btn")&&!e.target.closest("#nd"))$("nd")?.classList.remove("open");
+});
+// ═══ SLA SCHEDULED CHECKS ═══
+let _slaCheckInterval=null;
+function checkSLAs(){
+  if(!curUser)return;
+  const u=curUser;
+  // SLA #1: 24h since lead entry without status
+  LEADS.forEach(function(l){
+    if(!l.st&&sla1Hrs(l)>=24){
+      // Check if already notified
+      if(!NOTIFS.some(function(n){return n.lid===l.id&&n.kind==="sla1";})){
+        // Notify the assigned sales person and admin
+        if(u.role==="admin"||(u.role==="sales"&&l.repId===u.id)){
+          NOTIFS.unshift({text:"⚠ SLA #1 — "+l.nm,sub:sla1Hrs(l)+"h بدون حالة",clr:"var(--red)",read:false,lid:l.id,kind:"sla1"});
+        }
+      }
+    }
+  });
+  // SLA #2: follow-up date passed
+  LEADS.forEach(function(l){
+    if(l.fuDate&&!["عميل فعلي","لاغي"].includes(l.st)){
+      const t=new Date();t.setHours(0,0,0,0);
+      const fu=new Date(l.fuDate+"T00:00");
+      if(fu<t){
+        if(!NOTIFS.some(function(n){return n.lid===l.id&&n.kind==="sla2";})){
+          if(u.role==="admin"||(u.role==="sales"&&l.repId===u.id)){
+            const days=Math.round((t-fu)/86400000);
+            NOTIFS.unshift({text:"📅 متابعة متأخرة — "+l.nm,sub:"متأخر "+days+" يوم",clr:"var(--orange)",read:false,lid:l.id,kind:"sla2"});
+          }
+        }
+      }
+    }
+  });
+  renderNotifs();
+}
+
+async function saveDailyContacted(){
+  if(!curUser || curUser.role!=="coordinator"){showToast("⚠","الصلاحية للكوردينتور فقط");return;}
+  const input=$("daily-contacted-input");
+  if(!input)return;
+  const val=parseInt(input.value);
+  if(isNaN(val)||val<0){showToast("❌","أدخل رقم صحيح");return;}
+  if(!supa){showToast("❌","لا يوجد اتصال");return;}
+  
+  const td=today();
+  try {
+    const {error} = await supa.from("daily_contacted").upsert({
+      coord_id: curUser.id,
+      coord_name: curUser.name,
+      date: td,
+      count: val
+    }, {onConflict: "coord_id,date"});
+    if(error)throw error;
+    
+    // Update local state
+    if(!MC.daily[curUser.name]) MC.daily[curUser.name] = {};
+    MC.daily[curUser.name][td] = val;
+    
+    showToast("✓","تم حفظ "+val+" Contacted لليوم");
+    NOTIFS = NOTIFS.filter(n=>n.kind!=="daily-reminder");
+    renderNotifs();
+    renderDash();
+  } catch(err) {
+    console.error(err);
+    showToast("❌","خطأ: "+err.message);
+  }
+}
+
+function startSLAChecks(){
+  if(_slaCheckInterval)clearInterval(_slaCheckInterval);
+  checkSLAs();
+  _slaCheckInterval=setInterval(checkSLAs,60000); // Check every minute
+}
+// ═══ DASHBOARD ═══
+function renderDash(){
+  const u=curUser,el=$("pg-dashboard");
+  if(u.role==="admin")el.innerHTML=dashAdmin();
+  else if(u.role==="coordinator")el.innerHTML=dashCoord();
+  else el.innerHTML=dashSales();
+  setTimeout(()=>{if(u.role==="admin")initDashCharts();},30);
+}
+function kc(lbl,val,clr,sub,dc){
+  return`<div class="kc"><div class="kc-acc" style="background:${clr}"></div>
+    <div class="kc-lbl">${lbl}</div><div class="kc-val" style="color:${clr}">${val}</div>
+    <div class="kc-sub ${dc||""}">${sub}</div></div>`;
+}
+function dashAdmin(){
+  const l=LEADS,tot=l.length,act=l.filter(x=>x.st==="عميل فعلي").length;
+  const can=l.filter(x=>x.st==="لاغي").length,nl=l.filter(x=>isNew(x)).length;
+  const sla1b=l.filter(x=>sla1St(x)==="breach").length;
+  const tdFU=l.filter(x=>sla2St(x)==="today").length;
+  const srcMap={};l.forEach(x=>{srcMap[x.src]=(srcMap[x.src]||0)+1;});
+  const topSrc=Object.entries(srcMap).sort((a,b)=>b[1]-a[1]).slice(0,6),sm=topSrc[0]?.[1]||1;
+  const sp=SALES_USERS.map(s=>{const m=l.filter(x=>x.repId===s.id);return{name:s.name,act:m.filter(x=>x.st==="عميل فعلي").length,tot:m.length};}).sort((a,b)=>b.act-a.act).slice(0,6);
+  const smx=sp[0]?.act||1;
+  const rec=[...l].sort((a,b)=>b.id-a.id).slice(0,5);
+  return`
+  <div class="kpi-row c5">
+    ${kc("Total Leads",tot,"var(--blue)","إجمالي","")}
+    ${kc("Active Clients",act,"var(--green)",pct(act,tot)+"% conversion","up")}
+    ${kc("Leads جديدة",nl,"var(--cyan)",nl>0?"يحتاج حالة":"ممتاز",nl>0?"warn":"")}
+    ${kc("SLA #1 Breach",sla1b,"var(--red)","+24h بدون حالة",sla1b>0?"dn":"")}
+    ${kc("متابعة اليوم",tdFU,"var(--orange)","اتصل بيهم اليوم",tdFU>0?"warn":"")}
+  </div>
+  ${sla1b>0?`<div class="alert-banner ab-red">🚨 <strong>${sla1b} Lead</strong> تجاوزت 24h بدون حالة <button class="btn sm" style="margin-right:auto" onclick="showPg('leads')">عرض</button></div>`:""}
+  ${tdFU>0?`<div class="alert-banner ab-orange">📅 <strong>${tdFU} Lead</strong> تاريخ متابعتها اليوم</div>`:""}
+  <div class="g2">
+    <div class="card"><div class="card-title">Source Distribution</div><div class="card-sub">توزيع مصادر الـ Leads</div>
+      <div class="bar-list">${topSrc.map(([s,c])=>`<div class="bar-row"><div class="bar-nm">${s}</div><div class="bar-track"><div class="bar-fill" style="width:${pct(c,sm)}%;background:var(--blue)"></div></div><div class="bar-v" style="color:var(--blue2)">${c}</div></div>`).join("")}</div>
+    </div>
+    <div class="card"><div class="card-title">Sales Performance</div><div class="card-sub">Active Clients per Sales</div>
+      <div class="bar-list">${sp.map(s=>`<div class="bar-row"><div class="bar-nm">${s.name}</div><div class="bar-track"><div class="bar-fill" style="width:${s.act?pct(s.act,smx):0}%;background:var(--orange)"></div></div><div class="bar-v" style="color:var(--orange2)">${s.act}</div></div>`).join("")}</div>
+    </div>
+  </div>
+  <div class="g3">
+    <div class="card"><div class="card-title">Lead Score</div><div class="card-sub">Hot/Warm/Cold</div><canvas id="d-sc" height="150"></canvas></div>
+    <div class="card"><div class="card-title">Status Breakdown</div><div class="card-sub">توزيع الحالات</div><canvas id="d-st" height="150"></canvas></div>
+    <div class="card"><div class="card-title">Latest Leads</div><div class="card-sub">آخر ${rec.length}</div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse">
+        <thead><tr>${["العميل","الحالة","Score","SLA"].map(h=>`<th style="text-align:right;padding:5px 7px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border)">${h}</th>`).join("")}</tr></thead>
+        <tbody>${rec.map(l=>`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="goLead(${l.id})">
+          <td style="padding:5px 7px;font-weight:600">${l.nm}</td><td style="padding:5px 7px">${stBadge(l)}</td>
+          <td style="padding:5px 7px">${scoreBadge(score(l))}</td>
+          <td style="padding:5px 7px">${slaBadge1(l)||slaBadge2(l)||"<span style='color:var(--green);font-size:10px'>✓</span>"}</td>
+        </tr>`).join("")}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+function initDashCharts(){
+  const l=LEADS;
+  const hot=l.filter(x=>score(x)>=70).length,warm=l.filter(x=>score(x)>=40&&score(x)<70).length,cold=l.filter(x=>score(x)<40).length;
+  function donut(id,labels,data,colors){
+    const ctx=$(id);if(!ctx)return;if(charts[id])charts[id].destroy();
+    charts[id]=new Chart(ctx,{type:"doughnut",data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0,hoverOffset:3}]},
+      options:{responsive:true,plugins:{legend:{labels:{color:"#6B72A0",font:{size:10}},position:"bottom"}},cutout:"60%"}});
+  }
+  donut("d-sc",["Hot","Warm","Cold"],[hot,warm,cold],["#F55252","#F5924A","#4B7CF5"]);
+  const sts=["جديد","تحت المتابعة","لم يتم الرد","عميل فعلي","لاغي"];
+  donut("d-st",sts,[l.filter(x=>isNew(x)).length,...["تحت المتابعة","لم يتم الرد","عميل فعلي","لاغي"].map(s=>l.filter(x=>x.st===s).length)],["#22D4F5","#4B7CF5","#F5924A","#22C997","#F55252"]);
+}
+function dashCoord(){
+  const allMine=myLeads();
+  const td=today();
+  const dailyCount=getTodayDailyContacted(curUser.name);
+  const missingDays=getMissingDays(curUser.name,7);
+  // TODAY-focused stats
+  const todayLeads=allMine.filter(function(x){return x.dt===td;});
+  const todayActive=todayLeads.filter(function(x){return x.st==="عميل فعلي";}).length;
+  const todayCancel=todayLeads.filter(function(x){return x.st==="لاغي";}).length;
+  const todayFollowUp=todayLeads.filter(function(x){return x.st==="تحت المتابعة";}).length;
+  const todayNew=todayLeads.filter(function(x){return isNew(x);}).length;
+  
+  let html='';
+  // Header
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:8px">';
+  html+='<div><div style="font-size:14px;font-weight:700">📅 لوحة اليوم</div>';
+  html+='<div style="font-size:11px;color:var(--text2);margin-top:2px">'+new Date().toLocaleDateString("ar-EG",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+'</div></div>';
+  html+='<button class="btn primary" onclick="openAddLead()">+ Lead جديد</button>';
+  html+='</div>';
+  
+  // Daily Contacted Entry/Warning
+  html+='<div class="card" style="margin-bottom:13px;'+(dailyCount===null?'border-color:var(--orange);background:linear-gradient(135deg,rgba(245,146,74,.06),rgba(245,82,82,.04))':'')+'">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">';
+  html+='<div style="flex:1;min-width:200px">';
+  if(dailyCount===null){
+    html+='<div style="font-size:13px;font-weight:700;color:var(--orange);margin-bottom:3px">⚠️ لم تُدخل عدد الـ Contacted اليوم</div>';
+    html+='<div style="font-size:11px;color:var(--text2)">من فضلك أدخل عدد المكالمات/الرسايل اللي وصلتك النهاردة قبل نهاية اليوم</div>';
+  } else {
+    html+='<div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:3px">✅ تم إدخال Contacted اليوم</div>';
+    html+='<div style="font-size:18px;font-weight:800;color:var(--text);font-family:Outfit">'+dailyCount.toLocaleString()+' <span style="font-size:11px;color:var(--text3);font-weight:400">contacted</span></div>';
+  }
+  html+='</div>';
+  html+='<div style="display:flex;gap:6px;align-items:center">';
+  html+='<input type="number" id="daily-contacted-input" placeholder="عدد اليوم" min="0" value="'+(dailyCount!==null?dailyCount:'')+'" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;width:110px;color:var(--text);font-size:13px;font-weight:700;font-family:Outfit;text-align:center">';
+  html+='<button class="btn primary" onclick="saveDailyContacted()" style="font-size:11px">💾 حفظ</button>';
+  html+='</div></div>';
+  if(missingDays.length>0){
+    html+='<div style="margin-top:10px;padding:8px 10px;background:rgba(245,82,82,.08);border:1px solid rgba(245,82,82,.2);border-radius:6px;font-size:11px;color:var(--text2)">';
+    html+='<strong style="color:var(--red)">⚠️ '+missingDays.length+' يوم لم تسجل بياناتها:</strong> '+missingDays.slice(0,5).join(' · ')+(missingDays.length>5?' (+ '+(missingDays.length-5)+' أخرى)':'');
+    html+='</div>';
+  }
+  html+='</div>';
+  
+  // Today KPIs
+  html+='<div class="kpi-row c4">';
+  html+=kc("📋 Leads اليوم",todayLeads.length,"var(--blue)","اللي أدخلته","");
+  html+=kc("🆕 جديد",todayNew,"var(--cyan)","لم يتم الرد بعد","");
+  html+=kc("📞 تحت المتابعة",todayFollowUp,"var(--orange)","نشط","");
+  html+=kc("✅ عميل فعلي",todayActive,"var(--green)","تحويل ناجح","up");
+  html+='</div>';
+  
+  // Today's leads table
+  if(todayLeads.length===0){
+    html+='<div class="empty-st" style="margin-top:30px"><div class="empty-icon">📝</div>';
+    html+='<div class="empty-ttl">لا يوجد Leads اليوم</div>';
+    html+='<div style="font-size:12px;color:var(--text3);margin-top:6px">ابدأ بإضافة Lead جديد</div>';
+    html+='<button class="btn primary lg" style="margin-top:16px" onclick="openAddLead()">+ New Lead</button></div>';
+  } else {
+    html+='<div class="card"><div class="card-title">📋 Leads اليوم</div>';
+    html+='<div class="card-sub">العملاء اللي أدخلتهم النهاردة ('+todayLeads.length+')</div>';
+    html+='<table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:8px"><thead><tr>';
+    ["العميل","المنتج","Sales Rep","الحالة","Score","الوقت"].forEach(function(h){
+      html+='<th style="text-align:right;padding:6px 8px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border)">'+h+'</th>';
+    });
+    html+='</tr></thead><tbody>';
+    [].concat(todayLeads).sort(function(a,b){return b.id-a.id;}).forEach(function(ld){
+      html+='<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="goLead('+ld.id+')">';
+      html+='<td style="padding:6px 8px;font-weight:600">'+ld.nm+'</td>';
+      html+='<td style="padding:6px 8px;color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ld.prod||"—")+'</td>';
+      html+='<td style="padding:6px 8px;color:var(--text2)">'+ld.rep+'</td>';
+      html+='<td style="padding:6px 8px">'+stBadge(ld)+'</td>';
+      html+='<td style="padding:6px 8px">'+scoreBadge(score(ld))+'</td>';
+      html+='<td style="padding:6px 8px;color:var(--text3);font-size:10px">'+(ld.tm||"—")+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  
+  // Recent leads (separate from today)
+  const recentLeads=[].concat(allMine).sort(function(a,b){return b.id-a.id;}).slice(0,8);
+  if(recentLeads.length>0){
+    html+='<div class="card" style="margin-top:13px"><div class="card-title">📜 آخر Leads</div>';
+    html+='<div class="card-sub">آخر 8 Leads أدخلتها (كل التواريخ)</div>';
+    html+='<table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:8px"><thead><tr>';
+    ["العميل","التاريخ","المنتج","Sales Rep","الحالة","Score"].forEach(function(h){
+      html+='<th style="text-align:right;padding:6px 8px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border)">'+h+'</th>';
+    });
+    html+='</tr></thead><tbody>';
+    recentLeads.forEach(function(ld){
+      html+='<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="goLead('+ld.id+')">';
+      html+='<td style="padding:6px 8px;font-weight:600">'+ld.nm+'</td>';
+      html+='<td style="padding:6px 8px;color:var(--text3);font-size:10px">'+ld.dt+'</td>';
+      html+='<td style="padding:6px 8px;color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ld.prod||"—")+'</td>';
+      html+='<td style="padding:6px 8px;color:var(--text2)">'+ld.rep+'</td>';
+      html+='<td style="padding:6px 8px">'+stBadge(ld)+'</td>';
+      html+='<td style="padding:6px 8px">'+scoreBadge(score(ld))+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  
+  return html;
+}
+
+function dashSales(){
+  const nl=newLeads();
+  const pl=priorityLeads();
+  const tf=todayFU();
+  const lf=lateFU();
+  const newToday=nl.filter(l=>l.dt===today());
+  const act=myLeads().filter(x=>x.st==="عميل فعلي");
+  // SLA 1: عملاء جدد لم يتم التواصل معهم في 24 ساعة
+  const sla1b=myLeads().filter(x=>sla1St(x)==="breach");
+  // SLA 2: عملاء تحت المتابعة لم يتم التواصل معهم في الموعد
+  const sla2b=myLeads().filter(x=>x.st==="تحت المتابعة" && sla2St(x)==="late");
+  let html='<div class="kpi-row c4">';
+  html+=kc("🆕 عملاء جدد اليوم",newToday.length,"var(--cyan)","تم استلامهم اليوم",newToday.length>0?"warn":"");
+  html+=kc("📅 متابعات اليوم",tf.length,"var(--orange)",tf.length>0?"يحتاجون اتصال اليوم":"لا يوجد",tf.length>0?"warn":"");
+  html+=kc("⚠ SLA 1",sla1b.length,"var(--red)","عملاء جدد >24h","");
+  html+=kc("⏰ SLA 2",sla2b.length,"var(--red)","تأخر التواصل","");
+  html+='</div>';
+  html+='<div class="kpi-row c4" style="margin-top:8px">';
+  html+=kc("📋 إجمالي عملائي",myLeads().length,"var(--blue)","الكل","");
+  html+=kc("✅ عملاء فعليين",act.length,"var(--green)",pct(act.length,myLeads().length).toFixed(2)+"%","up");
+  const followups=myLeads().filter(x=>x.st==="تحت المتابعة").length;
+  html+=kc("📞 تحت المتابعة",followups,"var(--purple)","يحتاجون متابعة","");
+  const lostL=myLeads().filter(x=>x.st==="لاغي").length;
+  html+=kc("❌ لاغي",lostL,"var(--text3)",pct(lostL,myLeads().length).toFixed(2)+"% cancel","");
+  html+='</div>';
+  if(sla1b.length>0)html+='<div class="alert-banner ab-red">🚨 <strong>'+sla1b.length+' Lead</strong> تجاوزت 24h بدون حالة!</div>';
+  if(lf.length>0)html+='<div class="alert-banner ab-orange">⚠ <strong>'+lf.length+' Lead</strong> تأخرت عن تاريخ المتابعة</div>';
+  if(tf.length>0){
+    html+='<div class="today-fu"><div class="today-fu-title">📅 متابعة اليوم — '+tf.length+' عميل</div>';
+    tf.forEach(l=>{html+=buildQuickCard(l,true);});
+    html+='</div>';
+  }
+  if(pl.length>0){
+    html+='<div class="sh"><div class="sh-t">⚡ يحتاجون متابعة عاجلة</div></div><div class="g2" style="margin-bottom:14px">';
+    pl.slice(0,4).forEach(l=>{html+=buildQuickCard(l,false);});
+    html+='</div>';
+  }
+  const fu=myLeads().filter(x=>x.st==="تحت المتابعة"&&sla2St(x)==="ok"&&x.fuDate!==today());
+  if(fu.length>0){
+    html+='<div class="sh"><div class="sh-t">⏳ تحت المتابعة</div></div><div class="g2">';
+    fu.slice(0,4).forEach(l=>{html+=buildQuickCard(l,false);});
+    html+='</div>';
+  }
+  if(nl.length===0&&tf.length===0)html+='<div class="empty-st" style="margin-top:20px"><div class="empty-icon">🎉</div><div class="empty-ttl">ممتاز! كل حاجة تمام</div></div>';
+  return html;
+}
+function buildQuickCard(ld,isFU){
+  const sc=score(ld);
+  const newBadge=isNew(ld)?'<span class="badge b-new" style="font-size:9px">🆕 جديد</span>':'';
+  const reactBadge=isReactivated(ld)?'<span class="badge b-restored" style="font-size:9px">♻️ '+ld.reactivated+'</span>':'';
+  const fuMeta=ld.fuDate?'<span style="color:var(--orange)">· متابعة: '+ld.fuDate+'</span>':'';
+  const allowedStatuses=curUser.role==="sales"?SALES_STATUSES:DD.status;
+  const stOpts=allowedStatuses.map(s=>'<option'+(s===ld.st?' selected':'')+'>'+s+'</option>').join('');
+  const crOpts='<option value="">—</option>'+DD.cancelR.map(s=>'<option'+(s===ld.cr?' selected':'')+'>'+s+'</option>').join('');
+  const fuShow=ld.st==="تحت المتابعة"?"":"display:none";
+  const crShow=ld.st==="لاغي"?"":"display:none";
+  let h='';
+  if(isFU){
+    h='<div class="fu-item" onclick="viewLead('+ld.id+')">';
+    h+='<div><div class="fu-nm">'+ld.nm+' '+priBadge(ld.priority)+'</div>';
+    h+='<div class="fu-meta">'+ld.src+' · '+ld.dt+' '+ld.tm+' · '+svcStr(ld).substring(0,35)+'</div></div>';
+    h+='<div class="fu-acts">'+scoreBadge(sc);
+    h+='<a href="'+waLink(ld.mob)+'" target="_blank" class="ract wa" onclick="event.stopPropagation()">💬</a>';
+    h+='<button class="btn sm primary" onclick="event.stopPropagation();toggleQP('+ld.id+')">⚡</button>';
+    h+='</div></div>';
+  } else {
+    h='<div class="qlc">';
+    h+='<div class="qlc-hdr"><div class="qlc-av">'+(ld.nm[0]||'?')+'</div>';
+    h+='<div style="flex:1;min-width:0"><div class="qlc-nm">'+ld.nm+' '+newBadge+'</div>';
+    h+='<div class="qlc-meta"><span>'+ld.src+'</span><span>·</span><span>📅 '+ld.dt+' '+ld.tm+'</span>'+fuMeta+'</div></div>';
+    h+='<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">'+scoreBadge(sc)+priBadge(ld.priority)+slaBadge1(ld)+slaBadge2(ld);
+    h+='<a href="'+waLink(ld.mob)+'" target="_blank" class="ract wa">💬</a></div></div>';
+    h+='<div class="qlc-body">'+(ld.prod||'—').substring(0,50)+' · '+(svcStr(ld).substring(0,40)||'—')+'</div>';
+    h+='<div class="qlc-foot"><button class="btn sm" onclick="viewLead('+ld.id+')">👁 عرض</button>';
+    h+='<button class="btn sm primary" onclick="toggleQP('+ld.id+')">⚡ تحديث سريع</button></div>';
+  }
+  h+='<div class="qp" id="qp-'+ld.id+'">';
+  h+='<div class="fg2" style="margin-bottom:7px">';
+  h+='<div class="ff"><label>الحالة</label><select id="qs-st-'+ld.id+'" onchange="qpSt('+ld.id+')">'+stOpts+'</select></div>';
+  h+='<div class="ff" id="qs-crw-'+ld.id+'" style="'+crShow+'"><label>سبب الإلغاء</label><select id="qs-cr-'+ld.id+'">'+crOpts+'</select></div>';
+  h+='</div>';
+  h+='<div id="qs-fuw-'+ld.id+'" style="'+fuShow+'"><div class="fu-box" style="margin-bottom:7px"><div class="fu-lbl">📅 تاريخ المتابعة</div>';
+  h+='<input type="date" id="qs-fu-'+ld.id+'" value="'+(ld.fuDate||'')+'" min="'+today()+'"></div></div>';
+  h+='<div class="ff" style="margin-bottom:7px"><label>ملاحظات</label>';
+  h+='<textarea id="qs-n-'+ld.id+'" style="height:44px">'+(ld.c1||'')+'</textarea></div>';
+  h+='<div style="display:flex;gap:5px"><button class="btn sm primary" onclick="saveQP('+ld.id+')">💾 حفظ</button>';
+  h+='<button class="btn sm" onclick="toggleQP('+ld.id+')">إلغاء</button></div></div>';
+  if(!isFU)h+='</div>';
+  return h;
+}
+function toggleQP(id){$("qp-"+id)?.classList.toggle("open");}
+function qpSt(id){
+  const st=$("qs-st-"+id)?.value;
+  const crw=$("qs-crw-"+id);const fuw=$("qs-fuw-"+id);
+  if(crw)crw.style.display=st==="لاغي"?"":"none";
+  if(fuw)fuw.style.display=st==="تحت المتابعة"?"":"none";
+}
+function saveQP(id){
+  const l=LEADS.find(x=>x.id==id);if(!l)return;
+  const old=l.st,st=$("qs-st-"+id)?.value,notes=$("qs-n-"+id)?.value;
+  const cr=$("qs-cr-"+id)?.value,fu=$("qs-fu-"+id)?.value;
+  if(st){l.st=st;if(!l.fcd&&st){l.fcd=today();l.fct=nowTime();}}
+  if(notes)l.c1=notes;
+  if(cr!==undefined)l.cr=cr;
+  if(fu!==undefined)l.fuDate=fu;
+  if(!l.c1t&&notes)l.c1t=nowDT();
+  l.log=l.log||[];l.log.push({by:curUser.name,a:`Quick: ${old||"جديد"} → ${l.st}`,t:nowDT()});
+  $("qp-"+id)?.classList.remove("open");
+  showToast("✓","تم الحفظ");renderDash();
+}
+
+// ═══ LEADS PAGE ═══
+function renderLeadsPage(){
+  const el=$("pg-leads");
+  el.innerHTML=`
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+    <div class="col-leg">
+      <div class="cleg"><div class="cleg-dot" style="background:var(--green)"></div>Coordinator columns</div>
+      <div class="cleg"><div class="cleg-dot" style="background:var(--orange)"></div>Sales columns</div>
+    </div>
+    <div style="margin-right:auto;display:flex;gap:6px;align-items:center">
+      <div class="vt-toggle">
+        <button class="vt-btn ${lView==="table"?"on":""}" onclick="setLV('table')">☰ Table</button>
+        <button class="vt-btn ${lView==="kanban"?"on":""}" onclick="setLV('kanban')">⊞ Pipeline</button>
+      </div>
+    </div>
+  </div>
+  <div class="fbar" style="flex-wrap:wrap;gap:6px">
+    <input class="fsearch" type="text" placeholder="بحث — اسم، شركة، موبايل، منتج..." id="ls-q" oninput="filterL()" style="min-width:200px;flex:1">
+    <select class="fsel" id="ls-st" onchange="filterL()">
+      <option value="">كل الحالات</option>
+      <option value="جديد">🆕 جديد</option>
+      <option value="reactivated">♻️ مسترد</option>
+      ${DD.status.map(s=>`<option>${s}</option>`).join("")}
+    </select>
+    <select class="fsel" id="ls-src" onchange="filterL()">
+      <option value="">كل المصادر</option>${DD.source.map(s=>`<option>${s}</option>`).join("")}
+    </select>
+    ${(curUser.role==="admin"||curUser.role==="coordinator")?('<select class="fsel" id="ls-rep" onchange="filterL()"><option value="">كل Sales</option>'+SALES_USERS.map(s=>'<option>'+s.name+'</option>').join('')+'</select>'):""}
+    ${curUser.role==="admin"?('<select class="fsel" id="ls-coord" onchange="filterL()"><option value="">كل Coords</option>'+COORD_USERS.map(c=>'<option>'+c.name+'</option>').join('')+'</select>'):""}
+    <select class="fsel" id="ls-sc" onchange="filterL()">
+      <option value="">كل Scores</option><option>Hot</option><option>Warm</option><option>Cold</option>
+    </select>
+    <select class="fsel" id="ls-pri" onchange="filterL()">
+      <option value="">كل الأولويات</option>${DD.priority.map(p=>`<option>${p}</option>`).join("")}
+    </select>
+    <div style="display:flex;gap:3px;align-items:center;background:var(--bg3);padding:0 8px;border-radius:6px;border:1px solid var(--border2);height:32px">
+      <span style="font-size:10px;color:var(--text3)">تسجيل:</span>
+      <input type="date" id="ls-dt-from" onchange="filterL()" title="من" style="background:transparent;border:none;color:var(--text);font-size:10px;outline:none;width:105px">
+      <span style="font-size:10px;color:var(--text3)">→</span>
+      <input type="date" id="ls-dt-to" onchange="filterL()" title="إلى" style="background:transparent;border:none;color:var(--text);font-size:10px;outline:none;width:105px">
+    </div>
+    <div style="display:flex;gap:3px;align-items:center;background:var(--bg3);padding:0 8px;border-radius:6px;border:1px solid var(--border2);height:32px">
+      <span style="font-size:10px;color:var(--text3)">متابعة:</span>
+      <input type="date" id="ls-fu-from" onchange="filterL()" title="من" style="background:transparent;border:none;color:var(--text);font-size:10px;outline:none;width:105px">
+      <span style="font-size:10px;color:var(--text3)">→</span>
+      <input type="date" id="ls-fu-to" onchange="filterL()" title="إلى" style="background:transparent;border:none;color:var(--text);font-size:10px;outline:none;width:105px">
+    </div>
+    <button class="btn sm primary" onclick="setFUT()" title="متابعة اليوم">📅 اليوم</button>
+    <button class="btn sm" onclick="clearFilters()" title="مسح">✖</button>
+  </div>
+  <div id="leads-content"></div>`;
+  renderLeadsContent();
+}
+function setFUT(){const t=today();$("ls-fu-from").value=t;$("ls-fu-to").value=t;filterL();}
+function filteredL(){
+  let l=myLeads();
+  const q=($("ls-q")?.value||"").toLowerCase(),st=$("ls-st")?.value||"";
+  const src=$("ls-src")?.value||"",rep=$("ls-rep")?.value||"";
+  const coord=$("ls-coord")?.value||"";
+  const sc=$("ls-sc")?.value||"",pri=$("ls-pri")?.value||"";
+  const dtFrom=$("ls-dt-from")?.value||"",dtTo=$("ls-dt-to")?.value||"";
+  const fuFrom=$("ls-fu-from")?.value||"",fuTo=$("ls-fu-to")?.value||"";
+  if(q)l=l.filter(x=>(x.nm||"").toLowerCase().includes(q)||(x.mob||"").includes(q)||(x.prod||"").toLowerCase().includes(q)||(x.company||"").toLowerCase().includes(q));
+  if(st){
+    if(st==="جديد")l=l.filter(x=>isNew(x));
+    else if(st==="reactivated")l=l.filter(x=>isReactivated(x));
+    else l=l.filter(x=>x.st===st);
+  }
+  if(src)l=l.filter(x=>x.src===src);
+  if(rep)l=l.filter(x=>x.rep===rep);
+  if(coord)l=l.filter(x=>x.by===coord);
+  if(sc)l=l.filter(x=>scoreLbl(score(x))===sc);
+  if(pri)l=l.filter(x=>x.priority===pri);
+  if(dtFrom)l=l.filter(x=>x.dt&&x.dt>=dtFrom);
+  if(dtTo)l=l.filter(x=>x.dt&&x.dt<=dtTo);
+  if(fuFrom)l=l.filter(x=>(x.fuDate||"")>=fuFrom);
+  if(fuTo)l=l.filter(x=>(x.fuDate||"")<=fuTo);
+  return l;
+}
+function clearFilters(){
+  ["ls-q","ls-st","ls-src","ls-rep","ls-coord","ls-sc","ls-pri","ls-dt-from","ls-dt-to","ls-fu-from","ls-fu-to"].forEach(id=>{
+    const el=$(id); if(el) el.value="";
+  });
+  filterL();
+}
+function filterL(){pgLeads=1;renderLeadsContent();}
+function setLV(v){
+  lView=v;
+  document.querySelectorAll(".vt-btn").forEach(b=>{
+    b.classList.toggle("on",(v==="table"&&b.textContent.includes("Table"))||(v==="kanban"&&b.textContent.includes("Pipeline")));
+  });
+  renderLeadsContent();
+}
+function renderLeadsContent(){
+  const el=$("leads-content");if(!el)return;
+  if(lView==="kanban"){renderKanban(el);return;}
+  renderTable(el);
+}
+function renderTable(el){
+  const u=curUser,filtered=filteredL();
+  const tot=filtered.length,pages=Math.ceil(tot/PER)||1;
+  pgLeads=Math.min(pgLeads,pages);
+  const slice=filtered.slice((pgLeads-1)*PER,pgLeads*PER);
+  const isA=u.role==="admin",isC=u.role==="coordinator",isS=u.role==="sales";
+  const cH=["#","المصدر","التاريخ","العميل","الشركة","الموبايل","المنتج","الخدمة","أولوية","Score"];
+  const sH=["Sales Rep","تاريخ المتابعة","الحالة","SLA"];
+  let headers=isS?["العميل","الشركة","الموبايل","المنتج","الحالة","تاريخ المتابعة","SLA","Score"]:isA?[...cH,...sH]:cH;
+  headers.push("");
+  el.innerHTML=`<div class="tbl-wrap"><div class="tbl-scroll"><table>
+    <thead><tr>${headers.map((h,i)=>{
+      let cls="";if(isA)cls=i<cH.length?"ch":"sh2";else if(isC)cls="ch";
+      return`<th class="${cls}">${h}</th>`;
+    }).join("")}</tr></thead>
+    <tbody>${!slice.length?`<tr><td colspan="${headers.length}" style="text-align:center;padding:32px;color:var(--text4)">لا توجد نتائج</td></tr>`:
+    slice.map(l=>{
+      const sc=score(l),s1=sla1St(l),s2=sla2St(l);
+      const rc=s1==="breach"?"sla1-row":s2==="late"?"late-row":isNew(l)?"new-row":"";
+      const canEdit=isA||(isC&&l.byId===u.id)||(isS&&l.repId===u.id);
+      let cells="";
+      if(!isS){
+        cells+=`<td class="td-mono" style="color:var(--text3);font-size:10px">${l.id}</td>`;
+        cells+=`<td>${l.src}</td>`;
+        cells+=`<td class="td-m">${l.dt} ${l.tm}</td>`;
+        cells+=`<td style="font-weight:600">${l.nm}${isNew(l)?'<span class="badge b-new" style="font-size:9px;margin-right:4px">🆕</span>':""}${isReactivated(l)?'<span class="badge" style="background:rgba(168,85,247,.12);color:var(--purple2);font-size:9px;margin-right:4px">♻️</span>':""}</td>`;
+        cells+=`<td style="color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.company||''}">${l.company||"—"}</td>`;
+        cells+=`<td class="td-m td-mono">${l.mob}</td>`;
+        cells+=`<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.prod}">${l.prod||"—"}</td>`;
+        cells+=`<td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px">${svcStr(l)||"—"}</td>`;
+        cells+=`<td>${priBadge(l.priority)}</td>`;
+        cells+=`<td>${scoreBadge(sc)}</td>`;
+      }
+      if(isA){
+        cells+=`<td style="font-size:11px">${l.rep}</td>`;
+        cells+=`<td class="td-m" style="${sla2St(l)==='today'?'color:var(--orange)':sla2St(l)==='late'?'color:var(--red)':''}">${l.fuDate||"—"}</td>`;
+        cells+=`<td>${stBadge(l)}</td>`;
+        cells+=`<td>${slaBadge1(l)||slaBadge2(l)||'<span style="color:var(--green);font-size:10px">✓</span>'}</td>`;
+      }
+      if(isS){
+        cells+=`<td style="font-weight:600">${l.nm}${isNew(l)?'<span class="badge b-new" style="font-size:9px;margin-right:4px">🆕</span>':""}${isReactivated(l)?'<span class="badge" style="background:rgba(168,85,247,.12);color:var(--purple2);font-size:9px;margin-right:4px">♻️</span>':""}</td>`;
+        cells+=`<td style="color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.company||''}">${l.company||"—"}</td>`;
+        cells+=`<td class="td-m td-mono">${l.mob}</td>`;
+        cells+=`<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.prod||"—"}</td>`;
+        cells+=`<td>${stBadge(l)}</td>`;
+        cells+=`<td class="td-m" style="${s2==='today'?'color:var(--orange)':s2==='late'?'color:var(--red)':''}">${l.fuDate||"—"}</td>`;
+        cells+=`<td>${slaBadge1(l)||slaBadge2(l)||'<span style="color:var(--green);font-size:10px">✓</span>'}</td>`;
+        cells+=`<td>${scoreBadge(sc)}</td>`;
+      }
+      cells+=`<td><div class="racts">
+        <div class="ract vw" onclick="viewLead(${l.id})">👁</div>
+        ${canEdit?`<div class="ract ed" onclick="editLead(${l.id})">✏️</div>`:""}
+        ${canReactivate(l)?`<div class="ract" style="color:var(--purple2);background:rgba(168,85,247,.12)" onclick="event.stopPropagation();openReactivate(${l.id})" title="إعادة تفعيل">♻️</div>`:""}
+        <a href="${waLink(l.mob)}" target="_blank" class="ract wa">💬</a>
+      </div></td>`;
+      return`<tr class="${rc}">${cells}</tr>`;
+    }).join("")}</tbody></table></div>
+    <div class="pag">
+      <span class="pag-info">عرض ${tot?((pgLeads-1)*PER+1):0}–${Math.min(pgLeads*PER,tot)} من ${tot}</span>
+      <div class="pag-btns">${Array.from({length:pages},(_,i)=>`<button class="pag-btn${i+1===pgLeads?" on":""}" onclick="pgLeads=${i+1};renderLeadsContent()">${i+1}</button>`).join("")}</div>
+    </div></div>`;
+}
+function renderKanban(el){
+  const cols=[
+    {key:"new",lbl:"🆕 جديد",clr:"var(--cyan)"},
+    {key:"تحت المتابعة",lbl:"📞 تحت المتابعة",clr:"var(--blue)"},
+    
+    {key:"عميل فعلي",lbl:"✅ عميل فعلي",clr:"var(--green)"},
+    {key:"لاغي",lbl:"❌ لاغي",clr:"var(--text3)"},
+  ];
+  const leads=filteredL();
+  let html='<div class="pipeline">';
+  cols.forEach(function(c){
+    const cards=c.key==="new"?leads.filter(l=>isNew(l)):leads.filter(l=>l.st===c.key);
+    html+='<div class="pipe-col">';
+    html+='<div class="pipe-hdr"><div class="pipe-title" style="color:'+c.clr+'">'+c.lbl+'</div><div class="pipe-cnt">'+cards.length+'</div></div>';
+    html+='<div class="pipe-cards">';
+    if(!cards.length)html+='<div style="text-align:center;padding:14px;color:var(--text4);font-size:11px">فارغ</div>';
+    cards.forEach(function(l){
+      const cls='pipe-card'+(isNew(l)?' new-card':sla2St(l)==='late'?' late-card':'');
+      html+='<div class="'+cls+'" onclick="viewLead('+l.id+')">';
+      html+='<div class="pc-nm">'+l.nm+'</div>';
+      html+='<div class="pc-meta">'+l.src+' · '+l.dt+' '+l.tm+'</div>';
+      if(l.fuDate)html+='<div class="pc-meta" style="color:var(--orange)">📅 '+l.fuDate+'</div>';
+      html+='<div class="pc-foot">'+scoreBadge(score(l))+priBadge(l.priority)+slaBadge1(l)+slaBadge2(l)+'</div></div>';
+    });
+    html+='</div></div>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+// ═══ MULTI SELECT ═══
+function buildMs(field,selected){
+  msSelected[field]=[...(selected||[])];
+  const sel=selected||[];
+  const chips=sel.length?sel.map(function(v){
+    return '<span class="ms-chip">'+v+'<span class="ms-chip-x" onclick="event.stopPropagation();msRm(&quot;'+field+'&quot;,&quot;'+v+'&quot;)">×</span></span>';
+  }).join(''):'<span class="ms-ph">— اختر خدمة أو أكثر —</span>';
+  return '<div class="ms-pos">'
+    +'<div class="ms-wrap" id="ms-w-'+field+'" onclick="msTog(&quot;'+field+'&quot;)">'+chips+'</div>'
+    +'<div class="ms-drop" id="ms-d-'+field+'">'+msDropOpts(field,sel)+'</div>'
+    +'</div>';
+}
+function msDropOpts(f,sel){
+  return DD.services.map(function(v){
+    const cls="ms-opt"+(sel.includes(v)?" sel":"");
+    const chk=sel.includes(v)?"✓":"";
+    return '<div class="'+cls+'" onclick="event.stopPropagation();msSel(&quot;'+f+'&quot;,&quot;'+v+'&quot;)"><div class="ms-chk">'+chk+'</div>'+v+'</div>';
+  }).join('');
+}
+function msTog(f){const d=$("ms-d-"+f);if(!d)return;const o=d.classList.contains("open");document.querySelectorAll(".ms-drop").forEach(x=>x.classList.remove("open"));if(!o)d.classList.add("open");}
+function msSel(f,v){
+  if(!msSelected[f])msSelected[f]=[];
+  const i=msSelected[f].indexOf(v);
+  if(i>=0)msSelected[f].splice(i,1);else msSelected[f].push(v);
+  msRender(f);
+}
+function msRm(f,v){if(!msSelected[f])return;const i=msSelected[f].indexOf(v);if(i>=0){msSelected[f].splice(i,1);msRender(f);}}
+function msRender(f){
+  const wrap=$("ms-w-"+f),drop=$("ms-d-"+f);
+  if(!wrap)return;
+  const sel=msSelected[f]||[];
+  const chips=sel.length?sel.map(function(v){
+    return '<span class="ms-chip">'+v+'<span class="ms-chip-x" onclick="event.stopPropagation();msRm(&quot;'+f+'&quot;,&quot;'+v+'&quot;)">×</span></span>';
+  }).join(''):'<span class="ms-ph">— اختر خدمة أو أكثر —</span>';
+  wrap.innerHTML=chips;
+  if(drop)drop.innerHTML=msDropOpts(f,sel);
+}
+document.addEventListener("click",e=>{
+  if(!e.target.closest(".ms-pos"))document.querySelectorAll(".ms-drop").forEach(d=>d.classList.remove("open"));
+});
+// ═══ FORM ═══
+function openAddLead(){curLeadId=null;$("lm-ttl").textContent="New Lead";$("lm-body").innerHTML=buildForm(null);$("lead-modal").classList.add("open");bindForm();}
+function editLead(id){curLeadId=id;const l=LEADS.find(x=>x.id===id);$("lm-ttl").textContent="تعديل Lead";$("lm-body").innerHTML=buildForm(l);$("lead-modal").classList.add("open");bindForm();}
+function editFV(){closeM("view-modal");editLead(curLeadId);}
+
+function buildForm(l){
+  const u=curUser,isS=u.role==="sales",isC=u.role==="coordinator",isA=u.role==="admin";
+  const rr=l?USERS.find(x=>x.id===l.repId):(SALES_USERS.filter(x=>x.rr!==false)[rrIdx%Math.max(SALES_USERS.filter(x=>x.rr!==false).length,1)]||SALES_USERS[0]);
+  function sel(nm,opts,val,dis){
+    return`<select name="${nm}"${dis?" disabled":""} style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;width:100%;${dis?"opacity:.35":""}">
+      <option value="">— اختر —</option>${opts.map(o=>'<option'+(o===val?' selected':'')+'>'+o+'</option>').join('')}</select>`;
+  }
+  function inp(nm,val,type,dis,ph){
+    return`<input type="${type||"text"}" name="${nm}" value="${val||""}" placeholder="${ph||""}" ${dis?"disabled":""} style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;width:100%;${dis?"opacity:.35":""}">`;
+  }
+  function ta(nm,val,dis){
+    return`<textarea name="${nm}" ${dis?"disabled":""} style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:7px 8px;height:56px;color:var(--text);font-size:12px;outline:none;width:100%;resize:vertical;${dis?"opacity:.35":""}">${val||""}</textarea>`;
+  }
+  let html="";
+  if(!isS){
+    html+=`<div class="fsec coord">
+      <div class="fsec-ttl"><div class="fdot" style="background:var(--green)"></div>Coordinator Data</div>
+      <div class="fg" style="margin-bottom:9px">
+        <div class="ff"><label>المصدر *</label>${sel("src",DD.source,l?.src)}</div>
+        <div class="ff"><label>تاريخ التسجيل (Auto)</label>
+          <div class="auto-disp">📅 ${l?.dt||today()}</div><input type="hidden" name="dt" value="${l?.dt||today()}">
+        </div>
+        <div class="ff"><label>وقت التسجيل (Auto)</label>
+          <div class="auto-disp">🕐 ${l?.tm||nowTime()}</div><input type="hidden" name="tm" value="${l?.tm||nowTime()}">
+        </div>
+        <div class="ff"><label>اسم العميل *</label>${inp("nm",l?.nm,"text",false,"الاسم الكامل")}</div>
+        <div class="ff"><label>شركة العميل</label>${inp("company",l?.company,"text",false,"اختياري")}</div>
+        <div class="ff"><label>الموبايل</label>${inp("mob",l?.mob,"text",false,"01XXXXXXXXX")}</div>
+        <div class="ff"><label>الجنسية</label>${sel("nat",DD.nat,l?.nat)}</div>
+        <div class="ff"><label>بلد الاستيراد</label>${sel("imp",DD.country,l?.imp)}</div>
+        <div class="ff"><label>بلد التصدير</label>${sel("exp",DD.country,l?.exp)}</div>
+        <div class="ff"><label>مجال التخصص</label>${sel("spec",DD.spec,l?.spec)}</div>
+        <div class="ff s3"><label>المنتج المطلوب</label>${inp("prod",l?.prod,"text",false,"وصف المنتج")}</div>
+        <div class="ff"><label>الكمية</label>${inp("qty",l?.qty,"text",false)}</div>
+        <div class="ff"><label>الوحدة</label>${inp("unit",l?.unit,"text",false,"طن / حاوية")}</div>
+        <div class="ff"><label>رأس المال (USD)</label>${inp("cap",l?.cap,"text",false)}</div>
+        <div class="ff"><label>مستورد / مصدر</label>${sel("ie",DD.ie,l?.ie)}</div>
+        <div class="ff"><label>توفر المورد</label>${sel("sup",DD.supply,l?.sup)}</div>
+        <div class="ff"><label>أولوية العميل</label>${sel("priority",DD.priority,l?.priority||"عادي")}</div>
+        <div class="ff s3"><label>الخدمات المطلوبة (اختر أكثر من خدمة)</label>${buildMs("svc",l?.svc||[])}</div>
+        <div class="ff s3"><label>ملاحظات</label>${ta("cnotes",l?.cnotes)}</div>
+      </div>
+      <div class="rr-box">
+        <div style="flex:1">
+          <div style="font-size:9px;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Sales Rep ${l?'(يمكن تعديله)':'(تلقائي - Round Robin)'}</div>
+          <div class="rr-name">${l?.rep||rr?.name||"—"}</div>
+        </div>
+        ${l?`<select name="rep_id_change" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;min-width:160px">
+          <option value="">— احتفظ بالحالي —</option>
+          ${SALES_USERS.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+        </select>`:''}
+        <input type="hidden" name="rep" value="${l?.rep||rr?.name||""}">
+        <input type="hidden" name="repId" value="${l?.repId||rr?.id||0}">
+      </div>
+    </div>`;
+  }
+  if(!isC||isA){
+    const sd=isC&&!isA;
+    html+=`<div class="fsec sales">
+      <div class="fsec-ttl"><div class="fdot" style="background:var(--orange)"></div>Sales Data</div>
+      ${sd?`<div class="perm-note pn-sales">🔒 هذه الأعمدة خاصة بفريق المبيعات</div>`:""}
+      <div class="fg2" style="margin-bottom:9px">
+        <div class="ff"><label>تاريخ & وقت أول اتصال (Auto)</label>
+          <div class="auto-disp">${l?.fcd?`📅 ${l.fcd} ${l.fct}`:"سيتملأ تلقائياً عند أول حالة"}</div>
+          <input type="hidden" name="fcd" value="${l?.fcd||""}"><input type="hidden" name="fct" value="${l?.fct||""}">
+        </div>
+        <div class="ff"><label>الحالة</label>${sel("st",u.role==="sales"?SALES_STATUSES:DD.status,l?.st,sd)}</div>
+      </div>
+      <div class="fu-wrap ${l?.st==="تحت المتابعة"?"show":""}" id="fm-fu-w" style="margin-bottom:9px">
+        <div class="fu-box">
+          <div class="fu-lbl">📅 تاريخ المتابعة القادمة — متى ترجع تتصل؟</div>
+          <input type="date" name="fuDate" value="${l?.fuDate||""}" min="${today()}" ${sd?"disabled":""}>
+        </div>
+      </div>
+      <div id="fm-crw" style="${l?.st==="لاغي"?"":"display:none"};margin-bottom:9px">
+        <div class="ff"><label>سبب الإلغاء</label>${sel("cr",DD.cancelR,l?.cr,sd)}</div>
+      </div>
+      <div class="call-sec">
+        <div class="call-hdr"><div class="call-lbl">📞 أول مكالمة</div>
+          <div class="call-time" id="c1t-disp">${l?.c1t||"سيتملأ تلقائياً عند الكتابة"}</div>
+        </div>
+        ${ta("c1",l?.c1,sd)}<input type="hidden" name="c1t" value="${l?.c1t||""}">
+      </div>
+      <div class="call-sec">
+        <div class="call-hdr"><div class="call-lbl">📞 ثاني مكالمة</div>
+          <div class="call-time" id="c2t-disp">${l?.c2t||""}</div>
+        </div>
+        ${ta("c2",l?.c2,sd)}<input type="hidden" name="c2t" value="${l?.c2t||""}">
+      </div>
+      <div class="call-sec">
+        <div class="call-hdr"><div class="call-lbl">📞 ثالث مكالمة</div>
+          <div class="call-time" id="c3t-disp">${l?.c3t||""}</div>
+        </div>
+        ${ta("c3",l?.c3,sd)}<input type="hidden" name="c3t" value="${l?.c3t||""}">
+      </div>
+      <div class="ff" style="margin-top:9px"><label>ملاحظات السيلز</label>${ta("snotes",l?.snotes,sd)}</div>
+    </div>`;
+  }
+  return html;
+}
+function bindForm(){
+  const body=$("lm-body");
+  const stEl=body?.querySelector("[name='st']");
+  if(stEl){
+    stEl.addEventListener("change",()=>{
+      const v=stEl.value;
+      const fuw=$("fm-fu-w"),crw=$("fm-crw");
+      if(fuw)fuw.className="fu-wrap"+(v==="تحت المتابعة"?" show":"");
+      if(crw)crw.style.display=v==="لاغي"?"":"none";
+    });
+  }
+  ["c1","c2","c3"].forEach(f=>{
+    const ta=body?.querySelector(`[name="${f}"]`);
+    const hid=body?.querySelector(`[name="${f}t"]`);
+    if(ta&&hid&&!ta.disabled&&!hid.value){
+      ta.addEventListener("focus",()=>{
+        if(!hid.value){hid.value=nowDT();const d=$(f+"t-disp");if(d)d.textContent=hid.value;}
+      },{once:true});
+    }
+  });
+}
+function validateLead(body, get, isNew2){
+  const u=curUser, errs=[];
+  if(u.role!=="sales"){
+    // Coordinator/Admin mandatory fields (except qty, unit which are optional)
+    const required=[
+      ["src","المصدر"],["nm","اسم العميل"],["mob","الموبايل"],["nat","الجنسية"],
+      ["imp","بلد الاستيراد"],["exp","بلد التصدير"],["spec","مجال التخصص"],
+      ["prod","المنتج المطلوب"],["cap","رأس المال"],["ie","مستورد/مصدر"],
+      ["sup","توفر المورد"],["priority","الأولوية"]
+    ];
+    required.forEach(function(r){
+      if(!get(r[0])||get(r[0]).trim()==="")errs.push(r[1]);
+    });
+    // Services: at least one must be selected
+    const svcSel=msSelected["svc"]||[];
+    if(svcSel.length===0)errs.push("الخدمات المطلوبة (اختر واحدة على الأقل)");
+  }
+  // Sales status-dependent validation
+  if(u.role!=="coordinator"){
+    const stEl=body?body.querySelector("[name='st']"):null;
+    if(stEl&&!stEl.disabled){
+      const st=get("st");
+      if(st==="تحت المتابعة"){
+        if(!get("fuDate"))errs.push("تاريخ المتابعة (مطلوب لحالة 'تحت المتابعة')");
+        if(!get("c1")||get("c1").trim()==="")errs.push("نتيجة أول مكالمة (مطلوبة)");
+      }
+      if(st==="لاغي"){
+        if(!get("cr"))errs.push("سبب الإلغاء (مطلوب لحالة 'لاغي')");
+        if(!get("c1")||get("c1").trim()==="")errs.push("نتيجة أول مكالمة (مطلوبة)");
+      }
+      if(st==="عميل فعلي"){
+        if(!get("c1")||get("c1").trim()==="")errs.push("نتيجة أول مكالمة (مطلوبة)");
+      }
+      if(st==="لم يتم الرد"){
+        if(!get("c1")||get("c1").trim()==="")errs.push("نتيجة أول مكالمة (مطلوبة)");
+      }
+      if(st==="مسترد بعد الإلغاء"){
+        if(!get("c1")||get("c1").trim()==="")errs.push("نتيجة أول مكالمة (مطلوبة)");
+      }
+    }
+  }
+  return errs;
+}
+async function saveLead(){
+  const body=$("lm-body");
+  const get=n=>{const e=body?body.querySelector('[name="'+n+'"]'):null;return e?e.value:"";};
+  const isNew2=!curLeadId,u=curUser;
+  const errs=validateLead(body, get, isNew2);
+  if(errs.length>0){
+    showToast("❌","الحقول المطلوبة: "+errs.slice(0,3).join("، ")+(errs.length>3?` (و ${errs.length-3} أخرى)`:""));
+    return;
+  }
+  if(!supa){showToast("❌","لا يوجد اتصال بالسيرفر");return;}
+  
+  showToast("⏳","جاري الحفظ...");
+  
+  try {
+    if(isNew2){
+      // Insert new lead
+      const rr = getNextRR();
+      const newLead = {
+        cc: "CLT-"+Date.now(),
+        by_id: u.id, by_name: u.name,
+        rep_id: rr.id, rep_name: rr.name,
+        src: get("src"),
+        dt: get("dt") || today(),
+        tm: get("tm") || nowTime(),
+        nm: get("nm"), company: get("company")||"", mob: get("mob"), nat: get("nat"),
+        imp: get("imp"), exp: get("exp"),
+        spec: get("spec"), prod: get("prod"),
+        qty: get("qty"), unit: get("unit"), cap: get("cap"),
+        ie: get("ie"), sup: get("sup"),
+        priority: get("priority")||"عادي",
+        svc: [...(msSelected["svc"]||[])],
+        cnotes: get("cnotes"),
+        st: ""
+      };
+      const {data, error} = await supa.from("leads").insert(newLead).select().single();
+      if(error)throw error;
+      
+      // Insert log entry
+      await supa.from("lead_log").insert({
+        lead_id: data.id,
+        user_name: u.name,
+        action: "أضاف Lead جديد"
+      });
+      
+      showToast("✓", "تم الإضافة — Sales: "+rr.name);
+    } else {
+      // Update existing lead
+      const l = LEADS.find(x=>x.id===curLeadId);
+      if(!l)throw new Error("Lead not found");
+      const oldSt = l.st;
+      const updates = {};
+      
+      if(u.role!=="sales"){
+        ["src","nm","company","mob","nat","imp","exp","spec","prod","qty","unit","cap","ie","sup","priority","cnotes"].forEach(f=>{
+          const v=get(f); if(v!==undefined) updates[f]=v;
+        });
+        updates.svc = [...(msSelected["svc"]||l.svc||[])];
+        // Allow rep change
+        const newRepId = get("rep_id_change");
+        if(newRepId){
+          const newRep = SALES_USERS.find(s=>s.id===newRepId);
+          if(newRep){
+            updates.rep_id = newRep.id;
+            updates.rep_name = newRep.name;
+          }
+        }
+      }
+      
+      const stEl=body?body.querySelector("[name='st']"):null;
+      if(u.role!=="coordinator" && stEl && !stEl.disabled){
+        const ns=get("st");
+        if(ns){
+          updates.st=ns;
+          if(!l.fcd && ns){updates.fcd=today(); updates.fct=nowTime();}
+        }
+        updates.fu_date=get("fuDate")||null;
+        updates.cr=get("cr");
+        updates.snotes=get("snotes");
+        ["c1","c2","c3"].forEach(f=>{
+          const ta=body?body.querySelector('[name="'+f+'"]'):null;
+          if(ta && !ta.disabled){
+            const v=get(f); 
+            if(v!==undefined) updates[f]=v;
+          }
+        });
+      }
+      
+      const {error} = await supa.from("leads").update(updates).eq("id", l._supaId||l.id);
+      if(error)throw error;
+      
+      // Add log
+      await supa.from("lead_log").insert({
+        lead_id: l._supaId||l.id,
+        user_name: u.name,
+        action: l.st!==(updates.st||l.st) ? `غيّر الحالة: ${oldSt||"جديد"} → ${updates.st}` : "عدّل البيانات"
+      });
+      
+      showToast("✓","تم الحفظ");
+    }
+    
+    closeM("lead-modal");
+    // Reload data
+    await loadAllData();
+    renderLeadsContent();
+    if($("pg-dashboard").classList.contains("active")) renderDash();
+  } catch(err) {
+    console.error("Save error:", err);
+    showToast("❌","خطأ: "+err.message);
+  }
+}
+
+
+// ═══ REACTIVATE LEAD (Coordinator/Admin only) ═══
+function canReactivate(l){
+  if(!l||!curUser)return false;
+  if(curUser.role!=="coordinator"&&curUser.role!=="admin")return false;
+  // Only if it's lost or no-response
+  return l.st==="لاغي"||l.st==="لم يتم الرد";
+}
+function openReactivate(id){
+  const l=LEADS.find(x=>x.id===id);
+  if(!l||!canReactivate(l)){
+    showToast("⚠","غير مسموح بإعادة التفعيل لهذه الحالة");
+    return;
+  }
+  // Default reason based on current status
+  const defaultReason="مسترد بعد الإلغاء";
+  // Build mini modal
+  const html='<div class="mov open" id="react-modal" onclick="if(event.target===this)closeM(\'react-modal\')"><div class="modal" style="max-width:480px">'
+    +'<div class="mhdr"><h2>♻️ إعادة تفعيل العميل</h2><button class="mx" onclick="closeM(\'react-modal\')">×</button></div>'
+    +'<div class="mbody">'
+    +'<div style="background:var(--bg3);padding:10px;border-radius:8px;margin-bottom:12px;font-size:12px">'
+    +'<div><strong>العميل:</strong> '+l.nm+'</div>'
+    +'<div style="margin-top:3px"><strong>Sales:</strong> '+l.rep+'</div>'
+    +'<div style="margin-top:3px"><strong>الحالة الحالية:</strong> '+stBadge(l)+'</div>'
+    +(l.cr?'<div style="margin-top:3px"><strong>سبب الإلغاء:</strong> '+l.cr+'</div>':'')
+    +'</div>'
+    +'<div class="ff" style="margin-bottom:10px"><label>السبب</label>'
+    +'<select id="react-reason" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;width:100%">'
+    +'<option value="مسترد بعد الإلغاء"'+(defaultReason==="مسترد بعد الإلغاء"?" selected":'')+'>مسترد بعد الإلغاء</option>'
+    +''
+    +'</select></div>'
+    +'<div class="ff"><label>ملاحظة (اختياري)</label>'
+    +'<textarea id="react-note" placeholder="مثال: العميل اتصل تاني وقال انه عايز نراجع التكلفة..." style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:7px 8px;height:70px;color:var(--text);font-size:12px;outline:none;width:100%;resize:vertical"></textarea></div>'
+    +'<div style="background:var(--blue-bg);border:1px solid rgba(75,124,245,.25);border-radius:8px;padding:9px;margin-top:10px;font-size:11px;color:var(--text2)">'
+    +'<div style="font-weight:600;color:var(--blue2);margin-bottom:4px">ℹ️ ملحوظة:</div>'
+    +'<div>• سيرجع العميل لـ <strong>'+l.rep+'</strong> (نفس السيلز)</div>'
+    +'<div>• سيظهر للسيلز كأولوية في تقرير اليوم</div>'
+    +'<div>• كل بياناته القديمة (مكالمات، تواريخ) ستبقى محفوظة</div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="mftr">'
+    +'<button class="btn" onclick="closeM(\'react-modal\')">إلغاء</button>'
+    +'<button class="btn primary" onclick="confirmReactivate('+id+')">✓ إعادة تفعيل</button>'
+    +'</div></div></div>';
+  const wrap=document.createElement("div");wrap.innerHTML=html;
+  document.body.appendChild(wrap.firstChild);
+}
+async function confirmReactivate(id){
+  const l=LEADS.find(x=>x.id===id);
+  if(!l)return;
+  const reason=$("react-reason").value;
+  const note=$("react-note").value.trim();
+  if(!reason){showToast("❌","اختر السبب");return;}
+  if(!supa){showToast("❌","لا يوجد اتصال");return;}
+  
+  try {
+    const {error} = await supa.from("leads").update({
+      reactivated: reason,
+      reactivated_date: new Date().toISOString(),
+      reactivated_by: curUser.name,
+      reactivated_note: note,
+      st: "",
+      cr: ""
+    }).eq("id", l._supaId||l.id);
+    if(error)throw error;
+    
+    // Add log
+    await supa.from("lead_log").insert({
+      lead_id: l._supaId||l.id,
+      user_name: curUser.name,
+      action: "♻️ أعاد تفعيل ("+reason+")"+(note?" — "+note:"")
+    });
+    
+    // Add notification for sales rep
+    await supa.from("notifications").insert({
+      user_id: l.repId,
+      text: "♻️ عميل رجع — "+l.nm,
+      sub: reason+" · من "+curUser.name,
+      color: "var(--purple)",
+      lead_id: l._supaId||l.id,
+      kind: "reactivation"
+    });
+    
+    const modal=$("react-modal");
+    if(modal)modal.remove();
+    showToast("✓","تم إعادة التفعيل — Sales: "+l.rep);
+    
+    await loadAllData();
+    if($("pg-leads")&&$("pg-leads").classList.contains("active"))renderLeadsContent();
+    if($("pg-dashboard")&&$("pg-dashboard").classList.contains("active"))renderDash();
+    if($("pg-myreports")&&$("pg-myreports").classList.contains("active"))renderMyReports();
+    closeM("view-modal");
+  } catch(err) {
+    console.error(err);
+    showToast("❌","خطأ: "+err.message);
+  }
+}
+
+// ═══ VIEW LEAD ═══
+function viewLead(id){
+  curLeadId=id;
+  const l=LEADS.find(x=>x.id===id);if(!l)return;
+  const u=curUser;
+  const canEdit=u.role==="admin"||(u.role==="coordinator"&&l.byId===u.id)||(u.role==="sales"&&l.repId===u.id);
+  $("vm-edit").style.display=canEdit?"flex":"none";
+  // Show Reactivate button if applicable
+  let vmReact=$("vm-react");
+  if(!vmReact){
+    const ftr=$("vm-edit").parentElement;
+    if(ftr){
+      vmReact=document.createElement("button");
+      vmReact.id="vm-react";
+      vmReact.className="btn";
+      vmReact.style.background="var(--purple-bg)";
+      vmReact.style.color="var(--purple2)";
+      vmReact.style.border="1px solid rgba(168,85,247,.3)";
+      vmReact.innerHTML="♻️ إعادة تفعيل";
+      vmReact.onclick=function(){openReactivate(curLeadId);};
+      ftr.insertBefore(vmReact,$("vm-edit"));
+    }
+  }
+  if(vmReact)vmReact.style.display=canReactivate(l)?"flex":"none";
+  $("vm-ttl").textContent=l.nm;
+  function row(lbl,val){
+    return '<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px;text-transform:uppercase;">'+lbl+'</div>'
+      +'<div style="font-size:12px;font-weight:500">'+(val||"—")+'</div></div>';
+  }
+  let html='';
+  // Header
+  html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;padding-bottom:13px;border-bottom:1px solid var(--border)">';
+  html+='<div style="width:44px;height:44px;border-radius:12px;background:var(--blue-bg);border:1px solid rgba(75,124,245,.25);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:var(--blue2);flex-shrink:0">'+(l.nm[0]||"?")+'</div>';
+  html+='<div><div style="font-size:15px;font-weight:700">'+l.nm+'</div>';
+  html+='<div style="font-size:11px;color:var(--text2);margin-top:2px">'+l.mob+' · '+(l.nat||"—")+'</div></div>';
+  html+='<div style="margin-right:auto;display:flex;gap:5px;align-items:center;flex-wrap:wrap">';
+  html+=stBadge(l)+scoreBadge(score(l))+priBadge(l.priority)+(slaBadge1(l)||"")+(slaBadge2(l)||"");
+  html+='<a href="'+waLink(l.mob)+'" target="_blank" class="ract wa">💬</a></div></div>';
+  // Tabs
+  html+='<div class="vtabs"><button class="vtab on" onclick="svt(\'data\',this)">البيانات</button><button class="vtab" onclick="svt(\'sales\',this)">Sales Data</button><button class="vtab" onclick="svt(\'log\',this)">Activity Log</button></div>';
+  // Data tab
+  html+='<div id="vt-data">';
+  if(isReactivated(l)){
+    html+='<div style="background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);border-radius:8px;padding:11px;margin-bottom:11px">';
+    html+='<div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--purple2)">';
+    html+='<span style="font-size:18px">♻️</span><span>'+l.reactivated+'</span></div>';
+    html+='<div style="font-size:11px;color:var(--text2);margin-top:4px">';
+    html+='أعاد التفعيل: <strong>'+l.reactivatedBy+'</strong>';
+    html+=' · '+l.reactivatedDate;
+    if(l.reactivatedNote)html+='<div style="margin-top:5px;padding:7px;background:var(--bg3);border-radius:6px;font-size:11px">📝 '+l.reactivatedNote+'</div>';
+    html+='</div></div>';
+  }
+  html+='<div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:8px;">Coordinator Data</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:9px">';
+  html+=row("المصدر",l.src)+row("التاريخ",l.dt+" "+l.tm)+row("Coordinator",l.by);
+  html+=row("المنتج",l.prod)+row("الخدمات",svcStr(l))+row("رأس المال","$"+(l.cap||"—"));
+  html+=row("بلد الاستيراد",l.imp)+row("بلد التصدير",l.exp)+row("مستورد/مصدر",l.ie);
+  html+=row("توفر المورد",l.sup)+row("أولوية",l.priority)+row("Sales Rep",l.rep);
+  html+='</div>';
+  if(l.cnotes)html+='<div style="background:var(--bg3);border-radius:var(--r-sm);padding:8px;font-size:12px;color:var(--text2)">'+l.cnotes+'</div>';
+  html+='</div>';
+  // Sales tab
+  html+='<div id="vt-sales" style="display:none">';
+  html+='<div style="font-size:10px;font-weight:700;color:var(--orange);margin-bottom:8px;text-transform:uppercase;">Sales Data</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">';
+  html+=row("أول اتصال",l.fcd?l.fcd+" "+l.fct:"—")+row("تاريخ المتابعة",l.fuDate||"—")+row("آخر اتصال",l.lcd||"—");
+  html+='</div>';
+  if(l.c1)html+='<div style="margin-bottom:7px"><div style="font-size:9px;color:var(--orange);margin-bottom:3px">أول مكالمة'+(l.c1t?' · '+l.c1t:'')+'</div><div style="background:var(--bg3);border-radius:var(--r-sm);padding:8px;font-size:12px;color:var(--text2)">'+l.c1+'</div></div>';
+  if(l.c2)html+='<div style="margin-bottom:7px"><div style="font-size:9px;color:var(--orange);margin-bottom:3px">ثاني مكالمة'+(l.c2t?' · '+l.c2t:'')+'</div><div style="background:var(--bg3);border-radius:var(--r-sm);padding:8px;font-size:12px;color:var(--text2)">'+l.c2+'</div></div>';
+  if(l.c3)html+='<div style="margin-bottom:7px"><div style="font-size:9px;color:var(--orange);margin-bottom:3px">ثالث مكالمة'+(l.c3t?' · '+l.c3t:'')+'</div><div style="background:var(--bg3);border-radius:var(--r-sm);padding:8px;font-size:12px;color:var(--text2)">'+l.c3+'</div></div>';
+  if(l.cr)html+='<div style="background:var(--red-bg);border:1px solid rgba(245,82,82,.2);border-radius:var(--r-sm);padding:8px;font-size:12px;color:var(--red2)">سبب الإلغاء: '+l.cr+'</div>';
+  if(l.snotes)html+='<div style="margin-top:8px;background:var(--bg3);border-radius:var(--r-sm);padding:8px;font-size:12px;color:var(--text2)">ملاحظات: '+l.snotes+'</div>';
+  html+='</div>';
+  // Log tab
+  html+='<div id="vt-log" style="display:none">';
+  const logs=l.log||[];
+  if(logs.length){
+    [...logs].reverse().forEach(function(e){
+      html+='<div class="log-item"><div class="log-dot" style="background:var(--blue)"></div>';
+      html+='<div><div class="log-text">'+e.a+'</div><div class="log-time">'+e.by+' · '+e.t+'</div></div></div>';
+    });
+  } else {
+    html+='<div class="empty-st" style="padding:18px"><div class="empty-ttl">لا يوجد سجل</div></div>';
+  }
+  html+='</div>';
+  $("vm-body").innerHTML=html;
+  $("view-modal").classList.add("open");
+}
+function svt(id,btn){
+  document.querySelectorAll(".vtab").forEach(b=>b.classList.remove("on"));btn.classList.add("on");
+  ["vt-data","vt-sales","vt-log"].forEach(t=>{$(t).style.display=t==="vt-"+id?"block":"none";});
+}
+// ═══ MY REPORTS (Coordinator/Sales personal) ═══
+function renderMyReports(){
+  const u=curUser;
+  if(u.role==="coordinator")renderCoordReports();
+  else if(u.role==="sales")renderSalesReports();
+}
+function setMyRptPeriod(p){
+  if(curUser.role==="coordinator")coordRptPeriod=p;
+  else salesRptPeriod=p;
+  renderMyReports();
+}
+
+// ─── Coordinator Reports ───
+function renderCoordReports(){
+  const period=coordRptPeriod;
+  const r=getPeriodRange(period);
+  const allMyLeads=LEADS.filter(function(l){return l.byId===curUser.id;});
+  const l=allMyLeads.filter(function(ld){return ld.dt>=r.fromStr&&ld.dt<=r.toStr;});
+  
+  // Counts
+  const tot=l.length;
+  const act=l.filter(function(x){return x.st==="عميل فعلي";}).length;
+  const can=l.filter(function(x){return x.st==="لاغي";}).length;
+  const fol=l.filter(function(x){return x.st==="تحت المتابعة";}).length;
+  const rev=l.filter(function(x){return x.st==="تواصل مرة أخرى";}).length;
+  const news=l.filter(function(x){return isNew(x);}).length;
+  
+  // Contacted from monthly data
+  const contacted=totalContactedForPeriod(curUser.name,period);
+  
+  // Conversion rates
+  const c2l=contacted>0?(tot/contacted*100):0;
+  const l2a=tot>0?(act/tot*100):0;
+  const c2a=contacted>0?(act/contacted*100):0;
+  const cancelRate=tot>0?(can/tot*100):0;
+  
+  // Source distribution
+  const srcMap={};
+  l.forEach(function(x){srcMap[x.src]=(srcMap[x.src]||0)+1;});
+  const topSrc=Object.entries(srcMap).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
+  const srcMax=topSrc[0]?topSrc[0][1]:1;
+  
+  // Score distribution
+  const hot=l.filter(function(x){return score(x)>=70;}).length;
+  const warm=l.filter(function(x){return score(x)>=40&&score(x)<70;}).length;
+  const cold=l.filter(function(x){return score(x)<40;}).length;
+  
+  // Build HTML
+  let html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
+  html+='<div><div style="font-size:14px;font-weight:700">📊 تقاريري الشخصية</div>';
+  html+='<div style="font-size:11px;color:var(--text2);margin-top:2px">'+periodLabel(period)+' · '+r.fromStr+' → '+r.toStr+'</div></div>';
+  html+=buildPeriodFilter(period,"setMyRptPeriod");
+  html+='</div>';
+  
+  // Top KPIs
+  html+='<div class="kpi-row c4">';
+  html+=kc("📞 Contacted",contacted.toLocaleString(),"var(--purple)","تواصل","");
+  html+=kc("📋 Leads",tot,"var(--blue)",c2l.toFixed(2)+"% Conv","up");
+  html+=kc("✅ Active",act,"var(--green)",l2a.toFixed(2)+"% من Leads","up");
+  html+=kc("❌ Cancelled",can,"var(--red)",cancelRate.toFixed(2)+"%","");
+  html+='</div>';
+  
+  // Funnel
+  html+='<div class="card" style="margin-bottom:13px"><div class="card-title">🔄 مسار التحويل</div>';
+  html+='<div class="card-sub">Contacted → Leads → Active Clients</div>';
+  html+='<div style="margin-top:11px">';
+  const fmax=Math.max(contacted,1);
+  [["📞 Contacted",contacted,"var(--purple)"],["📋 Leads",tot,"var(--blue)"],["✅ Active",act,"var(--green)"]].forEach(function(rw){
+    const pctv=rw[1]/fmax*100;
+    const pctw=Math.round(pctv);
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+    html+='<div style="font-size:12px;color:var(--text2);width:120px;text-align:right;font-weight:600">'+rw[0]+'</div>';
+    html+='<div style="flex:1;height:26px;background:var(--bg4);border-radius:6px;overflow:hidden">';
+    html+='<div style="width:'+pctw+'%;height:100%;background:'+rw[2]+';display:flex;align-items:center;padding-right:8px;font-size:10px;font-weight:700;color:#fff;border-radius:6px">'+pctv.toFixed(2)+'%</div></div>';
+    html+='<div style="font-size:13px;font-weight:700;font-family:Outfit;width:60px;color:'+rw[2]+';text-align:left">'+rw[1].toLocaleString()+'</div></div>';
+  });
+  html+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
+  html+='<div style="text-align:center;background:var(--bg3);border-radius:6px;padding:8px">';
+  html+='<div style="font-size:10px;color:var(--text3)">Contacted → Lead</div>';
+  html+='<div style="font-size:16px;font-weight:700;color:var(--green);font-family:Outfit;margin-top:2px">'+c2l.toFixed(2)+'%</div></div>';
+  html+='<div style="text-align:center;background:var(--bg3);border-radius:6px;padding:8px">';
+  html+='<div style="font-size:10px;color:var(--text3)">Lead → Active</div>';
+  html+='<div style="font-size:16px;font-weight:700;color:var(--cyan);font-family:Outfit;margin-top:2px">'+l2a.toFixed(2)+'%</div></div>';
+  html+='<div style="text-align:center;background:var(--bg3);border-radius:6px;padding:8px">';
+  html+='<div style="font-size:10px;color:var(--text3)">Contacted → Active</div>';
+  html+='<div style="font-size:16px;font-weight:700;color:var(--purple);font-family:Outfit;margin-top:2px">'+c2a.toFixed(2)+'%</div></div>';
+  html+='</div></div>';
+  
+  // Status breakdown
+  html+='<div class="g2">';
+  html+='<div class="card"><div class="card-title">📈 توزيع الحالات</div>';
+  html+='<div class="card-sub">Status Breakdown</div>';
+  const stData=[["جديد",news,"var(--cyan)"],["تحت المتابعة",fol,"var(--blue)"],["تواصل مرة أخرى",rev,"var(--orange)"],["عميل فعلي",act,"var(--green)"],["لاغي",can,"var(--red)"]];
+  const stMax=Math.max.apply(null,stData.map(function(x){return x[1];}))||1;
+  html+='<div class="bar-list" style="margin-top:8px">';
+  stData.forEach(function(s){
+    const pctv=Math.round(s[1]/stMax*100);
+    html+='<div class="bar-row"><div class="bar-nm">'+s[0]+'</div>';
+    html+='<div class="bar-track"><div class="bar-fill" style="width:'+pctv+'%;background:'+s[2]+'"></div></div>';
+    html+='<div class="bar-v" style="color:'+s[2]+'">'+s[1]+'</div></div>';
+  });
+  html+='</div></div>';
+  
+  // Source distribution
+  html+='<div class="card"><div class="card-title">📡 توزيع المصادر</div>';
+  html+='<div class="card-sub">Top Channels</div>';
+  html+='<div class="bar-list" style="margin-top:8px">';
+  if(topSrc.length===0){
+    html+='<div style="text-align:center;padding:20px;color:var(--text4)">لا توجد بيانات</div>';
+  } else {
+    topSrc.forEach(function(s){
+      const pctv=Math.round(s[1]/srcMax*100);
+      html+='<div class="bar-row"><div class="bar-nm">'+s[0]+'</div>';
+      html+='<div class="bar-track"><div class="bar-fill" style="width:'+pctv+'%;background:var(--blue)"></div></div>';
+      html+='<div class="bar-v" style="color:var(--blue2)">'+s[1]+'</div></div>';
+    });
+  }
+  html+='</div></div></div>';
+  
+  // Score distribution + quality charts
+  html+='<div class="g2" style="margin-top:13px">';
+  html+='<div class="card"><div class="card-title">🎯 Lead Score</div><div class="card-sub">Hot / Warm / Cold</div>';
+  html+='<canvas id="cr-score" height="160"></canvas></div>';
+  html+='<div class="card"><div class="card-title">📊 ملخص الأداء</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px">';
+  [["Total Leads",tot,"var(--blue)"],["Active",act,"var(--green)"],["Cancellation Rate",cancelRate.toFixed(2)+"%","var(--red)"],["Hot Leads",hot,"var(--red)"]].forEach(function(rw){
+    html+='<div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center">';
+    html+='<div style="font-size:10px;color:var(--text3);margin-bottom:4px">'+rw[0]+'</div>';
+    html+='<div style="font-size:22px;font-weight:700;color:'+rw[2]+';font-family:Outfit">'+rw[1]+'</div></div>';
+  });
+  html+='</div></div></div>';
+  
+  $("pg-myreports").innerHTML=html;
+  
+  // Render score chart
+  setTimeout(function(){
+    if(typeof Chart==="undefined")return;
+    const ctx=$("cr-score");if(!ctx)return;
+    if(charts["cr-score"])charts["cr-score"].destroy();
+    charts["cr-score"]=new Chart(ctx,{
+      type:"doughnut",
+      data:{labels:["Hot","Warm","Cold"],datasets:[{data:[hot,warm,cold],backgroundColor:["#F55252","#F5924A","#4B7CF5"],borderWidth:0}]},
+      options:{responsive:true,plugins:{legend:{labels:{color:"#6B72A0",font:{size:10}},position:"bottom"}},cutout:"60%"}
+    });
+  },50);
+}
+
+// ─── Sales Reports ───
+function renderSalesReports(){
+  const period=salesRptPeriod;
+  const r=getPeriodRange(period);
+  const allMyLeads=LEADS.filter(function(l){return l.repId===curUser.id;});
+  const l=allMyLeads.filter(function(ld){return ld.dt>=r.fromStr&&ld.dt<=r.toStr;});
+  
+  const tot=l.length;
+  const act=l.filter(function(x){return x.st==="عميل فعلي";}).length;
+  const can=l.filter(function(x){return x.st==="لاغي";}).length;
+  const fol=l.filter(function(x){return x.st==="تحت المتابعة";}).length;
+  const rev=l.filter(function(x){return x.st==="تواصل مرة أخرى";}).length;
+  const news=l.filter(function(x){return isNew(x);}).length;
+  
+  // SLA stats
+  const sla1Breach=l.filter(function(x){return sla1St(x)==="breach";}).length;
+  const sla1Warn=l.filter(function(x){return sla1St(x)==="warn";}).length;
+  const sla1Ok=l.filter(function(x){return sla1St(x)==="ok";}).length;
+  const sla2Late=l.filter(function(x){return sla2St(x)==="late";}).length;
+  
+  const conv=tot>0?(act/tot*100):0;
+  const cancelRate=tot>0?(can/tot*100):0;
+  const slaScore=tot>0?(sla1Ok/tot*100):100;
+  
+  // Source map
+  const srcMap={};
+  l.forEach(function(x){srcMap[x.src]=(srcMap[x.src]||0)+1;});
+  const topSrc=Object.entries(srcMap).sort(function(a,b){return b[1]-a[1];}).slice(0,6);
+  const srcMax=topSrc[0]?topSrc[0][1]:1;
+  
+  // Score distribution
+  const hot=l.filter(function(x){return score(x)>=70;}).length;
+  const warm=l.filter(function(x){return score(x)>=40&&score(x)<70;}).length;
+  const cold=l.filter(function(x){return score(x)<40;}).length;
+  
+  let html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
+  html+='<div><div style="font-size:14px;font-weight:700">📊 تقاريري الشخصية</div>';
+  html+='<div style="font-size:11px;color:var(--text2);margin-top:2px">'+periodLabel(period)+' · '+r.fromStr+' → '+r.toStr+'</div></div>';
+  html+=buildPeriodFilter(period,"setMyRptPeriod");
+  html+='</div>';
+  
+  // Top KPIs
+  html+='<div class="kpi-row c4">';
+  html+=kc("📋 إجمالي Leads",tot,"var(--blue)","المحالة لي","");
+  html+=kc("✅ Active Clients",act,"var(--green)",conv.toFixed(2)+"% Conversion","up");
+  html+=kc("❌ Cancelled",can,"var(--red)",cancelRate.toFixed(2)+"%","");
+  html+=kc("⚡ SLA Score",slaScore.toFixed(2)+"%","var(--purple)","الالتزام بـ SLA","up");
+  html+='</div>';
+  
+  // SLA stats row
+  html+='<div class="kpi-row c4">';
+  html+=kc("🆕 جديد",news,"var(--cyan)","يحتاج رد","");
+  html+=kc("📞 تحت المتابعة",fol,"var(--blue)","نشط","");
+  html+=kc("⚠ SLA #1 Breach",sla1Breach,"var(--red)","+24h","");
+  html+=kc("📅 SLA #2 Late",sla2Late,"var(--orange)","فات الميعاد","");
+  html+='</div>';
+  
+  // Status breakdown + Source charts
+  html+='<div class="g2">';
+  html+='<div class="card"><div class="card-title">📈 توزيع الحالات</div>';
+  html+='<div class="card-sub">Status Breakdown</div>';
+  const stData=[["جديد",news,"var(--cyan)"],["تحت المتابعة",fol,"var(--blue)"],["تواصل مرة أخرى",rev,"var(--orange)"],["عميل فعلي",act,"var(--green)"],["لاغي",can,"var(--red)"]];
+  const stMax=Math.max.apply(null,stData.map(function(x){return x[1];}))||1;
+  html+='<div class="bar-list" style="margin-top:8px">';
+  stData.forEach(function(s){
+    const pctv=Math.round(s[1]/stMax*100);
+    html+='<div class="bar-row"><div class="bar-nm">'+s[0]+'</div>';
+    html+='<div class="bar-track"><div class="bar-fill" style="width:'+pctv+'%;background:'+s[2]+'"></div></div>';
+    html+='<div class="bar-v" style="color:'+s[2]+'">'+s[1]+'</div></div>';
+  });
+  html+='</div></div>';
+  
+  // Source distribution
+  html+='<div class="card"><div class="card-title">📡 المصادر</div>';
+  html+='<div class="card-sub">Top Sources</div>';
+  html+='<div class="bar-list" style="margin-top:8px">';
+  if(topSrc.length===0){
+    html+='<div style="text-align:center;padding:20px;color:var(--text4)">لا توجد بيانات</div>';
+  } else {
+    topSrc.forEach(function(s){
+      const pctv=Math.round(s[1]/srcMax*100);
+      html+='<div class="bar-row"><div class="bar-nm">'+s[0]+'</div>';
+      html+='<div class="bar-track"><div class="bar-fill" style="width:'+pctv+'%;background:var(--orange)"></div></div>';
+      html+='<div class="bar-v" style="color:var(--orange2)">'+s[1]+'</div></div>';
+    });
+  }
+  html+='</div></div></div>';
+  
+  // Charts row
+  html+='<div class="g3" style="margin-top:13px">';
+  html+='<div class="card"><div class="card-title">🎯 Lead Score</div>';
+  html+='<div class="card-sub">Hot / Warm / Cold</div>';
+  html+='<canvas id="sr-score" height="160"></canvas></div>';
+  html+='<div class="card"><div class="card-title">📊 SLA Performance</div>';
+  html+='<div class="card-sub">On Time / Warning / Breach</div>';
+  html+='<canvas id="sr-sla" height="160"></canvas></div>';
+  html+='<div class="card"><div class="card-title">📈 ملخص</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">';
+  [["Conv Rate",conv.toFixed(2)+"%","var(--green)"],["Cancel Rate",cancelRate.toFixed(2)+"%","var(--red)"],["Hot Leads",hot,"var(--red)"],["Warm Leads",warm,"var(--orange)"]].forEach(function(rw){
+    html+='<div style="background:var(--bg3);border-radius:6px;padding:8px;text-align:center">';
+    html+='<div style="font-size:9px;color:var(--text3)">'+rw[0]+'</div>';
+    html+='<div style="font-size:16px;font-weight:700;color:'+rw[2]+';font-family:Outfit">'+rw[1]+'</div></div>';
+  });
+  html+='</div></div></div>';
+  
+  $("pg-myreports").innerHTML=html;
+  
+  setTimeout(function(){
+    if(typeof Chart==="undefined")return;
+    let ctx=$("sr-score");
+    if(ctx){
+      if(charts["sr-score"])charts["sr-score"].destroy();
+      charts["sr-score"]=new Chart(ctx,{
+        type:"doughnut",
+        data:{labels:["Hot","Warm","Cold"],datasets:[{data:[hot,warm,cold],backgroundColor:["#F55252","#F5924A","#4B7CF5"],borderWidth:0}]},
+        options:{responsive:true,plugins:{legend:{labels:{color:"#6B72A0",font:{size:10}},position:"bottom"}},cutout:"60%"}
+      });
+    }
+    ctx=$("sr-sla");
+    if(ctx){
+      if(charts["sr-sla"])charts["sr-sla"].destroy();
+      charts["sr-sla"]=new Chart(ctx,{
+        type:"doughnut",
+        data:{labels:["On Time","Warning","Breach"],datasets:[{data:[sla1Ok,sla1Warn,sla1Breach],backgroundColor:["#22C997","#F5924A","#F55252"],borderWidth:0}]},
+        options:{responsive:true,plugins:{legend:{labels:{color:"#6B72A0",font:{size:10}},position:"bottom"}},cutout:"60%"}
+      });
+    }
+  },50);
+}
+
+
+// ═══ REPORTS ═══
+let adminRptPeriod="all", adminRptTab="overview";
+
+function renderReports(){
+  const r=getPeriodRange(adminRptPeriod);
+  $("pg-reports").innerHTML=`
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:8px">
+    <div>
+      <div style="font-size:14px;font-weight:700">📊 التقارير الإدارية</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">${periodLabel(adminRptPeriod)} · ${r.fromStr} → ${r.toStr}</div>
+    </div>
+    <div style="display:flex;gap:6px"><button class="btn sm" onclick="exportCSV()">⬇ Export CSV</button><button class="btn sm" onclick="window.print()">🖨 Print</button></div>
+  </div>
+  <div style="margin-bottom:13px">
+    ${buildPeriodFilter(adminRptPeriod,"setAdminRptPeriod")}
+  </div>
+  <div class="vtabs" style="margin-bottom:13px">
+    <button class="vtab ${adminRptTab==='overview'?'on':''}" onclick="showRT('overview',this)">📊 Overview</button>
+    <button class="vtab ${adminRptTab==='marketing'?'on':''}" onclick="showRT('marketing',this)">📡 Digital Marketing</button>
+    <button class="vtab ${adminRptTab==='salesperf'?'on':''}" onclick="showRT('salesperf',this)">🏆 Sales Performance</button>
+    <button class="vtab ${adminRptTab==='coords'?'on':''}" onclick="showRT('coords',this)">👥 Coordinators</button>
+    <button class="vtab ${adminRptTab==='clients'?'on':''}" onclick="showRT('clients',this)">🎯 Clients Analysis</button>
+  </div>
+  <div id="rpt-overview" ${adminRptTab!=='overview'?'style="display:none"':''}></div>
+  <div id="rpt-marketing" ${adminRptTab!=='marketing'?'style="display:none"':''}></div>
+  <div id="rpt-salesperf" ${adminRptTab!=='salesperf'?'style="display:none"':''}></div>
+  <div id="rpt-coords" ${adminRptTab!=='coords'?'style="display:none"':''}></div>
+  <div id="rpt-clients" ${adminRptTab!=='clients'?'style="display:none"':''}></div>`;
+  renderRT(adminRptTab);
+}
+function setAdminRptPeriod(p){
+  adminRptPeriod=p;
+  renderReports();
+}
+function showRT(id,btn){
+  adminRptTab=id;
+  document.querySelectorAll("#pg-reports .vtab").forEach(b=>b.classList.remove("on"));
+  if(btn)btn.classList.add("on");
+  ["overview","marketing","salesperf","coords","clients"].forEach(t=>{$("rpt-"+t).style.display=t===id?"block":"none";});
+  renderRT(id);
+}
+function rpL(){
+  // Use period-based filtering
+  const r=getPeriodRange(adminRptPeriod);
+  return LEADS.filter(l=>l.dt>=r.fromStr&&l.dt<=r.toStr);
+}
+
+function donut(id,labels,data,colors,pos){
+  const ctx=$(id);if(!ctx)return;if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(ctx,{type:"doughnut",data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0,hoverOffset:3}]},
+    options:{responsive:true,plugins:{legend:{labels:{color:"#6B72A0",font:{size:10}},position:pos||"bottom"}},cutout:"55%"}});
+}
+function getMonthRange(){
+  // Use admin period filter
+  const r=getPeriodRange(adminRptPeriod||"all");
+  const months=[];let cur=new Date(r.from.getFullYear(),r.from.getMonth(),1);
+  while(cur<=r.to){months.push({y:cur.getFullYear(),m:cur.getMonth()});cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);}
+  return months;
+}
+function totalContactedInRange(coordName){
+  // Sum monthly contacts for given coordinator within current report range
+  const months=getMonthRange();
+  if(!coordName){
+    // All coordinators total
+    return COORD_USERS.reduce(function(sum,c){
+      return sum+months.reduce(function(s,mv){return s+(MC.coords[c.name]&&MC.coords[c.name][mv.m]!==undefined?MC.coords[c.name][mv.m]:0);},0);
+    },0);
+  }
+  return months.reduce(function(sum,mv){
+    return sum+(MC.coords[coordName]&&MC.coords[coordName][mv.m]!==undefined?MC.coords[coordName][mv.m]:0);
+  },0);
+}
+function totalContactedAll(){
+  // Sum all months ever (for dashboard quick view)
+  return COORD_USERS.reduce(function(sum,c){
+    return sum+MONTHS.reduce(function(s,_,i){return s+(MC.coords[c.name]&&MC.coords[c.name][i]!==undefined?MC.coords[c.name][i]:0);},0);
+  },0);
+}
+function myTotalContactedAll(){
+  // For a coordinator: sum all their monthly contacts
+  if(!curUser||curUser.role!=="coordinator")return 0;
+  return MONTHS.reduce(function(s,_,i){
+    return s+(MC.coords[curUser.name]&&MC.coords[curUser.name][i]!==undefined?MC.coords[curUser.name][i]:0);
+  },0);
+}
+
+// ═══ PERIOD FILTERS ═══
+function getPeriodRange(period){
+  const t=new Date();t.setHours(0,0,0,0);
+  const yr=t.getFullYear();
+  let from=new Date(t),to=new Date(t);to.setHours(23,59,59,999);
+  switch(period){
+    case "today":
+      break;
+    case "week":{
+      const day=t.getDay();
+      from=new Date(t);from.setDate(t.getDate()-day);
+      to=new Date(from);to.setDate(from.getDate()+6);to.setHours(23,59,59,999);
+      break;}
+    case "month":
+      from=new Date(yr,t.getMonth(),1);
+      to=new Date(yr,t.getMonth()+1,0,23,59,59,999);
+      break;
+    case "q1":
+      from=new Date(yr,0,1);
+      to=new Date(yr,2,31,23,59,59,999);
+      break;
+    case "q2":
+      from=new Date(yr,3,1);
+      to=new Date(yr,5,30,23,59,59,999);
+      break;
+    case "q3":
+      from=new Date(yr,6,1);
+      to=new Date(yr,8,30,23,59,59,999);
+      break;
+    case "q4":
+      from=new Date(yr,9,1);
+      to=new Date(yr,11,31,23,59,59,999);
+      break;
+    case "year":
+      from=new Date(yr,0,1);
+      to=new Date(yr,11,31,23,59,59,999);
+      break;
+    case "all":
+    default:
+      from=new Date("2020-01-01");
+      to=new Date("2099-12-31");
+  }
+  return {from:from,to:to,fromStr:from.toISOString().slice(0,10),toStr:to.toISOString().slice(0,10)};
+}
+function filterLeadsByPeriod(leads,period){
+  if(period==="all"||!period)return leads;
+  const r=getPeriodRange(period);
+  return leads.filter(function(l){
+    return l.dt>=r.fromStr&&l.dt<=r.toStr;
+  });
+}
+function periodLabel(p){
+  const m={today:"اليوم",week:"هذا الأسبوع",month:"هذا الشهر",q1:"الربع الأول (Q1)",q2:"الربع الثاني (Q2)",q3:"الربع الثالث (Q3)",q4:"الربع الرابع (Q4)",year:"هذه السنة",all:"الكل"};
+  return m[p]||"الكل";
+}
+function periodTitleEn(p){
+  const m={today:"Day",week:"Week",month:"Month",q1:"Q1",q2:"Q2",q3:"Q3",q4:"Q4",year:"Year",all:"Period"};
+  return m[p]||"Period";
+}
+function buildPeriodFilter(currentPeriod,onChange){
+  const periods=[["today","اليوم"],["week","الأسبوع"],["month","الشهر"],["q1","Q1"],["q2","Q2"],["q3","Q3"],["q4","Q4"],["year","السنة"],["all","الكل"]];
+  let h='<div class="period-filter" style="display:inline-flex;gap:4px;background:var(--bg3);padding:3px;border-radius:8px;flex-wrap:wrap">';
+  periods.forEach(function(p){
+    const active=p[0]===currentPeriod;
+    h+='<button class="btn sm'+(active?' primary':'')+'" style="font-size:10px;padding:5px 10px" onclick="'+onChange+'(\''+p[0]+'\')">'+p[1]+'</button>';
+  });
+  h+='</div>';
+  return h;
+}
+function getMonthsForPeriod(period){
+  // Return array of month indices that fall within the given period
+  const r=getPeriodRange(period);
+  const months=[];
+  let cur=new Date(r.from.getFullYear(),r.from.getMonth(),1);
+  while(cur<=r.to){
+    months.push({y:cur.getFullYear(),m:cur.getMonth()});
+    cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+  }
+  return months;
+}
+function totalContactedForPeriod(coordName,period){
+  const months=getMonthsForPeriod(period);
+  if(!coordName){
+    return COORD_USERS.reduce(function(sum,c){
+      return sum+months.reduce(function(s,mv){return s+(MC.coords[c.name]&&MC.coords[c.name][mv.m]!==undefined?MC.coords[c.name][mv.m]:0);},0);
+    },0);
+  }
+  return months.reduce(function(sum,mv){
+    return sum+(MC.coords[coordName]&&MC.coords[coordName][mv.m]!==undefined?MC.coords[coordName][mv.m]:0);
+  },0);
+}
+function getTodayDailyContacted(coordName){
+  // Returns the daily contacted count for today, or null if not entered
+  if(!MC.daily[coordName])MC.daily[coordName]={};
+  const td=today();
+  return MC.daily[coordName][td]!==undefined?MC.daily[coordName][td]:null;
+}
+function setDailyContacted(coordName,date,count){
+  if(!MC.daily[coordName])MC.daily[coordName]={};
+  MC.daily[coordName][date]=parseInt(count)||0;
+  // Update monthly aggregate
+  const d=new Date(date);
+  const monthIdx=d.getMonth();
+  // Recalculate month total from all daily entries
+  let monthTotal=0;
+  Object.entries(MC.daily[coordName]).forEach(function(e){
+    const dt=new Date(e[0]);
+    if(dt.getMonth()===monthIdx&&dt.getFullYear()===d.getFullYear()){
+      monthTotal+=e[1];
+    }
+  });
+  // Note: we DON'T overwrite seed monthly data - we add daily on top
+  // The seed represents historical data, daily entries are for tracking new days
+}
+function getMissingDays(coordName,daysBack){
+  // Returns array of dates where coordinator didn't enter daily count
+  daysBack=daysBack||7;
+  const missing=[];
+  const t=new Date();
+  for(let i=1;i<=daysBack;i++){
+    const d=new Date(t);d.setDate(t.getDate()-i);
+    // Skip future dates and weekends if needed
+    if(d.getFullYear()<2026)continue; // Don't check before our data
+    const ds=d.toISOString().slice(0,10);
+    if(!MC.daily[coordName]||MC.daily[coordName][ds]===undefined){
+      missing.push(ds);
+    }
+  }
+  return missing;
+}
+function checkDailyContactedReminders(){
+  // Called on init - reminds coordinators if they didn't enter today
+  if(!curUser||curUser.role!=="coordinator")return;
+  const todayCount=getTodayDailyContacted(curUser.name);
+  if(todayCount===null){
+    // Show prominent reminder
+    NOTIFS.unshift({
+      text:"⚠️ لم تُدخل عدد الـ Contacted لليوم!",
+      sub:"اذهب لـ Settings > Daily Contacted",
+      clr:"var(--orange)",
+      read:false,
+      lid:null,
+      kind:"daily-reminder"
+    });
+  }
+  // Check missing days in last 3 days
+  const missing=getMissingDays(curUser.name,3);
+  if(missing.length>0){
+    NOTIFS.unshift({
+      text:"📅 أيام لم تسجل بياناتها: "+missing.length,
+      sub:missing.slice(0,3).join(", "),
+      clr:"var(--red)",
+      read:false,
+      lid:null,
+      kind:"daily-missing"
+    });
+  }
+  renderNotifs();
+}
+
+
+
+function renderRT(tab){
+  const l=rpL();
+  if(tab==="overview"){
+    const tot=l.length,act=l.filter(x=>x.st==="عميل فعلي").length,can=l.filter(x=>x.st==="لاغي").length;
+    const hot=l.filter(x=>score(x)>=70).length,warm=l.filter(x=>score(x)>=40&&score(x)<70).length,cold=l.filter(x=>score(x)<40).length;
+    const sla1b=l.filter(x=>sla1St(x)==="breach").length;
+    const srcMap={};l.forEach(x=>{srcMap[x.src]=(srcMap[x.src]||0)+1;});
+    const topSrc=Object.entries(srcMap).sort((a,b)=>b[1]-a[1]).slice(0,8),sm=topSrc[0]?.[1]||1;
+    $("rpt-overview").innerHTML=`
+    <div class="g4">
+      ${[["📞 Contacted",totalContactedInRange().toLocaleString(),"var(--purple)"],["📋 Total Leads",tot,"var(--blue)"],["✅ Active Clients",act,"var(--green)"],["Cancellation Rate",pct(can,tot).toFixed(2)+"%","var(--red)"]].map(([lbl,val,clr])=>`
+      <div class="kc"><div class="kc-acc" style="background:${clr}"></div><div class="kc-lbl">${lbl}</div><div class="kc-val" style="color:${clr}">${val}</div></div>`).join("")}
+    </div>
+    <div class="g4">
+      ${[["Hot Leads",hot,"var(--red)"],["Warm Leads",warm,"var(--orange)"],["SLA #1 Breach",sla1b,"var(--orange)"],["Leads جديدة",l.filter(x=>isNew(x)).length,"var(--cyan)"]].map(([lbl,val,clr])=>`
+      <div class="kc"><div class="kc-acc" style="background:${clr}"></div><div class="kc-lbl">${lbl}</div><div class="kc-val" style="color:${clr}">${val}</div></div>`).join("")}
+    </div>
+    <div class="g2">
+      <div class="card"><div class="card-title">Source Distribution</div><div class="card-sub">توزيع المصادر</div>
+        <div class="bar-list">${topSrc.map(([s,c])=>`<div class="bar-row"><div class="bar-nm">${s}</div><div class="bar-track"><div class="bar-fill" style="width:${pct(c,sm)}%;background:var(--blue)"></div></div><div class="bar-v" style="color:var(--blue2)">${c}</div></div>`).join("")}</div>
+      </div>
+      <div class="card"><div class="card-title">Conversion Funnel</div><div class="card-sub">مسار التحويل</div>
+        ${[["📞 Contacted",totalContactedInRange(),Math.max(totalContactedInRange(),1),"var(--purple)"],["📋 Total Leads",tot,Math.max(totalContactedInRange(),1),"var(--blue)"],["✅ Active Clients",act,Math.max(totalContactedInRange(),1),"var(--green)"]].map(([lbl,cnt,max,clr])=>`
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+            <div style="font-size:11px;color:var(--text2);width:100px;text-align:right">${lbl}</div>
+            <div style="flex:1;height:24px;background:var(--bg4);border-radius:5px;overflow:hidden">
+              <div style="width:${max?Math.round(pct(cnt,max)):0}%;height:100%;background:${clr};display:flex;align-items:center;padding-right:7px;font-size:10px;font-weight:700;color:#fff;border-radius:5px">${max?pct(cnt,max).toFixed(2):"0.00"}%</div>
+            </div>
+            <div style="font-size:11px;font-weight:700;width:24px;font-family:Outfit">${cnt}</div>
+          </div>`).join("")}
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div style="text-align:center;background:var(--bg3);border-radius:6px;padding:7px">
+            <div style="font-size:9px;color:var(--text3)">Contacted → Lead</div>
+            <div style="font-size:14px;font-weight:700;color:var(--green);font-family:Outfit">${totalContactedInRange()>0?pct(tot,totalContactedInRange()).toFixed(2):"0.00"}%</div>
+          </div>
+          <div style="text-align:center;background:var(--bg3);border-radius:6px;padding:7px">
+            <div style="font-size:9px;color:var(--text3)">Lead → Active</div>
+            <div style="font-size:14px;font-weight:700;color:var(--cyan);font-family:Outfit">${tot>0?pct(act,tot).toFixed(2):"0.00"}%</div>
+          </div>
+          <div style="text-align:center;background:var(--bg3);border-radius:6px;padding:7px">
+            <div style="font-size:9px;color:var(--text3)">Contacted → Active</div>
+            <div style="font-size:14px;font-weight:700;color:var(--purple);font-family:Outfit">${totalContactedInRange()>0?pct(act,totalContactedInRange()).toFixed(2):"0.00"}%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="g3">
+      <div class="card"><div class="card-title">Lead Score</div><div class="card-sub">Hot/Warm/Cold</div><canvas id="r-sc" height="150"></canvas></div>
+      <div class="card"><div class="card-title">Status Breakdown</div><div class="card-sub">توزيع الحالات</div><canvas id="r-st" height="150"></canvas></div>
+      <div class="card"><div class="card-title">SLA #1 Performance</div><div class="card-sub">الرد خلال 24h</div><canvas id="r-sla" height="150"></canvas></div>
+    </div>`;
+    setTimeout(()=>{
+      donut("r-sc",["Hot","Warm","Cold"],[hot,warm,cold],["#F55252","#F5924A","#4B7CF5"]);
+      const sts=["جديد","تحت المتابعة","تواصل مرة أخرى","عميل فعلي","لاغي"];
+      donut("r-st",sts,[l.filter(x=>isNew(x)).length,...["تحت المتابعة","تواصل مرة أخرى","عميل فعلي","لاغي"].map(s=>l.filter(x=>x.st===s).length)],["#22D4F5","#4B7CF5","#F5924A","#22C997","#F55252"]);
+      const sOk=l.filter(x=>sla1St(x)==="ok").length,sW=l.filter(x=>sla1St(x)==="warn").length;
+      donut("r-sla",["On Time","Warning","Breach"],[sOk,sW,sla1b],["#22C997","#F5924A","#F55252"]);
+    },50);
+  }
+  else if(tab==="marketing"){
+    const months=getMonthRange();
+    const srcData=DD.source.map(src=>{
+      const pot=l.filter(x=>x.src===src).length;
+      const act=l.filter(x=>x.src===src&&x.st==="عميل فعلي").length;
+      const can=l.filter(x=>x.src===src&&x.st==="لاغي").length;
+      const contacted=months.reduce((sum,{m})=>sum+(MC.channels[src]?.[m]||0),0);
+      return{src,contacted,pot,act,can,conv:pct(act,pot),cancelRate:pct(can,pot)};
+    }).filter(x=>x.pot>0||x.contacted>0);
+    const actuals=l.filter(x=>x.st==="عميل فعلي");
+    const expMap={};actuals.forEach(x=>{const c=x.exp||"أخرى";expMap[c]=(expMap[c]||0)+1;});
+    $("rpt-marketing").innerHTML=`
+    <div class="card" style="margin-bottom:13px">
+      <div class="card-title">Digital Marketing Performance</div>
+      <div class="card-sub">Total Contacted / Potential Leads / Actual / Conversion % / Cancellation %</div>
+      <div style="overflow-x:auto;margin-top:9px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr>${["Channel","Contacted","Potential","Actual","Cancelled","Conv %","Cancel %"].map(h=>`<th style="background:var(--bg3);padding:8px 10px;text-align:right;font-weight:600;color:var(--text2);font-size:10px;border-bottom:1px solid var(--border)">${h}</th>`).join("")}</tr></thead>
+          <tbody>${srcData.map(r=>`<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:8px 10px;font-weight:600">${r.src}</td>
+            <td style="padding:8px 10px;text-align:right;font-family:Outfit">${r.contacted.toLocaleString()}</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--blue2)">${r.pot}</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--green)">${r.act}</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--red)">${r.can}</td>
+            <td style="padding:8px 10px;text-align:right"><span class="badge ${r.conv>5?"b-active":r.conv>2?"b-revisit":"b-noreply"}">${r.conv.toFixed(2)}%</span></td>
+            <td style="padding:8px 10px;text-align:right"><span class="badge ${r.cancelRate>50?"b-cancelled":r.cancelRate>25?"b-revisit":"b-noreply"}">${r.cancelRate.toFixed(2)}%</span></td>
+          </tr>`).join("")}
+          <tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">
+            <td style="padding:8px 10px">الإجمالي</td>
+            <td style="padding:8px 10px;text-align:right;font-family:Outfit">${months.reduce((s,{m})=>s+DD.source.reduce((ss,ch)=>ss+(MC.channels[ch]?.[m]||0),0),0).toLocaleString()}</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--blue2)">${l.length}</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--green)">${l.filter(x=>x.st==="عميل فعلي").length}</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--red)">${l.filter(x=>x.st==="لاغي").length}</td>
+            <td style="padding:8px 10px;text-align:right">${pct(l.filter(x=>x.st==="عميل فعلي").length,l.length).toFixed(2)}%</td>
+            <td style="padding:8px 10px;text-align:right">${pct(l.filter(x=>x.st==="لاغي").length,l.length).toFixed(2)}%</td>
+          </tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card"><div class="card-title">Country of Export — Actuals</div><div class="card-sub">بلد التصدير للعملاء الفعليين</div><canvas id="r-exp" height="180"></canvas></div>
+      <div class="card"><div class="card-title">SLA Violations</div><div class="card-sub">Leads تجاوزت 24h بدون حالة</div>
+        <div style="margin-top:7px">${LEADS.filter(x=>sla1St(x)!=="ok").slice(0,6).map(l=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+            <div><div style="font-size:11px;font-weight:600">${l.nm}</div><div style="font-size:10px;color:var(--text3)">${l.rep}</div></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span style="font-size:10px;color:var(--text2)">${sla1Hrs(l)}h</span>
+              <span class="sla-t ${sla1St(l)==="breach"?"sla-b":"sla-w"}">${sla1St(l)==="breach"?"Breach":"Warning"}</span>
+            </div>
+          </div>`).join("")||'<div style="text-align:center;padding:18px;color:var(--green);font-size:12px">✅ لا توجد violations</div>'}
+      </div>
+    </div>`;
+    setTimeout(()=>{
+      const clrs=["#4B7CF5","#F5924A","#22C997","#A855F7","#F55252","#F5C84A","#22D4F5","#6B72A0"];
+      const ctx=$("r-exp");if(!ctx)return;if(charts["r-exp"])charts["r-exp"].destroy();
+      charts["r-exp"]=new Chart(ctx,{type:"doughnut",data:{labels:Object.keys(expMap),datasets:[{data:Object.values(expMap),backgroundColor:clrs,borderWidth:0}]},
+        options:{responsive:true,plugins:{legend:{labels:{color:"#6B72A0",font:{size:10}},position:"right"}},cutout:"45%"}});
+    },50);
+  }
+  else if(tab==="salesperf"){
+    const sd=SALES_USERS.map(s=>{
+      const m=l.filter(x=>x.repId===s.id);
+      const act=m.filter(x=>x.st==="عميل فعلي").length,can=m.filter(x=>x.st==="لاغي").length;
+      const slaOk=m.filter(x=>sla1St(x)==="ok").length;
+      return{...s,total:m.length,act,can,conv:pct(act,m.length),cancelRate:pct(can,m.length),slaPct:m.length?pct(slaOk,m.length):100};
+    }).sort((a,b)=>b.act-a.act);
+    const top=sd[0]||{name:"—",act:0};const maxA=top.act||1;
+    const srvMap={};l.filter(x=>x.st==="عميل فعلي").forEach(x=>{svcStr(x).split("، ").filter(Boolean).forEach(v=>{srvMap[v]=(srvMap[v]||0)+1;});});
+    const srvS=Object.entries(srvMap).sort((a,b)=>b[1]-a[1]),sm2=srvS[0]?.[1]||1;
+    $("rpt-salesperf").innerHTML=`
+    <div class="card" style="margin-bottom:13px;background:linear-gradient(135deg,rgba(245,200,74,.09),rgba(245,146,74,.06));border-color:rgba(245,200,74,.2)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="font-size:32px">🏆</div>
+        <div><div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.08em">Sales of the ${periodTitleEn(adminRptPeriod)}</div>
+          <div style="font-size:18px;font-weight:700;margin-top:2px">${top.name}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${top.act} Active Clients · Conv: ${top.conv}% · Cancel: ${top.cancelRate}%</div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:13px">
+      <div class="card-title">Sales Team Leaderboard</div>
+      <div style="overflow-x:auto;margin-top:9px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr>${["#","Sales Rep","Total","Active","Cancelled","Conv %","Cancel %","SLA %"].map(h=>`<th style="background:var(--bg3);padding:8px 10px;text-align:right;font-weight:600;color:var(--text2);font-size:10px;border-bottom:1px solid var(--border)">${h}</th>`).join("")}</tr></thead>
+          <tbody>${sd.map((s,i)=>`<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:8px 10px"><span style="width:19px;height:19px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${i===0?"rgba(255,215,0,.15)":i===1?"rgba(192,192,192,.15)":i===2?"rgba(205,127,50,.15)":"var(--bg4)"};color:${i===0?"#FFD700":i===1?"#C0C0C0":i===2?"#CD7F32":"var(--text4)"}">${i+1}</span></td>
+            <td style="padding:8px 10px;font-weight:600">${s.name}</td>
+            <td style="padding:8px 10px;text-align:right;font-family:Outfit">${s.total}</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--green);font-weight:700">${s.act}</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--red)">${s.can}</td>
+            <td style="padding:8px 10px;text-align:right"><span class="badge ${s.conv>30?"b-active":s.conv>15?"b-revisit":"b-noreply"}">${s.conv.toFixed(2)}%</span></td>
+            <td style="padding:8px 10px;text-align:right"><span class="badge ${s.cancelRate>50?"b-cancelled":s.cancelRate>25?"b-revisit":"b-noreply"}">${s.cancelRate.toFixed(2)}%</span></td>
+            <td style="padding:8px 10px;text-align:right"><span class="badge ${s.slaPct>80?"b-active":s.slaPct>50?"b-revisit":"b-cancelled"}">${s.slaPct.toFixed(2)}%</span></td>
+          </tr>`).join("")}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card"><div class="card-title">Active Clients per Sales</div>
+        <div class="bar-list" style="margin-top:7px">${sd.map(s=>`<div class="bar-row"><div class="bar-nm">${s.name}</div><div class="bar-track"><div class="bar-fill" style="width:${s.act?pct(s.act,maxA):0}%;background:var(--orange)"></div></div><div class="bar-v" style="color:var(--orange2)">${s.act}</div></div>`).join("")}</div>
+      </div>
+      <div class="card"><div class="card-title">Requested Services — Actuals</div>
+        <div class="bar-list" style="margin-top:7px">${srvS.map(([srv,cnt])=>`<div class="bar-row"><div class="bar-nm">${srv}</div><div class="bar-track"><div class="bar-fill" style="width:${pct(cnt,sm2)}%;background:var(--green)"></div></div><div class="bar-v" style="color:var(--green2)">${cnt}</div></div>`).join("")}</div>
+      </div>
+    </div>`;
+  }
+  else if(tab==="coords"){
+    const months=getMonthRange();
+    const cd=COORD_USERS.map(c=>{
+      const m=l.filter(x=>x.byId===c.id);
+      const act=m.filter(x=>x.st==="عميل فعلي").length,can=m.filter(x=>x.st==="لاغي").length;
+      const contacted=months.reduce((sum,{m:mi})=>sum+(MC.coords[c.name]?.[mi]||0),0);
+      const quality=m.length?pct(m.filter(x=>x.src&&x.nm&&x.prod).length,m.length):0;
+      const c2l=contacted>0?pct(m.length,contacted):0;
+      const l2a=m.length>0?pct(act,m.length):0;
+      const c2a=contacted>0?pct(act,contacted):0;
+      return{...c,total:m.length,act,can,contacted,conv:pct(act,m.length),cancelRate:pct(can,m.length),quality,c2l,l2a,c2a};
+    }).sort((a,b)=>b.act-a.act);
+    const topC=cd[0]||{name:"—",act:0};
+    $("rpt-coords").innerHTML=`
+    <div class="card" style="margin-bottom:13px;background:linear-gradient(135deg,rgba(245,200,74,.09),rgba(34,201,151,.06));border-color:rgba(245,200,74,.2)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="font-size:32px">🌟</div>
+        <div><div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.08em">Coordinator of the ${periodTitleEn(adminRptPeriod)}</div>
+          <div style="font-size:18px;font-weight:700;margin-top:2px">${topC.name}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${topC.act} Active Clients · Conv: ${topC.conv.toFixed(2)}% · Cancel: ${topC.cancelRate}%</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Coordinators Performance</div>
+      <div style="margin-top:11px;display:flex;flex-direction:column;gap:13px">
+        ${cd.map(c=>`<div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+            <div style="font-size:12px;font-weight:700">${c.name}</div>
+            <div style="display:flex;gap:9px;font-size:11px;flex-wrap:wrap">
+              <span style="color:var(--purple2)">📞 Contacted: ${c.contacted.toLocaleString()}</span>
+              <span style="color:var(--blue2)">📋 Leads: ${c.total}</span>
+              <span style="color:var(--green)">✅ Active: ${c.act}</span>
+              <span style="color:var(--red)">❌ Cancelled: ${c.can}</span>
+              <span style="color:var(--green)">C→L: ${c.c2l.toFixed(2)}%</span>
+              <span style="color:var(--cyan)">L→A: ${c.l2a.toFixed(2)}%</span>
+              <span style="color:var(--purple2)">C→A: ${c.c2a.toFixed(2)}%</span>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px">
+            ${[["Contacted",c.contacted,Math.max(...cd.map(x=>x.contacted),1),"var(--purple)"],["Leads",c.total,Math.max(...cd.map(x=>x.total),1),"var(--blue)"],["Active",c.act,Math.max(...cd.map(x=>x.act),1),"var(--green)"],["C→L%",c.c2l,100,"var(--green)"],["L→A%",c.l2a,100,"var(--cyan)"],["C→A%",c.c2a,100,"var(--purple)"]].map(([lbl,val])=>`
+            <div style="background:var(--bg3);border-radius:6px;padding:5px;text-align:center">
+              <div style="font-size:9px;color:var(--text3);margin-bottom:2px">${lbl}</div>
+              <div style="font-size:14px;font-weight:700;font-family:Outfit">${typeof val==="number"&&val>999?val.toLocaleString():val}${lbl.includes("%")?"%":""}</div>
+            </div>`).join("")}
+          </div>
+        </div>`).join("")}
+      </div>
+    </div>`;
+  }
+  else if(tab==="clients"){
+    const specMap={},cancelMap={},ieMap={};
+    l.forEach(x=>{if(x.spec)specMap[x.spec]=(specMap[x.spec]||0)+1;if(x.cr)cancelMap[x.cr]=(cancelMap[x.cr]||0)+1;if(x.ie)ieMap[x.ie]=(ieMap[x.ie]||0)+1;});
+    const srvMap={};l.forEach(x=>{svcStr(x).split("، ").filter(Boolean).forEach(v=>{srvMap[v]=(srvMap[v]||0)+1;});});
+    const specS=Object.entries(specMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const srvS=Object.entries(srvMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const tot=l.length||1,sm3=specS[0]?.[1]||1,sm4=srvS[0]?.[1]||1;
+    const acts=l.filter(x=>x.st==="عميل فعلي");
+    const sD=acts.filter(x=>x.dt===x.fcd).length;
+    const u7=acts.filter(x=>{if(!x.dt||!x.lcd)return false;return(new Date(x.lcd)-new Date(x.dt))/86400000<=7;}).length;
+    const u30=acts.filter(x=>{if(!x.dt||!x.lcd)return false;const d=(new Date(x.lcd)-new Date(x.dt))/86400000;return d>7&&d<=30;}).length;
+    const ov30=acts.filter(x=>{if(!x.dt||!x.lcd)return false;return(new Date(x.lcd)-new Date(x.dt))/86400000>30;}).length;
+    $("rpt-clients").innerHTML=`
+    <div class="g2">
+      <div class="card"><div class="card-title">Field of Specialization</div><div class="card-sub">مجالات التخصص</div>
+        <div class="bar-list" style="margin-top:7px">${specS.map(([sp,cnt])=>`<div class="bar-row"><div class="bar-nm">${sp}</div><div class="bar-track"><div class="bar-fill" style="width:${pct(cnt,sm3)}%;background:var(--purple)"></div></div><div class="bar-v" style="color:var(--purple2)">${pct(cnt,tot)}%</div></div>`).join("")}</div>
+      </div>
+      <div class="card"><div class="card-title">Requested Services</div><div class="card-sub">الخدمات المطلوبة</div>
+        <div class="bar-list" style="margin-top:7px">${srvS.map(([srv,cnt])=>`<div class="bar-row"><div class="bar-nm">${srv}</div><div class="bar-track"><div class="bar-fill" style="width:${pct(cnt,sm4)}%;background:var(--green)"></div></div><div class="bar-v" style="color:var(--green2)">${pct(cnt,tot)}%</div></div>`).join("")}</div>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card"><div class="card-title">Cancellation Reasons</div><div class="card-sub">أسباب الإلغاء</div><canvas id="r-cancel" height="200"></canvas></div>
+      <div class="card"><div class="card-title">Conversion Period</div><div class="card-sub">مدة التحويل لعميل فعلي</div><canvas id="r-period" height="200"></canvas></div>
+    </div>`;
+    setTimeout(()=>{
+      const clrs=["#4B7CF5","#F5924A","#22C997","#A855F7","#F55252","#F5C84A","#22D4F5","#6B72A0","#F55252","#22C997"];
+      function dn(id,data){
+        const ctx=$(id);if(!ctx)return;if(charts[id])charts[id].destroy();
+        charts[id]=new Chart(ctx,{type:"doughnut",data:{labels:Object.keys(data),datasets:[{data:Object.values(data),backgroundColor:clrs,borderWidth:0}]},
+          options:{responsive:true,plugins:{legend:{labels:{color:"#6B72A0",font:{size:10}},position:"right"}},cutout:"45%"}});
+      }
+      dn("r-cancel",cancelMap);dn("r-period",{"نفس اليوم":sD,"أقل من 7 أيام":u7,"7-30 يوم":u30,"أكثر من شهر":ov30});
+    },50);
+  }
+}
+// ═══ SETTINGS ═══
+function renderSettings(){
+  let html='<div class="set-grid"><div class="set-nav">';
+  html+='<div class="sn-item on" onclick="showST(\'users\',this)">👥 Users</div>';
+  html+='<div class="sn-item" onclick="showST(\'rr\',this)">🔄 Round Robin</div>';
+  html+='<div class="sn-item" onclick="showST(\'monthly\',this)">📊 Manual Input</div>';
+  html+='<div class="sn-item" onclick="showST(\'import\',this)">📥 Excel Import</div>';
+  html+='</div><div class="set-content">';
+  // Users
+  html+='<div class="st-sec on" id="st-users">';
+  html+='<div style="font-size:13px;font-weight:700;margin-bottom:13px">Users Management</div>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+  ["الاسم","البريد","الدور"].forEach(function(h){
+    html+='<th style="background:var(--bg3);padding:8px 10px;text-align:right;font-weight:600;color:var(--text2);font-size:10px;border-bottom:1px solid var(--border)">'+h+'</th>';
+  });
+  html+='</tr></thead><tbody>';
+  USERS.forEach(function(u){
+    const rc={admin:"var(--purple2)",coordinator:"var(--green2)",sales:"var(--orange2)"};
+    const rl={admin:"Admin",coordinator:"Coordinator",sales:"Sales"};
+    html+='<tr style="border-bottom:1px solid var(--border)">';
+    html+='<td style="padding:8px 10px"><div style="display:flex;align-items:center;gap:7px">';
+    html+='<div style="width:26px;height:26px;border-radius:7px;background:'+u.bg+';color:'+u.clr+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">'+u.av+'</div>'+u.name+'</div></td>';
+    html+='<td style="padding:8px 10px;color:var(--text2);font-size:11px">'+u.email+'</td>';
+    html+='<td style="padding:8px 10px"><span class="badge" style="background:'+u.bg+';color:'+rc[u.role]+'">'+rl[u.role]+'</span></td></tr>';
+  });
+  html+='</tbody></table></div>';
+  // Round Robin
+  html+='<div class="st-sec" id="st-rr">';
+  html+='<div style="font-size:13px;font-weight:700;margin-bottom:5px">Round Robin Control</div>';
+  html+='<div style="font-size:11px;color:var(--text2);margin-bottom:13px">إيقاف أي Sales مؤقتاً</div>';
+  SALES_USERS.forEach(function(u){
+    html+='<div class="set-row"><div><div class="si-ttl">'+u.name+'</div><div class="si-sub">'+u.email+'</div></div>';
+    html+='<label class="toggle-sw"><input type="checkbox" '+(u.inRotation!==false?"checked":"")+'  onchange="toggleRR('+u.id+',this.checked)"><span class="tsl"></span></label></div>';
+  });
+  html+='</div>';
+  // Monthly Input
+  html+='<div class="st-sec" id="st-monthly">';
+  html+='<div style="font-size:13px;font-weight:700;margin-bottom:5px">Manual Input — شهري</div>';
+  html+='<div style="font-size:11px;color:var(--text2);margin-bottom:13px">إجمالي التواصل شهرياً</div>';
+  html+='<div style="font-size:12px;font-weight:700;margin-bottom:8px;">📊 Coordinators</div>';
+  html+='<div style="overflow-x:auto;margin-bottom:18px"><table class="monthly-tbl"><thead><tr><th>Coordinator</th>';
+  MONTHS.forEach(function(m){html+='<th>'+m+'</th>';});
+  html+='</tr></thead><tbody>';
+  COORD_USERS.forEach(function(c){
+    html+='<tr><td>'+c.name+'</td>';
+    MONTHS.forEach(function(_,i){
+      const v=MC.coords[c.name]&&MC.coords[c.name][i]!==undefined?MC.coords[c.name][i]:0;
+      html+='<td><input class="monthly-inp" type="number" value="'+v+'" onchange="MC.coords[\''+c.name+'\']['+i+']=parseInt(this.value)||0" min="0"></td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  html+='<div style="font-size:12px;font-weight:700;margin-bottom:8px;">📣 Channels</div>';
+  html+='<div style="overflow-x:auto"><table class="monthly-tbl"><thead><tr><th>Channel</th>';
+  MONTHS.forEach(function(m){html+='<th>'+m+'</th>';});
+  html+='</tr></thead><tbody>';
+  DD.source.forEach(function(s){
+    html+='<tr><td>'+s+'</td>';
+    MONTHS.forEach(function(_,i){
+      const v=MC.channels[s]&&MC.channels[s][i]!==undefined?MC.channels[s][i]:0;
+      html+='<td><input class="monthly-inp" type="number" value="'+v+'" onchange="MC.channels[\''+s+'\']['+i+']=parseInt(this.value)||0" min="0"></td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  html+='<button class="btn primary" style="margin-top:13px" onclick="showToast(\'✓\',\'تم حفظ البيانات\')">💾 حفظ</button>';
+  html+='</div>';
+  // Excel Import Section
+  html+='<div class="st-sec" id="st-import">';
+  html+='<div style="font-size:13px;font-weight:700;margin-bottom:5px">📥 استيراد البيانات من Excel</div>';
+  html+='<div style="font-size:11px;color:var(--text2);margin-bottom:18px">حمّل الـ Template، املأه، ثم ارفعه هنا</div>';
+  html+='<div style="background:var(--bg3);border:1px dashed var(--border2);border-radius:var(--r-md);padding:24px;text-align:center;margin-bottom:14px">';
+  html+='<div style="font-size:28px;margin-bottom:8px">📊</div>';
+  html+='<div style="font-size:13px;font-weight:600;margin-bottom:14px">اختر ملف Excel أو CSV</div>';
+  html+='<input type="file" id="excel-import-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelImport(this)">';
+  html+='<button class="btn primary lg" onclick="document.getElementById(\'excel-import-input\').click()">📁 اختر الملف</button>';
+  html+='</div>';
+  html+='<div style="background:var(--bg3);border-radius:var(--r-sm);padding:14px;margin-bottom:14px">';
+  html+='<div style="font-size:12px;font-weight:700;margin-bottom:8px">📋 خطوات الاستيراد:</div>';
+  html+='<ol style="font-size:11px;color:var(--text2);padding-right:18px;line-height:1.8">';
+  html+='<li>حمّل الـ Template الجاهز بالضغط على الزرار التحت</li>';
+  html+='<li>افتح الملف في Excel وأضف بيانات Leads</li>';
+  html+='<li>الحقول المطلوبة: <strong>المصدر، اسم العميل</strong> (الباقي اختياري)</li>';
+  html+='<li>للخدمات المتعددة: افصلها بفاصلة (مثل: <code>توفير موردين، الشحن البحري</code>)</li>';
+  html+='<li>احفظ الملف وارفعه من الزرار فوق</li>';
+  html+='</ol></div>';
+  html+='<button class="btn primary" onclick="downloadTemplate()">⬇ تحميل Template Excel</button>';
+  html+='</div>';
+  html+='</div></div>';
+  $("pg-settings").innerHTML=html;
+}
+function showST(id,el){
+  document.querySelectorAll(".st-sec").forEach(s=>s.classList.remove("on"));
+  document.querySelectorAll(".sn-item").forEach(s=>s.classList.remove("on"));
+  $("st-"+id)?.classList.add("on");el.classList.add("on");
+}
+async function toggleRR(uid,active){
+  const u=USERS.find(x=>x.id===uid);
+  if(!u)return;
+  if(!supa){showToast("❌","لا يوجد اتصال");return;}
+  
+  // Update local state immediately for snappy UI
+  u.inRotation=active;
+  u.rr=active;
+  
+  try {
+    const {error} = await supa.from("profiles").update({in_rotation:active}).eq("id",uid);
+    if(error)throw error;
+    showToast(active?"✓":"⚠",u.name+" "+(active?"تفعيل":"إيقاف")+" في Round Robin");
+  } catch(err) {
+    console.error("toggleRR error:",err);
+    // Revert on error
+    u.inRotation=!active;
+    u.rr=!active;
+    showToast("❌","خطأ: "+err.message);
+    renderSettings(); // re-render to show correct state
+  }
+}
+// ═══ UTILS ═══
+function closeM(id){$(id)?.classList.remove("open");}
+document.querySelectorAll(".mov").forEach(o=>{o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("open");});});
+function showToast(icon,msg){
+  const t=$("toast");$("t-ic").textContent=icon;$("t-msg").textContent=msg;
+  t.classList.add("on");setTimeout(()=>t.classList.remove("on"),3200);
+}
+function exportCSV(){
+  const h=["ID","Code","Client","Mobile","Source","Date","Time","Sales Rep","Status","FU Date","Score","Priority","Services","Cancel Reason"];
+  const rows=LEADS.map(l=>[l.id,l.cc,l.nm,l.mob,l.src,l.dt,l.tm,l.rep,stDisplay(l),l.fuDate||"",score(l),l.priority,svcStr(l),l.cr||""].map(v=>`"${v}"`).join(","));
+  const csv=[h.join(","),...rows].join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"}));
+  a.download=`SLL_CRM_${today()}.csv`;a.click();
+}
+function downloadTemplate(){
+  // Generate a template Excel file with proper headers
+  const ws=XLSX.utils.aoa_to_sheet([
+    ["المصدر","تاريخ التسجيل","وقت التسجيل","اسم العميل","الموبايل","الجنسية","بلد الاستيراد","بلد التصدير","مجال التخصص","المنتج المطلوب","الكمية","الوحدة","رأس المال","مستورد/مصدر","توفر المورد","الخدمات المطلوبة","الأولوية","Coordinator"],
+    ["Whatsapp","2026-05-04","12:00","اسم العميل التجريبي","01000000000","مصر","مصر","الصين","Machinery & Equipment","منتج تجريبي","","","10000","يرغب في الاستيراد","غير متوفر","توفير موردين","عادي","Fatma"],
+  ]);
+  ws["!cols"]=Array(18).fill({wch:18});
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Leads");
+  XLSX.writeFile(wb,"SLL_CRM_Template.xlsx");
+  showToast("✓","تم تحميل الـ Template");
+}
+async function handleExcelImport(input){
+  const file=input.files[0];if(!file)return;
+  if(!supa){showToast("❌","لا يوجد اتصال بالسيرفر");return;}
+  showToast("⏳","جاري قراءة الملف...");
+  
+  const reader=new FileReader();
+  reader.onload=async function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:"array"});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:""});
+      if(!rows.length){showToast("❌","الملف فارغ");return;}
+      
+      const colMap={
+        "المصدر":"src","Source":"src","Channel":"src",
+        "تاريخ التسجيل":"dt","Date":"dt",
+        "وقت التسجيل":"tm","Time":"tm",
+        "اسم العميل":"nm","Name":"nm",
+        "شركة العميل":"company","Company":"company","الشركة":"company",
+        "الموبايل":"mob","Mobile":"mob","Phone":"mob",
+        "الجنسية":"nat",
+        "بلد الاستيراد":"imp",
+        "بلد التصدير":"exp",
+        "مجال التخصص":"spec",
+        "المنتج المطلوب":"prod",
+        "الكمية":"qty","الوحدة":"unit",
+        "رأس المال":"cap","Capital":"cap",
+        "مستورد/مصدر":"ie","مستورد / مصدر":"ie",
+        "توفر المورد":"sup",
+        "الخدمات المطلوبة":"svc","Services":"svc",
+        "الأولوية":"priority",
+        "Coordinator":"by","مدخل البيانات":"by",
+        "Sales Rep":"rep","فريق المبيعات":"rep",
+        "الحالة":"st",
+        "تاريخ أول اتصال":"fcd","تاريخ اول اتصال":"fcd",
+        "وقت أول اتصال":"fct","وقت اول اتصال":"fct",
+        "نتيجة أول مكالمة":"c1","نتيجة اول مكالمة":"c1",
+        "نتيجة ثاني مكالمة":"c2","نتيجة ثانى مكالمة":"c2",
+        "نتيجة ثالث مكالمة":"c3",
+        "تاريخ آخر مكالمة":"lcd","تاريخ اخر مكالمة":"lcd",
+        "سبب الإلغاء":"cr","سبب الالغاء":"cr",
+        "Reactivated":"reactivated","مسترد":"reactivated"
+      };
+      const stMap={
+        "لاغى":"لاغي","لاغي":"لاغي",
+        "تحت المتابعة":"تحت المتابعة",
+        "لم يتم الرد":"لم يتم الرد",
+        "عميل فعلى":"عميل فعلي","عميل فعلي":"عميل فعلي",
+        "":""
+      };
+      
+      const batch = [];
+      let skipped = 0;
+      let rrIdx = 0;
+      
+      for(const row of rows){
+        const lead = {};
+        Object.keys(row).forEach(k => {
+          const tk = String(k||"").trim();
+          if(colMap[tk]){
+            const v = row[k];
+            if(v instanceof Date){
+              const fld = colMap[tk];
+              if(["dt","fcd","lcd"].includes(fld)){
+                lead[fld] = v.toISOString().slice(0,10);
+              } else if(["tm","fct"].includes(fld)){
+                lead[fld] = String(v.getHours()).padStart(2,"0")+":"+String(v.getMinutes()).padStart(2,"0");
+              } else {
+                lead[fld] = String(v).trim();
+              }
+            } else {
+              lead[colMap[tk]] = String(v||"").trim();
+            }
+          }
+        });
+        
+        if(!lead.nm || !lead.src){skipped++; continue;}
+        
+        // Find coord
+        let coord = null;
+        if(lead.by){
+          coord = USERS.find(u=>u.role==="coordinator" && u.name.toLowerCase()===lead.by.trim().toLowerCase());
+        }
+        if(!coord) coord = curUser.role==="coordinator"?curUser:COORD_USERS[0];
+        
+        // Find sales rep
+        let rep = null;
+        if(lead.rep){
+          rep = USERS.find(u=>u.role==="sales" && u.name.toLowerCase()===lead.rep.trim().toLowerCase());
+        }
+        if(!rep){
+          rep = SALES_USERS[rrIdx % SALES_USERS.length];
+          rrIdx++;
+        }
+        
+        const svcArr = lead.svc ? lead.svc.split(/[،,]/).map(s=>s.trim()).filter(Boolean) : [];
+        const mappedSt = stMap[lead.st]!==undefined ? stMap[lead.st] : (lead.st||"");
+        
+        batch.push({
+          cc: "CLT-"+Date.now()+"-"+batch.length,
+          by_id: coord.id, by_name: coord.name,
+          rep_id: rep.id, rep_name: rep.name,
+          src: lead.src,
+          dt: lead.dt || today(),
+          tm: lead.tm || nowTime(),
+          nm: lead.nm, company: lead.company||"", mob: lead.mob||"",
+          nat: lead.nat||"مصر",
+          imp: lead.imp||"مصر",
+          exp: lead.exp||"الصين",
+          spec: lead.spec||"اخرى",
+          prod: lead.prod||"",
+          qty: lead.qty||"", unit: lead.unit||"",
+          cap: lead.cap||"",
+          ie: lead.ie||"يرغب في الاستيراد",
+          sup: lead.sup||"غير متوفر",
+          svc: svcArr,
+          priority: lead.priority||"عادي",
+          fcd: lead.fcd||null,
+          fct: lead.fct||null,
+          c1: lead.c1||"",
+          c2: lead.c2||"",
+          c3: lead.c3||"",
+          lcd: lead.lcd||null,
+          st: mappedSt,
+          cr: lead.cr||"",
+          reactivated: lead.reactivated||""
+        });
+      }
+      
+      // Insert in chunks of 200 to avoid timeout
+      const CHUNK_SIZE = 200;
+      let added = 0;
+      for(let i=0; i<batch.length; i+=CHUNK_SIZE){
+        const chunk = batch.slice(i, i+CHUNK_SIZE);
+        showToast("⏳", "جاري رفع... " + (i+chunk.length) + "/" + batch.length);
+        const {error} = await supa.from("leads").insert(chunk);
+        if(error){console.error(error); throw error;}
+        added += chunk.length;
+      }
+      
+      showToast("✓", "تم استيراد "+added+" Lead" + (skipped>0?" (تخطي "+skipped+")":""));
+      input.value="";
+      
+      // Reload
+      await loadAllData();
+      if($("pg-leads")&&$("pg-leads").classList.contains("active"))renderLeadsContent();
+      if($("pg-dashboard")&&$("pg-dashboard").classList.contains("active"))renderDash();
+      renderSettings();
+    } catch(err){
+      console.error(err);
+      showToast("❌","خطأ: "+err.message.slice(0,80));
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+
+// Auto-restore session on page load — placed at end so all functions are defined
+window.addEventListener("DOMContentLoaded", async () => {
+  console.log("[Auth] DOMContentLoaded fired");
+  if(!supa) {
+    console.error("[Auth] Supabase client not initialized!");
+    return;
+  }
+  console.log("[Auth] Checking for existing session...");
+  try {
+    const {data, error} = await supa.auth.getSession();
+    if(error) {
+      console.error("[Auth] Session check error:", error);
+      return;
+    }
+    if(data.session){
+      console.log("[Auth] Found existing session, restoring...");
+      supaSession = data.session;
+      const {data:profile, error:perr} = await supa.from("profiles").select("*").eq("id", data.session.user.id).single();
+      if(perr || !profile) {
+        console.warn("[Auth] No profile found, user may need to log in again");
+        await supa.auth.signOut();
+        return;
+      }
+      curUser = {
+        id: profile.id, name: profile.name, email: profile.email, role: profile.role,
+        av: profile.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase(),
+        clr: profile.role==="admin"?"var(--purple2)":profile.role==="coordinator"?"var(--green2)":"var(--orange2)",
+        bg: profile.role==="admin"?"var(--admin-bg)":profile.role==="coordinator"?"var(--coord-bg)":"var(--sales-bg)"
+      };
+      console.log("[Auth] Restored user:", curUser.name);
+      try {
+        await loadAllData();
+      } catch(e) {
+        console.error("[Auth] loadAllData failed during restore:", e);
+      }
+      try {
+        initApp();
+      } catch(e) {
+        console.error("[Auth] initApp failed during restore:", e);
+      }
+    } else {
+      console.log("[Auth] No session, showing login");
+    }
+  } catch(err) {
+    console.error("[Auth] Restore failed:", err);
+  }
+});
+
+</script>
+<div style="position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:var(--text4);pointer-events:none;z-index:10;font-family:Outfit;letter-spacing:.04em">
+  Developed by <strong style="color:var(--text3)">Straight Line Group</strong>
+</div>
+</body>
+</html>
