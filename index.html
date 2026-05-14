@@ -485,6 +485,7 @@ tr.sla1-row .sticky-actions{background:rgba(245,82,82,0.06);}
     <div class="page" id="pg-leads"></div>
     <div class="page" id="pg-reports"></div>
     <div class="page" id="pg-myreports"></div>
+    <div class="page" id="pg-tools"></div>
     <div class="page" id="pg-settings"></div>
   </div>
 </div>
@@ -861,6 +862,8 @@ async function loadAllData(){
       id: p.id,
       name: p.name,
       email: p.email,
+      phone: p.phone || "",
+      jobTitle: p.job_title || "",
       role: p.role,
       av: p.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase(),
       clr: p.role==="admin"?"var(--purple2)":p.role==="coordinator"?"var(--green2)":"var(--orange2)",
@@ -1245,6 +1248,7 @@ function initApp(){
   $("sb-urole").textContent=rl[u.role];$("sb-urole").style.color=rc[u.role];
   const nav=[{id:"dashboard",icon:"⊞",lbl:"Dashboard"},{id:"leads",icon:"☰",lbl:"Leads"},
     ...((u.role==="coordinator"||u.role==="sales")?[{id:"myreports",icon:"📊",lbl:"My Reports"}]:[]),
+    ...((u.role==="admin"||u.role==="sales")?[{id:"tools",icon:"🛠️",lbl:"Tools"}]:[]),
     ...(u.role==="admin"?[{id:"reports",icon:"📊",lbl:"Reports"},{id:"settings",icon:"⚙",lbl:"Settings"}]:[])];
   const nb=$("sb-nav");nb.innerHTML="";
   nav.forEach(n=>{
@@ -1309,11 +1313,18 @@ function toggleTheme(){
 })();
 
 function showPg(id){
+  // Block access for unauthorized roles
+  if(id==="tools" && curUser.role!=="admin" && curUser.role!=="sales"){
+    showToast("⚠","غير مسموح"); return;
+  }
+  if(id==="users" && curUser.role!=="admin"){
+    showToast("⚠","غير مسموح"); return;
+  }
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.querySelectorAll(".sb-item").forEach(n=>n.classList.remove("active"));
   $("pg-"+id)?.classList.add("active");
   document.querySelector(`.sb-item[data-pg="${id}"]`)?.classList.add("active");
-  const ttls={dashboard:"Dashboard",leads:"Leads",reports:"Reports",settings:"Settings"};
+  const ttls={dashboard:"Dashboard",leads:"Leads",reports:"Reports",settings:"Settings",tools:"🛠️ Tools"};
   $("topbar-title").textContent=ttls[id]||id;
   const ex=$("topbar-extra");ex.innerHTML="";
   if(id==="leads"&&curUser.role!=="sales"){
@@ -1324,6 +1335,7 @@ function showPg(id){
   if(id==="reports")renderReports();
   if(id==="myreports")renderMyReports();
   if(id==="settings")renderSettings();
+  if(id==="tools")renderTools();
   // Save current page so refresh stays on it
   try { localStorage.setItem("sll-crm-last-page", id); } catch(e){}
 }
@@ -3945,25 +3957,51 @@ function renderSettings(){
   html+='<div class="sn-item" onclick="showST(\'rr\',this)">🔄 Round Robin</div>';
   html+='<div class="sn-item" onclick="showST(\'monthly\',this)">📊 Manual Input</div>';
   html+='<div class="sn-item" onclick="showST(\'import\',this)">📥 Excel Import</div>';
+  html+='<div class="sn-item" onclick="showST(\'calcdefaults\',this)">🛠️ Calc Defaults</div>';
   html+='</div><div class="set-content">';
-  // Users
+  // Users — Full editable management
   html+='<div class="st-sec on" id="st-users">';
-  html+='<div style="font-size:13px;font-weight:700;margin-bottom:13px">Users Management</div>';
-  html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
-  ["الاسم","البريد","الدور"].forEach(function(h){
-    html+='<th style="background:var(--bg3);padding:8px 10px;text-align:right;font-weight:600;color:var(--text2);font-size:10px;border-bottom:1px solid var(--border)">'+h+'</th>';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:8px">';
+  html+='<div><div style="font-size:13px;font-weight:700;margin-bottom:3px">👥 Users Management</div>';
+  html+='<div style="font-size:11px;color:var(--text2)">إدارة بيانات المستخدمين — يظهر في Tools والـ PDFs المُصدّرة</div></div>';
+  html+='<button class="btn primary" onclick="saveAllUsersInfo()" id="users-save-btn">💾 حفظ كل التغييرات</button>';
+  html+='</div>';
+  html+='<div id="users-save-status" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:7px;font-size:12px;font-weight:600"></div>';
+  html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px"><thead><tr>';
+  ["#","الدور","الاسم","البريد","رقم التليفون","المسمى الوظيفي","الحالة"].forEach(function(h){
+    html+='<th style="background:var(--bg3);padding:9px 10px;text-align:right;font-weight:600;color:var(--text2);font-size:10px;border-bottom:1px solid var(--border);white-space:nowrap">'+h+'</th>';
   });
   html+='</tr></thead><tbody>';
-  USERS.forEach(function(u){
+  // Sort: admin → coordinator → sales, then by name
+  const sortedUsers=USERS.slice().sort(function(a,b){
+    const order={admin:1,coordinator:2,sales:3};
+    if((order[a.role]||9)!==(order[b.role]||9)) return (order[a.role]||9)-(order[b.role]||9);
+    return (a.name||"").localeCompare(b.name||"");
+  });
+  sortedUsers.forEach(function(u,idx){
     const rc={admin:"var(--purple2)",coordinator:"var(--green2)",sales:"var(--orange2)"};
     const rl={admin:"Admin",coordinator:"Coordinator",sales:"Sales"};
-    html+='<tr style="border-bottom:1px solid var(--border)">';
+    const isMe=curUser.id===u.id;
+    html+='<tr style="border-bottom:1px solid var(--border)" data-uid="'+u.id+'">';
+    html+='<td style="padding:8px 10px;color:var(--text3);font-family:Outfit;text-align:center">'+(idx+1)+'</td>';
+    html+='<td style="padding:8px 10px"><span class="badge" style="background:'+u.bg+';color:'+rc[u.role]+';font-size:10px">'+rl[u.role]+'</span></td>';
     html+='<td style="padding:8px 10px"><div style="display:flex;align-items:center;gap:7px">';
-    html+='<div style="width:26px;height:26px;border-radius:7px;background:'+u.bg+';color:'+u.clr+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">'+u.av+'</div>'+u.name+'</div></td>';
-    html+='<td style="padding:8px 10px;color:var(--text2);font-size:11px">'+u.email+'</td>';
-    html+='<td style="padding:8px 10px"><span class="badge" style="background:'+u.bg+';color:'+rc[u.role]+'">'+rl[u.role]+'</span></td></tr>';
+    html+='<div style="width:26px;height:26px;border-radius:7px;background:'+u.bg+';color:'+u.clr+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">'+u.av+'</div>';
+    html+='<span style="font-weight:600">'+u.name+(isMe?' <span style="color:var(--blue2);font-size:9px">(انت)</span>':'')+'</span></div></td>';
+    html+='<td style="padding:6px 10px"><input type="email" id="ue-'+u.id+'" value="'+(u.email||"")+'" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:5px 8px;color:var(--text);font-size:11px;width:100%;min-width:160px;font-family:Outfit;direction:ltr;text-align:left" placeholder="user@sllcrm.com"></td>';
+    html+='<td style="padding:6px 10px"><input type="tel" id="up-'+u.id+'" value="'+(u.phone||"")+'" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:5px 8px;color:var(--text);font-size:11px;width:100%;min-width:140px;font-family:Outfit;direction:ltr;text-align:left" placeholder="+20 100 000 0000"></td>';
+    html+='<td style="padding:6px 10px"><input type="text" id="uj-'+u.id+'" value="'+(u.jobTitle||"")+'" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:5px 8px;color:var(--text);font-size:11px;width:100%;min-width:180px" placeholder="Senior Sales Account Manager"></td>';
+    html+='<td style="padding:8px 10px"><span style="color:'+(u.active?"var(--green2)":"var(--text3)")+';font-size:11px;font-weight:600">'+(u.active?"✓ نشط":"⏸ موقوف")+'</span></td>';
+    html+='</tr>';
   });
   html+='</tbody></table></div>';
+  html+='<div style="margin-top:14px;padding:10px 12px;background:var(--bg3);border-radius:7px;font-size:11px;color:var(--text2);line-height:1.6">';
+  html+='<div style="font-weight:700;color:var(--text);margin-bottom:4px">ℹ️ ملاحظات:</div>';
+  html+='<div>• البيانات المُدخلة هنا تظهر في Tools (Cost Calculator) وفي الـ PDF المُصدّر</div>';
+  html+='<div>• الإيميل يجب أن يكون فريد لكل مستخدم</div>';
+  html+='<div>• اضغط "حفظ كل التغييرات" لحفظ كل التعديلات مرة واحدة</div>';
+  html+='</div>';
+  html+='</div>';
   // Round Robin
   html+='<div class="st-sec" id="st-rr">';
   html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px">';
@@ -4119,8 +4157,33 @@ function renderSettings(){
   html+='</ol></div>';
   html+='<button class="btn primary" onclick="downloadTemplate()">⬇ تحميل Template Excel</button>';
   html+='</div>';
+
+  // ═══ Calc Defaults Manager (Cost Calculator defaults per shipping type) ═══
+  html+='<div class="st-sec" id="st-calcdefaults">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:8px">';
+  html+='<div><div style="font-size:13px;font-weight:700;margin-bottom:3px">🛠️ Cost Calculator Defaults</div>';
+  html+='<div style="font-size:11px;color:var(--text2)">القيم الافتراضية للمصاريف الداخلية حسب نوع الشحن — تظهر تلقائياً في Cost Calculator</div></div>';
+  html+='<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="loadCalcDefaultsAdmin()" id="cd-reload-btn">🔄 تحديث</button>';
+  html+='<button class="btn primary" onclick="saveAllCalcDefaults()" id="cd-save-btn">💾 حفظ كل القيم</button></div>';
+  html+='</div>';
+  html+='<div id="cd-save-status" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:7px;font-size:12px;font-weight:600"></div>';
+  html+='<div id="cd-table-wrap"><div style="text-align:center;padding:30px;color:var(--text3);font-size:12px">⏳ جاري التحميل...</div></div>';
+  html+='<div style="margin-top:14px;padding:10px 12px;background:var(--bg3);border-radius:7px;font-size:11px;color:var(--text2);line-height:1.6">';
+  html+='<div style="font-weight:700;color:var(--text);margin-bottom:4px">ℹ️ ملاحظات:</div>';
+  html+='<div>• كل سطر في الجدول = بند مصاريف داخلية لنوع شحن معين</div>';
+  html+='<div>• البنود: التخليص الجمركي، الخط الملاحي، الميناء، الجمارك، النقل، أخرى، نثريات</div>';
+  html+='<div>• أنواع الشحن: FCL 20'+'\''+'، FCL 40'+'\''+' HQ، LCL، جوي</div>';
+  html+='<div>• القيم بالجنيه المصري — لما المستخدم يفتح Calculator ويختار نوع الشحن، البنود تتعبأ تلقائياً</div>';
+  html+='</div>';
+  html+='</div>';
+
   html+='</div></div>';
   $("pg-settings").innerHTML=html;
+  // ★ Auto-load calc_defaults table when entering this section
+  if(window._cdLoaded !== true){
+    setTimeout(loadCalcDefaultsAdmin, 100);
+    window._cdLoaded = true;
+  }
 }
 function showST(id,el){
   document.querySelectorAll(".st-sec").forEach(s=>s.classList.remove("on"));
@@ -4474,6 +4537,308 @@ async function toggleRR(uid,active){
     renderSettings();
   }
 }
+
+// ═══ USERS MANAGEMENT — Save email, phone, job title for all users ═══
+async function saveAllUsersInfo(){
+  if(!supa){showToast("❌","لا يوجد اتصال");return;}
+  if(curUser.role!=="admin"){showToast("⚠","غير مسموح");return;}
+  const btn=$("users-save-btn");
+  const statusEl=$("users-save-status");
+  if(btn){btn.disabled=true;btn.textContent="⏳ جاري الحفظ...";}
+
+  // Collect changes
+  const updates=[];
+  USERS.forEach(function(u){
+    const emEl=document.getElementById("ue-"+u.id);
+    const phEl=document.getElementById("up-"+u.id);
+    const jtEl=document.getElementById("uj-"+u.id);
+    if(!emEl)return;
+    const newEmail=emEl.value.trim();
+    const newPhone=phEl?phEl.value.trim():"";
+    const newJob=jtEl?jtEl.value.trim():"";
+    // Validate email format minimally
+    if(newEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)){
+      throw new Error("إيميل غير صحيح للمستخدم: "+u.name);
+    }
+    // Only push if changed
+    if(newEmail!==(u.email||"") || newPhone!==(u.phone||"") || newJob!==(u.jobTitle||"")){
+      updates.push({id:u.id, name:u.name, email:newEmail||null, phone:newPhone||null, job_title:newJob||null});
+    }
+  });
+
+  if(updates.length===0){
+    if(btn){btn.disabled=false;btn.textContent="💾 حفظ كل التغييرات";}
+    showToast("ℹ","لا يوجد تغييرات لحفظها");
+    return;
+  }
+
+  console.log("[Users] Saving updates:",updates);
+
+  try {
+    let saved=0;
+    let errors=[];
+    for(const upd of updates){
+      const payload={email:upd.email, phone:upd.phone, job_title:upd.job_title};
+      const {error}=await supa.from("profiles").update(payload).eq("id",upd.id);
+      if(error){
+        console.error("[Users] Failed for",upd.name,":",error);
+        errors.push(upd.name+": "+error.message);
+        continue;
+      }
+      // Sync local state
+      const u=USERS.find(x=>x.id===upd.id);
+      if(u){
+        u.email=upd.email||"";
+        u.phone=upd.phone||"";
+        u.jobTitle=upd.job_title||"";
+      }
+      saved++;
+    }
+    if(errors.length>0){
+      if(statusEl){
+        statusEl.style.display="block";
+        statusEl.style.background="var(--red-bg)";
+        statusEl.style.color="var(--red2)";
+        statusEl.innerHTML="❌ فشل حفظ "+errors.length+" مستخدم: "+errors.join(" | ").slice(0,200);
+      }
+    } else {
+      if(statusEl){
+        statusEl.style.display="block";
+        statusEl.style.background="var(--green-bg)";
+        statusEl.style.color="var(--green2)";
+        statusEl.textContent="✅ تم حفظ "+saved+" مستخدم بنجاح";
+        setTimeout(()=>{if(statusEl)statusEl.style.display="none";},4000);
+      }
+      showToast("✓","تم حفظ "+saved+" مستخدم");
+    }
+  } catch(err){
+    console.error("saveAllUsersInfo error:",err);
+    if(statusEl){
+      statusEl.style.display="block";
+      statusEl.style.background="var(--red-bg)";
+      statusEl.style.color="var(--red2)";
+      statusEl.textContent="❌ خطأ: "+err.message;
+    }
+    showToast("❌","خطأ: "+err.message);
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent="💾 حفظ كل التغييرات";}
+  }
+}
+
+// ═══ TOOLS PAGE ═══
+// ═══ CALC DEFAULTS MANAGER (Admin only — Cost Calculator defaults per shipping type) ═══
+async function loadCalcDefaultsAdmin(){
+  if(!supa){showToast("❌","لا يوجد اتصال");return;}
+  if(curUser.role!=="admin"){showToast("⚠","غير مسموح");return;}
+  const wrap=$("cd-table-wrap");
+  if(wrap) wrap.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:12px">⏳ جاري التحميل...</div>';
+  try {
+    const {data, error} = await supa.from("calc_defaults").select("*").order("shipping_type").order("display_order");
+    if(error) throw error;
+    if(!data || data.length===0){
+      if(wrap) wrap.innerHTML='<div style="text-align:center;padding:30px;background:var(--orange-bg);border:1px solid rgba(245,146,74,0.3);border-radius:8px;color:var(--orange2);font-size:12px;font-weight:600">⚠️ جدول calc_defaults فارغ أو لم يتم إنشاؤه — شغّل SQL في Supabase أولاً</div>';
+      return;
+    }
+    // Build the matrix table — rows = field_keys, columns = shipping types
+    const shippingTypes = ["FCL20","FCL40HQ","LCL","AIR"];
+    const shippingLabels = {FCL20:"FCL 20'",FCL40HQ:"FCL 40' HQ",LCL:"LCL",AIR:"جوي / Air"};
+    // Group by field_key
+    const fieldKeys = [];
+    const byKey = {};
+    data.forEach(row => {
+      if(!byKey[row.field_key]){
+        byKey[row.field_key] = {
+          key: row.field_key,
+          label_ar: row.field_label_ar,
+          label_en: row.field_label_en,
+          display_order: row.display_order,
+          values: {}
+        };
+        fieldKeys.push(row.field_key);
+      }
+      byKey[row.field_key].values[row.shipping_type] = {id: row.id, value: row.default_value};
+    });
+    // Sort by display_order
+    fieldKeys.sort((a,b) => (byKey[a].display_order||99)-(byKey[b].display_order||99));
+
+    let html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:850px"><thead><tr>';
+    html+='<th style="background:var(--bg3);padding:10px 12px;text-align:right;font-weight:700;color:var(--text2);font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;min-width:200px">البند</th>';
+    shippingTypes.forEach(st => {
+      html+='<th style="background:var(--bg3);padding:10px 12px;text-align:center;font-weight:700;color:var(--text2);font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap">'+shippingLabels[st]+'</th>';
+    });
+    html+='</tr></thead><tbody>';
+    fieldKeys.forEach(fk => {
+      const item = byKey[fk];
+      html+='<tr style="border-bottom:1px solid var(--border)" data-fk="'+fk+'">';
+      html+='<td style="padding:9px 12px"><div style="font-weight:600;font-size:12px">'+item.label_ar+'</div>';
+      html+='<div style="font-family:Outfit;font-size:10px;color:var(--text3);letter-spacing:0.05em">'+item.label_en+'</div></td>';
+      shippingTypes.forEach(st => {
+        const cell = item.values[st];
+        const val = cell ? cell.value : 0;
+        const id = cell ? cell.id : '';
+        html+='<td style="padding:6px 8px;text-align:center">';
+        html+='<input type="number" data-cd-id="'+id+'" data-cd-fk="'+fk+'" data-cd-st="'+st+'" value="'+val+'" step="100" min="0" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:6px 8px;color:var(--text);font-size:11px;width:110px;font-family:Outfit;direction:ltr;text-align:center">';
+        html+='<div style="font-size:9px;color:var(--text3);margin-top:2px">ج.م</div>';
+        html+='</td>';
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table></div>';
+    if(wrap) wrap.innerHTML=html;
+  } catch(err){
+    console.error("loadCalcDefaultsAdmin error:",err);
+    if(wrap) wrap.innerHTML='<div style="text-align:center;padding:30px;background:var(--red-bg);border:1px solid rgba(232,76,76,0.3);border-radius:8px;color:var(--red2);font-size:12px;font-weight:600">❌ '+err.message+'</div>';
+  }
+}
+
+async function saveAllCalcDefaults(){
+  if(!supa){showToast("❌","لا يوجد اتصال");return;}
+  if(curUser.role!=="admin"){showToast("⚠","غير مسموح");return;}
+  const btn=$("cd-save-btn");
+  const statusEl=$("cd-save-status");
+  if(btn){btn.disabled=true;btn.textContent="⏳ جاري الحفظ...";}
+  // Collect all inputs and save
+  const inputs=document.querySelectorAll("[data-cd-id]");
+  const updates=[];
+  inputs.forEach(inp => {
+    const id=inp.getAttribute("data-cd-id");
+    const val=parseFloat(inp.value)||0;
+    if(id && id!=='null'){
+      updates.push({id:parseInt(id,10), value:val});
+    }
+  });
+  if(updates.length===0){
+    if(btn){btn.disabled=false;btn.textContent="💾 حفظ كل القيم";}
+    showToast("ℹ","لا توجد بيانات للحفظ");
+    return;
+  }
+  try {
+    let saved=0;
+    let errors=[];
+    for(const upd of updates){
+      const {error}=await supa.from("calc_defaults").update({default_value:upd.value, updated_at:new Date().toISOString()}).eq("id",upd.id);
+      if(error){
+        errors.push("ID "+upd.id+": "+error.message);
+        continue;
+      }
+      saved++;
+    }
+    if(errors.length>0){
+      if(statusEl){
+        statusEl.style.display="block";
+        statusEl.style.background="var(--red-bg)";
+        statusEl.style.color="var(--red2)";
+        statusEl.innerHTML="❌ فشل حفظ "+errors.length+" قيمة: "+errors.slice(0,3).join(" | ");
+      }
+    } else {
+      if(statusEl){
+        statusEl.style.display="block";
+        statusEl.style.background="var(--green-bg)";
+        statusEl.style.color="var(--green2)";
+        statusEl.textContent="✅ تم حفظ "+saved+" قيمة بنجاح. ستظهر فوراً في Cost Calculator.";
+        setTimeout(()=>{if(statusEl)statusEl.style.display="none";},5000);
+      }
+      showToast("✓","تم حفظ "+saved+" قيمة");
+    }
+  } catch(err){
+    console.error("saveAllCalcDefaults error:",err);
+    if(statusEl){
+      statusEl.style.display="block";
+      statusEl.style.background="var(--red-bg)";
+      statusEl.style.color="var(--red2)";
+      statusEl.textContent="❌ خطأ: "+err.message;
+    }
+    showToast("❌","خطأ: "+err.message);
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent="💾 حفظ كل القيم";}
+  }
+}
+
+function renderTools(){
+  if(curUser.role!=="admin" && curUser.role!=="sales"){
+    $("pg-tools").innerHTML='<div class="empty-st"><div class="empty-icon">🔒</div><div class="empty-ttl">غير مسموح</div></div>';
+    return;
+  }
+  // Hero page with tool cards
+  const tools=[
+    {id:"cost-calc", icon:"🧮", name:"حاسبة تكاليف الاستيراد", nameEn:"Cost Calculator",
+     desc:"حساب تكاليف استيراد شاملة من المصدر للمخازن مع توليد PDF احترافي بالعربي",
+     status:"متاح", color:"var(--blue)", action:"openCostCalculator()"},
+    {id:"quotation", icon:"📄", name:"مولّد عروض الأسعار", nameEn:"Quotation Builder",
+     desc:"بناء عرض سعر احترافي من بيانات الـ Lead مباشرة",
+     status:"قريباً", color:"var(--text3)", action:""},
+    {id:"shipment", icon:"📦", name:"متابعة الشحنات", nameEn:"Shipment Tracker",
+     desc:"تتبع شحنات العميل من Pickup حتى Delivery",
+     status:"قريباً", color:"var(--text3)", action:""},
+    {id:"profit", icon:"💰", name:"حاسبة الأرباح", nameEn:"Profit Calculator",
+     desc:"احسب ربح/خسارة كل شحنة بالتفصيل",
+     status:"قريباً", color:"var(--text3)", action:""}
+  ];
+
+  let html='<div style="padding:8px 0">';
+  // Header card with user info
+  html+='<div style="background:linear-gradient(135deg,rgba(75,124,245,0.08),rgba(34,212,245,0.04));border:1px solid var(--border);border-radius:12px;padding:18px 22px;margin-bottom:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">';
+  html+='<div style="width:54px;height:54px;border-radius:14px;background:'+curUser.bg+';color:'+curUser.clr+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0">'+curUser.av+'</div>';
+  html+='<div style="flex:1;min-width:200px"><div style="font-size:11px;color:var(--text3);font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:3px">🛠️ TOOLS · أدوات العمل</div>';
+  html+='<div style="font-size:18px;font-weight:800;color:var(--text);line-height:1.2">أهلاً '+curUser.name+'</div>';
+  html+='<div style="font-size:11px;color:var(--text2);margin-top:3px">بياناتك (إيميل/تليفون) ستظهر تلقائياً في الأدوات والـ PDFs اللي بتصدّرها</div></div>';
+  if(curUser.role==="admin"){
+    html+='<button class="btn primary" onclick="showPg(\'settings\');setTimeout(()=>{const el=document.querySelector(\'.sn-item\');if(el)el.click();},100)" style="white-space:nowrap">⚙ إدارة بيانات المستخدمين</button>';
+  }
+  html+='</div>';
+
+  // Quick info: current user contact data
+  const missingInfo=[];
+  if(!curUser.email)missingInfo.push("الإيميل");
+  if(!curUser.phone)missingInfo.push("رقم التليفون");
+  if(!curUser.jobTitle)missingInfo.push("المسمى الوظيفي");
+  if(missingInfo.length>0){
+    html+='<div style="background:var(--orange-bg);border:1px solid rgba(245,146,74,0.3);border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:12px;color:var(--orange2);display:flex;align-items:center;gap:8px">';
+    html+='<span style="font-size:16px">⚠️</span>';
+    html+='<div><strong>بياناتك ناقصة:</strong> '+missingInfo.join("، ")+(curUser.role==="admin"?' — <a onclick="showPg(\'settings\')" style="color:var(--orange);cursor:pointer;text-decoration:underline">عدّلها من Settings</a>':' — اطلب من الأدمن إضافتها')+'</div></div>';
+  }
+
+  // Tools grid
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">';
+  tools.forEach(function(t){
+    const isActive=t.status==="متاح";
+    html+='<div class="tool-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;'+(isActive?'cursor:pointer;':'opacity:0.55;')+'transition:all 0.2s"'+(isActive?' onclick="'+t.action+'" onmouseover="this.style.borderColor=\''+t.color+'\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'translateY(0)\'"':'')+'>';
+    html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">';
+    html+='<div style="width:46px;height:46px;border-radius:10px;background:'+t.color+'22;color:'+t.color+';display:flex;align-items:center;justify-content:center;font-size:22px">'+t.icon+'</div>';
+    html+='<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px;background:'+(isActive?'var(--green-bg)':'var(--bg3)')+';color:'+(isActive?'var(--green2)':'var(--text3)')+';letter-spacing:0.05em">'+(isActive?'✓ '+t.status:'⏳ '+t.status)+'</span>';
+    html+='</div>';
+    html+='<div style="font-family:Outfit;font-weight:600;font-size:10px;color:'+t.color+';letter-spacing:0.15em;text-transform:uppercase;margin-bottom:4px">'+t.nameEn+'</div>';
+    html+='<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px">'+t.name+'</div>';
+    html+='<div style="font-size:12px;color:var(--text2);line-height:1.6">'+t.desc+'</div>';
+    if(isActive){
+      html+='<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:'+t.color+';font-weight:600">افتح الأداة ←</div>';
+    }
+    html+='</div>';
+  });
+  html+='</div>';
+  html+='</div>';
+  $("pg-tools").innerHTML=html;
+}
+
+// ═══ COST CALCULATOR (opens in new window with user's profile pre-filled) ═══
+function openCostCalculator(){
+  // Pass user info via URL params so calculator pre-fills them
+  const params=new URLSearchParams({
+    sp_name: curUser.name||"",
+    sp_role: curUser.jobTitle||"Sales Account Manager",
+    sp_phone: curUser.phone||"",
+    sp_email: curUser.email||""
+  });
+  // Try to open the calculator from the same folder
+  const calcUrl="cost-calculator.html?"+params.toString();
+  const win=window.open(calcUrl,"_blank");
+  if(!win){
+    showToast("⚠","اسمح بفتح النوافذ المنبثقة من المتصفح");
+  } else {
+    showToast("✓","تم فتح الحاسبة في تاب جديد");
+  }
+}
+
 // ═══ UTILS ═══
 function closeM(id){$(id)?.classList.remove("open");}
 document.querySelectorAll(".mov").forEach(o=>{o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("open");});});
