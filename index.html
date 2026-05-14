@@ -24,6 +24,65 @@
   --r:10px;--r-sm:7px;--r-lg:14px;--r-xl:20px;
   --shadow:0 4px 20px rgba(0,0,0,0.45);--shadow-lg:0 8px 40px rgba(0,0,0,0.55);
 }
+/* ═════ LIGHT MODE — SLL brand colors with high contrast for accessibility ═════ */
+[data-theme="light"]{
+  --bg:#F5F2ED;          /* cream — main background */
+  --bg2:#FFFFFF;         /* white */
+  --bg3:#FAF8F4;         /* lighter cream */
+  --bg4:#F0EDE6;         /* darker cream for hover */
+  --surface:#FFFFFF;
+  --surface2:#FAF8F4;
+  --surface3:#F0EDE6;
+  --border:rgba(58,57,58,0.12);
+  --border2:rgba(58,57,58,0.20);
+  --border3:rgba(58,57,58,0.35);
+  --text:#1A1A1A;        /* almost-black for max contrast */
+  --text2:#3A393A;       /* charcoal */
+  --text3:#5C5C5E;       /* mid-gray */
+  --text4:#8A8A8C;       /* lighter gray */
+  --blue:#0066CC;        /* deeper blue for contrast on light bg */
+  --blue2:#003D99;
+  --blue-bg:rgba(0,102,204,0.10);
+  --blue-glow:rgba(0,102,204,0.22);
+  --green:#117A4D;
+  --green2:#0A5A37;
+  --green-bg:rgba(17,122,77,0.11);
+  --orange:#C25E10;
+  --orange2:#9C4A0A;
+  --orange-bg:rgba(194,94,16,0.11);
+  --red:#EC1C23;         /* SLL brand red */
+  --red2:#C71F2D;        /* SLL brand red dark */
+  --red-bg:rgba(236,28,35,0.10);
+  --purple:#7C3AED;
+  --purple2:#5B21B6;
+  --purple-bg:rgba(124,58,237,0.11);
+  --amber:#B8860B;
+  --cyan:#0E7490;
+  --cyan-bg:rgba(14,116,144,0.11);
+  --shadow:0 4px 20px rgba(58,57,58,0.10);
+  --shadow-lg:0 8px 40px rgba(58,57,58,0.15);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(58,57,58,0.25);}
+[data-theme="light"] body{background:var(--bg);}
+/* Boost text weight slightly in light mode for better readability */
+[data-theme="light"] {font-weight:500;}
+[data-theme="light"] .label, [data-theme="light"] label{color:var(--text2)!important;font-weight:600;}
+[data-theme="light"] input,[data-theme="light"] select,[data-theme="light"] textarea{background:#FFFFFF!important;color:var(--text)!important;border-color:var(--border2)!important;}
+[data-theme="light"] input::placeholder,[data-theme="light"] textarea::placeholder{color:var(--text3);}
+[data-theme="light"] .topbar,[data-theme="light"] .sidebar{background:#FFFFFF;border-color:var(--border);}
+[data-theme="light"] .card,[data-theme="light"] .modal{background:#FFFFFF;}
+[data-theme="light"] table{background:#FFFFFF;}
+[data-theme="light"] table thead th{background:#FAF8F4!important;color:var(--text2);font-weight:700;}
+[data-theme="light"] .btn{background:#FFFFFF;color:var(--text);border:1px solid var(--border2);}
+[data-theme="light"] .btn:hover{background:var(--bg4);}
+[data-theme="light"] .btn.primary{background:var(--red);color:#FFFFFF;border-color:var(--red);}
+[data-theme="light"] .btn.primary:hover{background:var(--red2);}
+[data-theme="light"] .btn-login{background:var(--red);}
+[data-theme="light"] .btn-login:hover{background:var(--red2);}
+[data-theme="light"] .brand-mark{background:var(--red);}
+[data-theme="light"] tr.new-row{background:rgba(0,102,204,0.06)!important;}
+[data-theme="light"] tr.late-row{background:rgba(194,94,16,0.08)!important;}
+[data-theme="light"] tr.sla1-row{background:rgba(236,28,35,0.08)!important;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:"Cairo",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
 ::-webkit-scrollbar{width:4px;height:4px;}
@@ -302,7 +361,17 @@ tr.new-row{background:rgba(34,212,245,.03);}
 .fu-meta{font-size:10px;color:var(--text2);margin-top:2px;}
 .fu-acts{display:flex;gap:5px;align-items:center;}
 /* ROW ACTIONS */
-.racts{display:flex;gap:4px;}
+.racts{display:flex;gap:4px;justify-content:center;}
+/* Sticky actions column — fixed to right in RTL, visible while scrolling horizontally */
+.sticky-actions{position:sticky;right:0;z-index:5;background:var(--bg2);box-shadow:-4px 0 12px rgba(0,0,0,0.25);}
+[data-theme="light"] .sticky-actions{background:#FFFFFF;box-shadow:-4px 0 12px rgba(58,57,58,0.10);}
+thead th.sticky-actions{z-index:6;background:var(--bg3)!important;}
+tr.new-row .sticky-actions{background:rgba(75,124,245,0.05);}
+tr.late-row .sticky-actions{background:rgba(245,146,74,0.06);}
+tr.sla1-row .sticky-actions{background:rgba(245,82,82,0.06);}
+[data-theme="light"] tr.new-row .sticky-actions{background:rgba(0,102,204,0.05);}
+[data-theme="light"] tr.late-row .sticky-actions{background:rgba(194,94,16,0.07);}
+[data-theme="light"] tr.sla1-row .sticky-actions{background:rgba(236,28,35,0.07);}
 .ract{width:23px;height:23px;border-radius:5px;border:1px solid var(--border2);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .1s;color:var(--text2);text-decoration:none;}
 .ract:hover{background:var(--surface2);color:var(--text);border-color:var(--border3);}
 .ract.wa:hover{border-color:var(--green);color:var(--green);}
@@ -400,6 +469,9 @@ tr.new-row{background:rgba(34,212,245,.03);}
       <div class="topbar-title" id="topbar-title">Dashboard</div>
       <div class="topbar-acts">
         <div id="topbar-extra"></div>
+        <button class="btn sm" id="theme-toggle" onclick="toggleTheme()" title="تبديل الوضع الليلي / النهاري" style="padding:6px 10px;display:flex;align-items:center;gap:5px">
+          <span id="theme-icon">🌙</span><span id="theme-label">داكن</span>
+        </button>
         <div class="nw">
           <div class="nb" onclick="toggleNotif()" id="nb-btn">🔔<div class="nc" id="nc">0</div></div>
           <div class="nd" id="nd">
@@ -622,8 +694,21 @@ async function getNextRRFromDB(){
       console.warn("[RR] DB function returned empty, falling back to local");
       return getNextRRLocal();
     }
-    const rep = {id: data[0].rep_id, name: data[0].rep_name};
-    console.log("[RR] DB picked:", rep.name);
+    // ★ CRITICAL: DB function returned a row, but the rep_id/rep_name could be NULL
+    // (this happens if the function isn't installed correctly or returns nothing)
+    const row = data[0];
+    if(!row.rep_id || !row.rep_name){
+      console.warn("[RR] DB function returned row with NULL values:", row, "— falling back to local");
+      return getNextRRLocal();
+    }
+    // Verify the rep_id actually matches a known sales user (extra safety)
+    const verifiedUser = SALES_USERS.find(s => String(s.id) === String(row.rep_id));
+    if(!verifiedUser){
+      console.warn("[RR] DB returned rep_id not in SALES_USERS:", row.rep_id, "— falling back to local");
+      return getNextRRLocal();
+    }
+    const rep = {id: row.rep_id, name: row.rep_name};
+    console.log("[RR] DB picked:", rep.name, "(id:"+rep.id+")");
     return rep;
   } catch(e){
     console.warn("[RR] rpc error, fallback:", e.message);
@@ -633,8 +718,11 @@ async function getNextRRFromDB(){
 
 function getNextRRLocal(){
   // Fallback: local algorithm (same logic as before — used if DB function missing)
-  const a = SALES_USERS.filter(u => u.inRotation !== false);
-  if(!a.length) return SALES_USERS[0];
+  const a = SALES_USERS.filter(u => u.inRotation !== false && u.id && u.name);
+  if(!a.length){
+    console.error("[RR-local] NO ACTIVE SALES USERS! Returning first available sales user.");
+    return SALES_USERS[0] || null;
+  }
   const lastLeadId = {};
   a.forEach(u => { lastLeadId[u.id] = null; });
   LEADS.forEach(l => {
@@ -656,8 +744,9 @@ function getNextRRLocal(){
     if(xLast > yLast) return 1;
     return 0;
   });
-  console.log("[RR-local] Next:", sorted[0].name, "last lead id:", lastLeadId[sorted[0].id]);
-  return sorted[0];
+  const picked = sorted[0];
+  console.log("[RR-local] Picked:", picked.name, "(id:"+picked.id+")", "last lead id:", lastLeadId[picked.id]);
+  return {id: picked.id, name: picked.name};  // ← Return clean object
 }
 
 function getNextRR(){ return getNextRRLocal(); }  // kept for UI preview only
@@ -856,7 +945,7 @@ async function loadAllData(){
       cc: l.cc || ("CLT-"+l.id),
       by: l.by_name || "",
       byId: l.by_id,
-      rep: l.rep_name || "",
+      rep: l.rep_name || (l.rep_id ? (USERS.find(u=>String(u.id)===String(l.rep_id))?.name || "غير محدد") : ""),
       repId: l.rep_id,
       repManual: l.rep_manual===true,
       src: l.src||"",
@@ -958,7 +1047,8 @@ function subscribeToChanges(){
     return {
       id: lead.id, _supaId: lead.id,
       cc: lead.cc, byId: lead.by_id, by: lead.by_name,
-      repId: lead.rep_id, rep: lead.rep_name,
+      repId: lead.rep_id,
+      rep: lead.rep_name || (lead.rep_id ? (USERS.find(u=>String(u.id)===String(lead.rep_id))?.name || "غير محدد") : ""),
       repManual: lead.rep_manual===true,
       src: lead.src, ad_num: lead.ad_num||"", dt: lead.dt,
       tm: lead.tm ? lead.tm.slice(0,5) : "",
@@ -1181,10 +1271,43 @@ function initApp(){
     }
   } catch(e){}
   showPg(savedPage);
+  // Apply saved theme (updates button icon/label)
+  try {
+    const savedTheme=localStorage.getItem("sll-crm-theme")||"dark";
+    applyTheme(savedTheme);
+  } catch(e){ applyTheme("dark"); }
   startSLAChecks();
   checkDailyContactedReminders();
   subscribeToChanges();
 }
+// ═══ THEME TOGGLE (Light/Dark Mode) ═══
+function applyTheme(mode){
+  // mode: "light" or "dark"
+  if(mode==="light"){
+    document.documentElement.setAttribute("data-theme","light");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+  // Update button
+  const icon=$("theme-icon"),lbl=$("theme-label");
+  if(icon&&lbl){
+    if(mode==="light"){icon.textContent="☀️";lbl.textContent="فاتح";}
+    else {icon.textContent="🌙";lbl.textContent="داكن";}
+  }
+  try { localStorage.setItem("sll-crm-theme",mode); } catch(e){}
+}
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute("data-theme")==="light"?"light":"dark";
+  applyTheme(cur==="light"?"dark":"light");
+}
+// Initialize theme on page load (before app starts)
+(function(){
+  try {
+    const saved=localStorage.getItem("sll-crm-theme");
+    if(saved==="light") document.documentElement.setAttribute("data-theme","light");
+  } catch(e){}
+})();
+
 function showPg(id){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.querySelectorAll(".sb-item").forEach(n=>n.classList.remove("active"));
@@ -1667,7 +1790,7 @@ function buildQuickCard(ld,isFU){
     h+='<div class="fu-meta">'+ld.src+' · '+ld.dt+' '+ld.tm+' · '+svcStr(ld).substring(0,35)+'</div></div>';
     h+='<div class="fu-acts">'+scoreBadge(sc);
     h+='<a href="'+waLink(ld.mob)+'" target="_blank" class="ract wa" onclick="event.stopPropagation()">💬</a>';
-    h+='<button class="btn sm primary" onclick="event.stopPropagation();toggleQP('+ld.id+')">⚡</button>';
+    h+='<button class="btn sm primary" onclick="event.stopPropagation();editLead('+ld.id+')" title="تعديل كامل">✏️</button>';
     h+='</div></div>';
   } else {
     h='<div class="qlc">';
@@ -1678,19 +1801,8 @@ function buildQuickCard(ld,isFU){
     h+='<a href="'+waLink(ld.mob)+'" target="_blank" class="ract wa">💬</a></div></div>';
     h+='<div class="qlc-body">'+(ld.prod||'—').substring(0,50)+' · '+(svcStr(ld).substring(0,40)||'—')+'</div>';
     h+='<div class="qlc-foot"><button class="btn sm" onclick="viewLead('+ld.id+')">👁 عرض</button>';
-    h+='<button class="btn sm primary" onclick="toggleQP('+ld.id+')">⚡ تحديث سريع</button></div>';
+    h+='<button class="btn sm primary" onclick="editLead('+ld.id+')">✏️ تعديل</button></div>';
   }
-  h+='<div class="qp" id="qp-'+ld.id+'">';
-  h+='<div class="fg2" style="margin-bottom:7px">';
-  h+='<div class="ff"><label>الحالة</label><select id="qs-st-'+ld.id+'" onchange="qpSt('+ld.id+')">'+stOpts+'</select></div>';
-  h+='<div class="ff" id="qs-crw-'+ld.id+'" style="'+crShow+'"><label>سبب الإلغاء</label><select id="qs-cr-'+ld.id+'">'+crOpts+'</select></div>';
-  h+='</div>';
-  h+='<div id="qs-fuw-'+ld.id+'" style="'+fuShow+'"><div class="fu-box" style="margin-bottom:7px"><div class="fu-lbl">📅 تاريخ المتابعة</div>';
-  h+='<input type="date" id="qs-fu-'+ld.id+'" value="'+(ld.fuDate||'')+'" min="'+today()+'"></div></div>';
-  h+='<div class="ff" style="margin-bottom:7px"><label>ملاحظات</label>';
-  h+='<textarea id="qs-n-'+ld.id+'" style="height:44px">'+(ld.c1||'')+'</textarea></div>';
-  h+='<div style="display:flex;gap:5px"><button class="btn sm primary" onclick="saveQP('+ld.id+')">💾 حفظ</button>';
-  h+='<button class="btn sm" onclick="toggleQP('+ld.id+')">إلغاء</button></div></div>';
   if(!isFU)h+='</div>';
   return h;
 }
@@ -1726,7 +1838,112 @@ async function saveQP(id){
   }
 }
 
-// ═══ LEADS PAGE ═══
+// ═══ EXCEL EXPORT (Admin only) ═══
+function exportLeadsExcel(){
+  if(curUser.role!=="admin"){showToast("⚠","غير مسموح — Admin فقط");return;}
+  if(typeof XLSX==="undefined"){showToast("❌","مكتبة Excel غير محملة");return;}
+  // Use currently filtered leads (respect filters)
+  const leads = filteredL();
+  if(!leads.length){showToast("⚠","لا توجد leads للتصدير");return;}
+  showToast("⏳","جاري التصدير... ("+leads.length+" lead)");
+  setTimeout(()=>{
+    try {
+      const rows = leads.map(l=>{
+        // Build extra calls summary
+        let extraTxt="";
+        if(Array.isArray(l.extraCalls)&&l.extraCalls.length>0){
+          extraTxt = l.extraCalls.map((c,i)=>"#"+(4+i)+" ["+(c.d||"")+" "+(c.t||"")+"] "+(c.txt||c.note||"")).join(" || ");
+        }
+        return {
+          "ID": l.id,
+          "Customer Code": l.cc||"",
+          "المصدر": l.src||"",
+          "رقم الإعلان": l.ad_num||"",
+          "تاريخ التسجيل": l.dt||"",
+          "وقت التسجيل": l.tm||"",
+          "الكوردينتور": l.by||"",
+          "السيلز": l.rep||"",
+          "نوع التعيين": l.repManual?"يدوي":"تلقائي (Round Robin)",
+          "اسم العميل": l.nm||"",
+          "الشركة": l.company||"",
+          "الموبايل": l.mob||"",
+          "الجنسية": l.nat||"",
+          "بلد الاستيراد": l.imp||"",
+          "بلد التصدير": l.exp||"",
+          "مجال التخصص": l.spec||"",
+          "المنتج": l.prod||"",
+          "الكمية": l.qty||"",
+          "الوحدة": l.unit||"",
+          "رأس المال": l.cap?"$"+l.cap:"",
+          "مستورد/مصدر": l.ie||"",
+          "توفر المورد": l.sup||"",
+          "الخدمات": svcStr(l),
+          "الأولوية": l.priority||"عادي",
+          "ملاحظات الكوردينتور": l.cnotes||"",
+          "الحالة": l.st||"جديد",
+          "Score": score(l),
+          "تاريخ أول اتصال": l.fcd||"",
+          "وقت أول اتصال": l.fct||"",
+          "تاريخ المتابعة": l.fuDate||"",
+          "آخر اتصال": l.lcd||"",
+          "أول مكالمة": l.c1||"",
+          "وقت أول مكالمة": l.c1t||"",
+          "ثاني مكالمة": l.c2||"",
+          "وقت ثاني مكالمة": l.c2t||"",
+          "ثالث مكالمة": l.c3||"",
+          "وقت ثالث مكالمة": l.c3t||"",
+          "مكالمات إضافية": extraTxt,
+          "ملاحظات Sales": l.snotes||"",
+          "سبب الإلغاء": l.cr||"",
+          "تم إعادة تفعيله": l.reactivated||"",
+          "تاريخ إعادة التفعيل": l.reactivatedDate||"",
+          "بواسطة": l.reactivatedBy||"",
+          "ملاحظة الاسترجاع": l.reactivatedNote||"",
+          "SLA حالة الجديد": sla1St(l)==="ok"?"OK":sla1St(l)==="warning"?"تحذير":sla1St(l)==="breach"?"خرق":"",
+          "SLA حالة المتابعة": sla2St(l)==="ok"?"OK":sla2St(l)==="today"?"اليوم":sla2St(l)==="late"?"متأخر":"",
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(rows);
+      // Auto column widths
+      const headers = Object.keys(rows[0]||{});
+      ws["!cols"] = headers.map(h=>{
+        const maxLen = Math.max(h.length, ...rows.map(r=>String(r[h]||"").length).slice(0,500));
+        return {wch: Math.min(Math.max(maxLen+2, 12), 50)};
+      });
+      ws["!freeze"] = {xSplit:0, ySplit:1};
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Leads");
+      // Add a stats sheet
+      const stats = [
+        ["الإحصائيات",""],
+        ["إجمالي الـ Leads المُصدّرة", leads.length],
+        ["تاريخ التصدير", today()+" "+nowTime()],
+        ["المُصدِّر", curUser.name+" (Admin)"],
+        ["",""],
+        ["توزيع الحالات", "العدد"],
+        ["عميل فعلي", leads.filter(l=>l.st==="عميل فعلي").length],
+        ["تحت المتابعة", leads.filter(l=>l.st==="تحت المتابعة").length],
+        ["لم يتم الرد", leads.filter(l=>l.st==="لم يتم الرد").length],
+        ["لاغي", leads.filter(l=>l.st==="لاغي").length],
+        ["جديد", leads.filter(l=>!l.st).length],
+        ["",""],
+        ["توزيع نوع التعيين","العدد"],
+        ["تعيين يدوي", leads.filter(l=>l.repManual).length],
+        ["Round Robin تلقائي", leads.filter(l=>!l.repManual).length],
+      ];
+      const ws2 = XLSX.utils.aoa_to_sheet(stats);
+      ws2["!cols"] = [{wch:30},{wch:15}];
+      XLSX.utils.book_append_sheet(wb, ws2, "إحصائيات");
+      // Filename with timestamp
+      const fname = "SLL_Leads_Export_"+today().replace(/-/g,"")+"_"+nowTime().replace(":","")+".xlsx";
+      XLSX.writeFile(wb, fname);
+      showToast("✓","تم التصدير: "+leads.length+" lead");
+    } catch(err){
+      console.error("exportLeadsExcel error:", err);
+      showToast("❌","خطأ في التصدير: "+err.message);
+    }
+  }, 100);
+}
 function renderLeadsPage(){
   const el=$("pg-leads");
   el.innerHTML=`
@@ -1736,6 +1953,7 @@ function renderLeadsPage(){
       <div class="cleg"><div class="cleg-dot" style="background:var(--orange)"></div>Sales columns</div>
     </div>
     <div style="margin-right:auto;display:flex;gap:6px;align-items:center">
+      ${curUser.role==="admin"?'<button class="btn sm primary" onclick="exportLeadsExcel()" title="تصدير كل الـ Leads (المعروضة بعد الفلتر) إلى Excel">📥 Export Excel</button>':''}
       <div class="vt-toggle">
         <button class="vt-btn ${lView==="table"?"on":""}" onclick="setLV('table')">☰ Table</button>
         <button class="vt-btn ${lView==="kanban"?"on":""}" onclick="setLV('kanban')">⊞ Pipeline</button>
@@ -2011,13 +2229,13 @@ function renderTable(el){
 
   // Build table
   let tableHtml = '<div class="tbl-wrap"><div class="tbl-scroll" style="overflow-x:auto"><table style="min-width:'+(cols.reduce((s,c)=>s+(c.width||100),0)+80)+'px">';
-  // Header
+  // Header — actions first (sticky to right in RTL)
   tableHtml += '<thead><tr>';
+  tableHtml += '<th class="sticky-actions" style="min-width:120px;text-align:center;background:var(--bg3)!important">⚡ الإجراءات</th>';
   cols.forEach(c => {
     const cls = c.role === "coord" ? "ch" : c.role === "sales" ? "sh2" : "";
     tableHtml += '<th class="'+cls+'" style="min-width:'+(c.width||100)+'px;white-space:nowrap">'+c.label+'</th>';
   });
-  tableHtml += '<th style="min-width:80px"></th>'; // actions
   tableHtml += '</tr></thead>';
   // Body
   tableHtml += '<tbody>';
@@ -2030,6 +2248,14 @@ function renderTable(el){
       const isA=u.role==="admin",isC=u.role==="coordinator",isS=u.role==="sales";
       const canEdit=isA||(isC&&l.byId===u.id)||(isS&&l.repId===u.id);
       tableHtml += '<tr class="'+rc+'">';
+      // Actions cell — FIRST + sticky
+      tableHtml += '<td class="sticky-actions"><div class="racts">';
+      tableHtml += '<div class="ract vw" onclick="viewLead('+l.id+')" title="عرض">👁</div>';
+      if(canEdit) tableHtml += '<div class="ract ed" onclick="editLead('+l.id+')" title="تعديل">✏️</div>';
+      if(canReactivate(l)) tableHtml += '<div class="ract" style="color:var(--purple2);background:rgba(168,85,247,.12)" onclick="event.stopPropagation();openReactivate('+l.id+')" title="إعادة تفعيل">♻️</div>';
+      tableHtml += '<a href="'+waLink(l.mob)+'" target="_blank" class="ract wa" title="واتساب">💬</a>';
+      tableHtml += '</div></td>';
+      // Data cells
       cols.forEach(c => {
         try {
           tableHtml += '<td>'+c.render(l)+'</td>';
@@ -2037,13 +2263,6 @@ function renderTable(el){
           tableHtml += '<td>—</td>';
         }
       });
-      // Actions cell
-      tableHtml += '<td><div class="racts">';
-      tableHtml += '<div class="ract vw" onclick="viewLead('+l.id+')">👁</div>';
-      if(canEdit) tableHtml += '<div class="ract ed" onclick="editLead('+l.id+')">✏️</div>';
-      if(canReactivate(l)) tableHtml += '<div class="ract" style="color:var(--purple2);background:rgba(168,85,247,.12)" onclick="event.stopPropagation();openReactivate('+l.id+')" title="إعادة تفعيل">♻️</div>';
-      tableHtml += '<a href="'+waLink(l.mob)+'" target="_blank" class="ract wa">💬</a>';
-      tableHtml += '</div></td>';
       tableHtml += '</tr>';
     });
   }
