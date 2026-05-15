@@ -621,10 +621,10 @@ body{
             <div class="form-field">
               <label>نوع الشحن</label>
               <select id="shippingType" class="form-select" onchange="onShippingTypeChange()">
-                <option value="FCL20">بحري FCL — حاوية 20'</option>
-                <option value="FCL40HQ">بحري FCL — حاوية 40' HQ</option>
-                <option value="LCL">بحري LCL (تجميعي)</option>
-                <option value="AIR">جوي</option>
+                <option value="FCL">شحن بحري — حاويات FCL</option>
+                <option value="LCL">شحن بحري جزئي LCL</option>
+                <option value="AIR">شحن جوي</option>
+                <option value="LAND">شحن بري</option>
               </select>
             </div>
             <div class="form-field">
@@ -2163,16 +2163,22 @@ function buildPDFContext(){
   const dateAr = dateObj.getDate() + ' ' + monthNames[dateObj.getMonth()] + ' ' + dateObj.getFullYear();
   
   const shippingTypesAr = {
-    FCL20: 'بحري FCL — 20 قدم',
-    FCL40HQ: 'بحري FCL — 40 قدم HQ',
-    LCL: 'بحري LCL (تجميعي)',
-    AIR: 'شحن جوي'
+    FCL: 'شحن بحري — حاويات FCL',
+    LCL: 'شحن بحري جزئي LCL',
+    AIR: 'شحن جوي',
+    LAND: 'شحن بري',
+    // Legacy support
+    FCL20: 'شحن بحري — حاويات FCL',
+    FCL40HQ: 'شحن بحري — حاويات FCL'
   };
   const shippingTypesEn = {
-    FCL20: 'Sea Freight FCL — 20\' Container',
-    FCL40HQ: 'Sea Freight FCL — 40\' HQ Container',
-    LCL: 'Sea Freight LCL (Consolidated)',
-    AIR: 'Air Freight'
+    FCL: 'Sea Freight — FCL Containers',
+    LCL: 'Sea Freight LCL (Partial)',
+    AIR: 'Air Freight',
+    LAND: 'Land Freight',
+    // Legacy support
+    FCL20: 'Sea Freight — FCL Containers',
+    FCL40HQ: 'Sea Freight — FCL Containers'
   };
   const containerLabelsAr = {
     '20FT':'حاوية 20 قدم','40FT':'حاوية 40 قدم','40HC':'حاوية 40 قدم HC','45HC':'حاوية 45 قدم HC',
@@ -2226,12 +2232,11 @@ function getPageStyle(lang){
 }
 function getSideBars(lang){
   const isEn = lang === 'en';
-  // For Arabic (RTL): bars on the LEFT (which appears as 'start' in RTL flow but visually is left)
-  // For English (LTR): bars on the RIGHT (mirror)
+  // Only the red side bar - no black square
   if(isEn){
-    return '<div style="position:absolute;top:0;bottom:0;right:0;width:16mm;background:#EC1C23;"></div><div style="position:absolute;top:0;right:16mm;width:16mm;height:16mm;background:#3A393A;"></div>';
+    return '<div style="position:absolute;top:0;bottom:0;right:0;width:16mm;background:#EC1C23;"></div>';
   }
-  return '<div style="position:absolute;top:0;bottom:0;left:0;width:16mm;background:#EC1C23;"></div><div style="position:absolute;top:0;left:16mm;width:16mm;height:16mm;background:#3A393A;"></div>';
+  return '<div style="position:absolute;top:0;bottom:0;left:0;width:16mm;background:#EC1C23;"></div>';
 }
 // Padding helper — content area pushed away from side bars
 function getContentPadding(lang, top, otherSide, bottom){
@@ -2252,78 +2257,180 @@ function renderCoverPage(ctx){
   const loc = getLocalizedShipping(ctx);
   const shippingDisplay = loc.shippingDisplay;
   const containerDisplay = loc.containerDisplay;
-  const ps = getPageStyle(lang);
-  const sb = getSideBars(lang);
-  const pad = isEn ? 'padding:18mm 28mm 14mm 14mm;' : 'padding:18mm 14mm 14mm 28mm;';
-  const footerPos = isEn ? 'position:absolute;bottom:10mm;right:28mm;left:14mm;' : 'position:absolute;bottom:10mm;left:28mm;right:14mm;';
-  const arrow = isEn ? '→' : '←';
+  const arrow = isEn ? '\u2192' : '\u2190';
 
-  // Localized labels
   const t = {
-    titleAr1: isEn ? 'Import' : 'بيان',
-    titleAr2: isEn ? 'Cost Quotation' : 'تكاليف إستيراد',
-    subtitle: isEn ? 'Comprehensive import cost study from source to client warehouse' : 'دراسة تكاليف إستيرادية شاملة من المصدر وإلى مخازن العميل',
-    preparedFor: isEn ? 'PREPARED FOR' : 'تم إعداده لـ',
-    quoteNum: isEn ? 'QUOTATION NUMBER' : 'رقم العرض',
-    route: isEn ? 'ROUTE' : 'المسار',
-    shippingType: isEn ? 'SHIPPING TYPE' : 'نوع الشحن',
+    titleAr1: isEn ? 'Import' : '\u0628\u064a\u0627\u0646',
+    titleAr2: isEn ? 'Cost Quotation' : '\u062a\u0643\u0627\u0644\u064a\u0641 \u0625\u0633\u062a\u064a\u0631\u0627\u062f',
+    subtitle: isEn ? 'Comprehensive import cost study from source to client warehouse' : '\u062f\u0631\u0627\u0633\u0629 \u062a\u0643\u0627\u0644\u064a\u0641 \u0625\u0633\u062a\u064a\u0631\u0627\u062f \u0634\u0627\u0645\u0644\u0629 \u0645\u0646 \u0627\u0644\u0645\u0635\u062f\u0631 \u0648\u0625\u0644\u0649 \u0645\u062e\u0627\u0632\u0646 \u0627\u0644\u0639\u0645\u064a\u0644',
+    preparedFor: isEn ? 'Prepared for' : '\u062a\u0645 \u0625\u0639\u062f\u0627\u062f\u0647 \u0644\u0640',
+    quoteNum: isEn ? 'Quotation Number' : '\u0631\u0642\u0645 \u0627\u0644\u0639\u0631\u0636',
+    route: isEn ? 'Route' : '\u0627\u0644\u0645\u0633\u0627\u0631',
+    shippingType: isEn ? 'Shipping Type' : '\u0646\u0648\u0639 \u0627\u0644\u0634\u062d\u0646',
     sloganEn: '"The shortest way between you and your cargo"',
-    sloganAr: 'أقصر طريق بينك وبين بضائعك',
+    sloganAr: '\u0623\u0642\u0635\u0631 \u0637\u0631\u064a\u0642 \u0628\u064a\u0646\u0643 \u0648\u0628\u064a\u0646 \u0628\u0636\u0627\u0626\u0639\u0643',
     disclaimer: isEn
-      ? 'All values mentioned are estimates and non-binding — please review all terms and conditions'
-      : 'جميع القيم المذكورة تقديرية وغير إلزامية — برجاء مراجعة جميع الشروط والأحكام'
+      ? 'All values mentioned are estimates and non-binding \u2014 please review all terms and conditions'
+      : '\u062c\u0645\u064a\u0639 \u0627\u0644\u0642\u064a\u0645 \u0627\u0644\u0645\u0630\u0643\u0648\u0631\u0629 \u062a\u0642\u062f\u064a\u0631\u064a\u0629 \u0648\u063a\u064a\u0631 \u0625\u0644\u0632\u0627\u0645\u064a\u0629 \u2014 \u0628\u0631\u062c\u0627\u0621 \u0645\u0631\u0627\u062c\u0639\u0629 \u062c\u0645\u064a\u0639 \u0627\u0644\u0634\u0631\u0648\u0637 \u0648\u0627\u0644\u0623\u062d\u0643\u0627\u0645'
   };
 
-  // Date format
   let dateDisplay = dateAr;
   if(isEn && formData.quotationDate){
     const d = new Date(formData.quotationDate);
     dateDisplay = d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
   }
 
+  const ps = getPageStyle(lang);
+  const sb = getSideBars(lang);
+
   return `
-    <div class="pdf-page" style="${ps}${pad}">
+    <div class="pdf-page" style="${ps}background:#FFF;">
       ${sb}
-      <div style="display:inline-flex;align-items:center;gap:18px;margin-bottom:60px;padding:8px 12px;background:rgba(255,255,255,0.6);border-radius:6px;">
-        <img src="data:image/png;base64,${PDF_LOGO_B64}" style="height:64px;width:auto;display:block;">
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:22px;color:#3A393A;line-height:1.1;">Straight Line Logistics & Trade</div>
-          ${!isEn ? '<div style="font-weight:700;font-size:16px;color:#3A393A;line-height:1.2;">ستريت لاين للشحن والتجارة</div>' : '<div style="font-family:\'Outfit\',sans-serif;font-weight:500;font-size:12px;color:#737373;letter-spacing:0.15em;">SHIPPING & TRADING SOLUTIONS</div>'}
+      
+      <div style="position:absolute;top:0;left:0;right:0;height:4px;background:#EC1C23;z-index:3;"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:#EC1C23;z-index:3;"></div>
+      
+      <svg style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:280mm;height:auto;opacity:0.09;pointer-events:none;z-index:1;" viewBox="0 0 1000 500" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <g fill="#6B7280">
+          <!-- Greenland -->
+          <path d="M 270 60 L 295 55 L 320 65 L 330 85 L 325 110 L 310 130 L 285 135 L 265 125 L 255 105 L 258 80 Z"/>
+          <!-- Alaska -->
+          <path d="M 100 110 L 130 105 L 155 115 L 165 130 L 155 145 L 130 150 L 105 145 L 90 130 L 92 115 Z"/>
+          <!-- North America (Canada + USA + Mexico) -->
+          <path d="M 130 130 L 175 120 L 220 115 L 255 120 L 280 130 L 295 145 L 300 165 L 290 185 L 275 200 L 255 210 L 230 215 L 215 230 L 205 250 L 195 265 L 178 275 L 160 270 L 145 255 L 135 235 L 130 210 L 138 185 L 145 165 L 142 145 Z"/>
+          <!-- Central America -->
+          <path d="M 195 270 L 215 280 L 230 295 L 235 310 L 225 320 L 210 325 L 195 320 L 188 305 L 185 285 Z"/>
+          <!-- South America -->
+          <path d="M 245 305 L 270 315 L 290 335 L 305 360 L 315 385 L 320 415 L 318 445 L 308 470 L 290 480 L 270 478 L 255 465 L 245 445 L 240 420 L 238 395 L 240 370 L 238 345 L 240 325 Z"/>
+          <!-- Iceland -->
+          <path d="M 460 130 L 478 128 L 485 140 L 478 152 L 460 152 L 450 140 Z"/>
+          <!-- UK & Ireland -->
+          <path d="M 462 165 L 478 162 L 488 175 L 482 192 L 470 198 L 458 192 L 452 178 Z"/>
+          <path d="M 442 175 L 454 175 L 458 185 L 452 195 L 440 192 L 436 182 Z"/>
+          <!-- Europe (main) -->
+          <path d="M 488 175 L 510 165 L 540 162 L 568 168 L 590 178 L 605 192 L 610 210 L 598 225 L 575 235 L 545 240 L 515 235 L 495 225 L 485 210 L 482 192 Z"/>
+          <!-- Scandinavia -->
+          <path d="M 530 130 L 555 125 L 575 132 L 580 150 L 568 168 L 548 172 L 532 162 L 525 148 Z"/>
+          <!-- Africa -->
+          <path d="M 510 248 L 540 245 L 568 255 L 590 275 L 605 300 L 615 330 L 618 365 L 612 400 L 595 432 L 575 455 L 552 465 L 528 460 L 508 442 L 495 415 L 488 385 L 485 355 L 488 325 L 495 295 L 502 270 Z"/>
+          <!-- Madagascar -->
+          <path d="M 620 400 L 632 405 L 635 425 L 628 442 L 618 440 L 614 422 Z"/>
+          <!-- Middle East -->
+          <path d="M 605 235 L 635 240 L 660 255 L 665 275 L 658 290 L 640 295 L 618 290 L 605 275 L 602 255 Z"/>
+          <!-- Russia & Northern Asia -->
+          <path d="M 580 145 L 640 135 L 710 130 L 780 132 L 845 138 L 895 148 L 920 165 L 925 185 L 915 200 L 890 210 L 850 215 L 800 215 L 745 212 L 690 208 L 640 200 L 600 188 L 580 170 Z"/>
+          <!-- China & East Asia -->
+          <path d="M 720 215 L 760 215 L 800 220 L 835 232 L 855 250 L 860 270 L 850 285 L 830 295 L 800 298 L 770 295 L 740 285 L 720 270 L 712 250 L 715 232 Z"/>
+          <!-- India -->
+          <path d="M 712 270 L 740 275 L 758 290 L 762 312 L 752 332 L 735 340 L 718 332 L 708 312 L 705 290 Z"/>
+          <!-- Southeast Asia / Indonesia -->
+          <path d="M 800 305 L 825 308 L 848 315 L 855 328 L 845 340 L 820 342 L 798 338 L 790 325 Z"/>
+          <path d="M 855 332 L 880 332 L 895 342 L 888 355 L 868 358 L 852 350 Z"/>
+          <!-- Japan -->
+          <path d="M 880 215 L 895 218 L 905 232 L 900 248 L 888 252 L 878 245 L 872 230 Z"/>
+          <path d="M 902 250 L 912 255 L 915 268 L 908 278 L 898 275 L 895 262 Z"/>
+          <!-- Philippines -->
+          <path d="M 870 280 L 882 285 L 885 300 L 878 312 L 868 308 L 865 295 Z"/>
+          <!-- Australia -->
+          <path d="M 825 380 L 870 375 L 905 385 L 925 400 L 925 420 L 905 432 L 870 438 L 832 435 L 810 422 L 805 402 Z"/>
+          <!-- New Zealand -->
+          <path d="M 935 432 L 945 435 L 950 450 L 942 462 L 932 458 L 928 445 Z"/>
+          <!-- Tasmania -->
+          <path d="M 870 445 L 882 448 L 885 458 L 878 465 L 868 462 Z"/>
+        </g>
+      </svg>
+      
+      <div style="position:relative;z-index:5;${getContentPadding(lang, '20mm', '18mm', '14mm')}height:297mm;display:flex;flex-direction:column;box-sizing:border-box;">
+        
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6mm;">
+          ${isEn ? `
+            <img src="data:image/png;base64,${PDF_LOGO_B64}" style="height:55px;width:auto;display:block;">
+            <div style="display:flex;flex-direction:column;gap:3px;text-align:right;">
+              <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;color:#3A393A;line-height:1.1;">Straight Line Logistics & Trade</div>
+              <div style="font-family:'Outfit',sans-serif;font-weight:500;font-size:10px;color:#6B7280;letter-spacing:0.18em;text-transform:uppercase;">Shipping & Trading Solutions</div>
+            </div>
+          ` : `
+            <div style="display:flex;flex-direction:column;gap:4px;text-align:left;">
+              <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;color:#3A393A;line-height:1.1;">Straight Line Logistics & Trade</div>
+              <div style="font-weight:600;font-size:11px;color:#6B7280;line-height:1.3;">ستريت لاين للشحن والتجارة</div>
+            </div>
+            <img src="data:image/png;base64,${PDF_LOGO_B64}" style="height:55px;width:auto;display:block;">
+          `}
         </div>
-      </div>
-      <div style="width:80px;height:4px;background:#EC1C23;margin-bottom:55px;"></div>
-      <h1 style="font-size:42px;font-weight:900;line-height:1.2;margin-bottom:20px;letter-spacing:-0.5px;color:#3A393A;"><span style="color:#EC1C23;">${t.titleAr1}</span><br>${t.titleAr2}</h1>
-      <p style="font-size:16px;color:#737373;margin-bottom:75px;font-weight:400;">${t.subtitle}</p>
-      <div style="background:#FFFFFF;border:1px solid #EAE6DD;border-${isEn ? 'left' : 'right'}:5px solid #EC1C23;padding:32px;display:grid;grid-template-columns:1fr 1fr;gap:25px;box-shadow:0 8px 30px rgba(58,57,58,0.08);margin-bottom:50px;">
-        <div>
-          <div style="font-size:11px;color:#FF6B75;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:6px;">${t.preparedFor}</div>
-          <div style="font-size:18px;font-weight:700;color:#3A393A;line-height:1.3;">${formData.clientName || '—'}</div>
-          <div style="font-size:13px;color:#737373;margin-top:2px;">${formData.clientCompany || ''}</div>
+        
+        <div style="height:1.5px;background:#EC1C23;margin-bottom:18mm;width:100%;"></div>
+        
+        <div style="${isEn ? 'text-align:left;' : 'text-align:right;'}margin-bottom:5mm;">
+          <h1 style="font-size:58px;font-weight:900;line-height:1.0;margin:0 0 4mm 0;letter-spacing:-1.5px;color:#3A393A;">
+            ${t.titleAr1}<br>${t.titleAr2}
+          </h1>
+          <p style="font-size:13px;color:#6B7280;margin:0;font-weight:400;line-height:1.5;">${t.subtitle}</p>
         </div>
-        <div>
-          <div style="font-size:11px;color:#FF6B75;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:6px;">${t.quoteNum}</div>
-          <div style="font-size:18px;font-weight:700;color:#3A393A;line-height:1.3;font-family:'Outfit',sans-serif;direction:ltr;display:inline-block;">${formData.quotationNum || '—'}</div>
-          <div style="font-size:13px;color:#737373;margin-top:2px;">${dateDisplay}</div>
+        
+        <div style="background:#FFF;border:1px solid #EAE6DD;border-radius:8px;padding:7mm 8mm;box-shadow:0 10px 30px rgba(58,57,58,0.08);position:relative;overflow:hidden;margin-top:6mm;">
+          
+          <div style="position:absolute;top:0;${isEn ? 'left' : 'right'}:6mm;width:60px;height:3px;background:#EC1C23;"></div>
+          
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6mm 10mm;">
+            
+            <div style="display:flex;align-items:center;gap:12px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+              <div style="width:42px;height:42px;background:#FFF;border:1.5px solid #EC1C23;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EC1C23" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:${isEn ? 'flex-start' : 'flex-end'};text-align:${isEn ? 'left' : 'right'};">
+                <div style="font-size:10px;color:#9CA3AF;font-weight:600;margin-bottom:3px;">${t.preparedFor}</div>
+                <div style="font-size:14px;font-weight:800;color:#3A393A;line-height:1.2;">${formData.clientName || '\u2014'}</div>
+                ${formData.clientCompany ? `<div style="font-size:10px;color:#9CA3AF;margin-top:2px;line-height:1.2;">${formData.clientCompany}</div>` : ''}
+              </div>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:12px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+              <div style="width:42px;height:42px;background:#FFF;border:1.5px solid #EC1C23;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EC1C23" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:${isEn ? 'flex-start' : 'flex-end'};text-align:${isEn ? 'left' : 'right'};">
+                <div style="font-size:10px;color:#9CA3AF;font-weight:600;margin-bottom:3px;">${t.quoteNum}</div>
+                <div style="font-size:14px;font-weight:800;color:#3A393A;line-height:1.2;font-family:'Outfit',sans-serif;direction:ltr;">${formData.quotationNum || '\u2014'}</div>
+                <div style="font-size:10px;color:#9CA3AF;margin-top:2px;line-height:1.2;">${dateDisplay}</div>
+              </div>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:12px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+              <div style="width:42px;height:42px;background:#FFF;border:1.5px solid #EC1C23;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EC1C23" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:${isEn ? 'flex-start' : 'flex-end'};text-align:${isEn ? 'left' : 'right'};">
+                <div style="font-size:10px;color:#9CA3AF;font-weight:600;margin-bottom:3px;">${t.route}</div>
+                <div style="font-size:14px;font-weight:800;color:#3A393A;line-height:1.2;">${formData.originCountry || '\u2014'} <span style="color:#EC1C23;">${arrow}</span> ${formData.destCountry || '\u2014'}</div>
+                ${(formData.originPort || formData.destPort) ? `<div style="font-size:10px;color:#9CA3AF;margin-top:2px;line-height:1.2;">${formData.originPort || ''} ${arrow} ${formData.destPort || ''}</div>` : ''}
+              </div>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:12px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+              <div style="width:42px;height:42px;background:#FFF;border:1.5px solid #EC1C23;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EC1C23" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="11" rx="1"/><line x1="7" y1="8" x2="7" y2="19"/><line x1="11" y1="8" x2="11" y2="19"/><line x1="15" y1="8" x2="15" y2="19"/></svg>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:${isEn ? 'flex-start' : 'flex-end'};text-align:${isEn ? 'left' : 'right'};">
+                <div style="font-size:10px;color:#9CA3AF;font-weight:600;margin-bottom:3px;">${t.shippingType}</div>
+                <div style="font-size:14px;font-weight:800;color:#3A393A;line-height:1.2;">${shippingDisplay}</div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          <div style="font-size:11px;color:#FF6B75;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:6px;">${t.route}</div>
-          <div style="font-size:18px;font-weight:700;color:#3A393A;line-height:1.3;">${formData.originCountry || '—'} ${arrow} ${formData.destCountry || '—'}</div>
-          <div style="font-size:13px;color:#737373;margin-top:2px;">${formData.originPort || ''} ${arrow} ${formData.destPort || ''}</div>
+        
+        <div style="flex:1;"></div>
+        
+        <div style="text-align:center;padding:10mm 0;">
+          <div style="font-family:'Outfit',sans-serif;font-weight:400;font-size:24px;font-style:italic;color:#3A393A;letter-spacing:0.01em;line-height:1.4;margin-bottom:12px;">${t.sloganEn}</div>
+          ${!isEn ? '<div style="font-weight:800;font-size:22px;color:#EC1C23;letter-spacing:0.02em;">' + t.sloganAr + '</div>' : ''}
         </div>
-        <div>
-          <div style="font-size:11px;color:#FF6B75;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:6px;">${t.shippingType}</div>
-          <div style="font-size:18px;font-weight:700;color:#3A393A;line-height:1.3;">${shippingDisplay}</div>
-          <div style="font-size:13px;color:#737373;margin-top:2px;">${containerDisplay}</div>
+        
+        <div style="flex:1;"></div>
+        
+        <div style="text-align:center;padding-top:5mm;border-top:1px solid #EAE6DD;">
+          <div style="font-size:9px;font-weight:400;color:#9CA3AF;line-height:1.5;margin-bottom:5px;">${t.disclaimer}</div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:12px;color:#EC1C23;letter-spacing:0.04em;">${COMPANY_INFO.website}</div>
         </div>
-      </div>
-      <div style="text-align:center;padding:30px 20px;">
-        <div style="width:60px;height:3px;background:#EC1C23;margin:0 auto 24px;border-radius:2px;"></div>
-        <div style="font-family:'Outfit',sans-serif;font-weight:400;font-size:24px;font-style:italic;color:#3A393A;letter-spacing:0.01em;line-height:1.4;margin-bottom:10px;">${t.sloganEn}</div>
-        ${!isEn ? '<div style="font-weight:700;font-size:16px;color:#EC1C23;letter-spacing:0.02em;">' + t.sloganAr + '</div>' : ''}
-      </div>
-      <div style="${footerPos}text-align:center;padding-top:5mm;border-top:1px solid #E5E7EB;">
-        <div style="font-size:11px;font-weight:500;color:#737373;line-height:1.5;margin-bottom:8px;">${t.disclaimer}</div>
-        <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;color:#EC1C23;letter-spacing:0.04em;">${COMPANY_INFO.website}</div>
       </div>
     </div>
   `;
@@ -3087,7 +3194,7 @@ function renderPaymentPage(ctx){
     <div class="pdf-page" style="${ps}">
       ${sb}
       <div style="${pad}height:100%;display:flex;flex-direction:column;">
-        ${pdfPageHeader(t.eyebrow, t.title, '03', lang)}
+        ${pdfPageHeader(t.eyebrow, t.title, '04', lang)}
 
         <div style="background:#FFF;border:1px solid #EAE6DD;border-${isEn ? 'left' : 'right'}:5px solid #EC1C23;padding:14px 18px;margin-bottom:16px;font-size:12px;color:#3A393A;line-height:1.7;font-weight:500;">
           ${t.intro}
@@ -3129,7 +3236,7 @@ function renderPaymentPage(ctx){
           </div>
         </div>
 
-        ${pdfFooter('04', '05', lang)}
+        ${pdfFooter('04', '06', lang)}
       </div>
     </div>
   `;
@@ -3164,6 +3271,9 @@ function renderTermsPage(ctx){
     term6Title: 'Force Majeure',
     term6En: 'FORCE MAJEURE',
     term6Desc: 'Straight Line bears no responsibility for delays resulting from <strong style="color:#EC1C23;font-weight:700;">force majeure</strong> events such as strikes, wars, port closures, or any circumstances beyond company control.',
+    term7Title: 'Customs Accepted Value',
+    term7En: 'CUSTOMS ACCEPTED VALUE',
+    term7Desc: '<strong style="color:#EC1C23;font-weight:700;">"Customs Accepted Value"</strong> is an estimated value approved by the Egyptian Customs Authority for the purpose of calculating duties and taxes, according to the official customs tariff valuation standards and rates applicable at the time of cargo release. This value may differ from the actual commercial invoice value based on the sovereign discretion of the Customs Authority, and does not necessarily reflect the actual purchase price from the supplier.',
     disclaimerTitle: 'LEGAL DISCLAIMER',
     disclaimerText: 'All figures and values contained in this quotation are <strong style="color:#FF6B75;font-weight:700;">estimates and for guidance only</strong>, aimed at enabling the client to estimate expected costs. This document does not constitute a binding contract, and imposes no legal or financial obligations on Straight Line Logistics & Trade. Actual obligations are determined only by an official signed contract between the parties.'
   } : {
@@ -3188,6 +3298,9 @@ function renderTermsPage(ctx){
     term6Title: 'القوة القاهرة',
     term6En: 'FORCE MAJEURE',
     term6Desc: 'لا تتحمل Straight Line أي مسؤولية عن التأخير الناتج عن ظروف <strong style="color:#EC1C23;font-weight:700;">القوة القاهرة</strong> كالإضرابات، الحروب، إغلاق الموانئ، أو أي ظروف خارجة عن إرادة الشركة.',
+    term7Title: 'القيمة المقبولة جمركياً',
+    term7En: 'CUSTOMS ACCEPTED VALUE',
+    term7Desc: '<strong style="color:#EC1C23;font-weight:700;">"القيمة المقبولة جمركياً":</strong> هي القيمة التقديرية المعتمدة من مصلحة الجمارك المصرية لأغراض حساب الرسوم والضرائب، وفقاً لمعايير وأسعار التسعير الجمركي الرسمية المعمول بها وقت الإفراج عن الشحنة. هذه القيمة قد تختلف عن قيمة الفاتورة التجارية الفعلية بناءً على التقدير السيادي لمصلحة الجمارك، ولا تعكس بالضرورة سعر الشراء الفعلي من المورد.',
     disclaimerTitle: 'إخلاء المسؤولية القانونية · LEGAL DISCLAIMER',
     disclaimerText: 'جميع الأرقام والقيم الواردة في هذا البيان هي <strong style="color:#FF6B75;font-weight:700;">تقديرية واسترشادية فقط</strong>، والهدف منها تمكين العميل من تقدير التكلفة المتوقعة. لا يُمثل هذا المستند عقداً ملزماً، ولا يُرتب على Straight Line Logistics & Trade أي التزامات قانونية أو مالية. تُحدَّد الالتزامات الفعلية فقط بموجب عقد رسمي مُوقَّع بين الطرفين.'
   };
@@ -3213,7 +3326,7 @@ function renderTermsPage(ctx){
     <div class="pdf-page" style="${ps}">
       ${sb}
       <div style="${pad}height:100%;display:flex;flex-direction:column;">
-        ${pdfPageHeader(t.eyebrow, t.title, '07', lang)}
+        ${pdfPageHeader(t.eyebrow, t.title, '05', lang)}
 
         <div style="background:#FFF;border:1px solid #EAE6DD;border-${isEn ? 'left' : 'right'}:5px solid #EC1C23;padding:14px 20px;margin-bottom:14px;font-size:11.5px;color:#3A393A;line-height:1.7;font-weight:500;">
           ${t.intro}
@@ -3226,6 +3339,7 @@ function renderTermsPage(ctx){
           ${termItem(4, false, t.term4Title, t.term4En, t.term4Desc)}
           ${termItem(5, false, t.term5Title, t.term5En, t.term5Desc)}
           ${termItem(6, false, t.term6Title, t.term6En, t.term6Desc)}
+          ${termItem(7, true,  t.term7Title, t.term7En, t.term7Desc)}
         </div>
 
         <div style="background:#3A393A;color:#FFF;padding:12px 18px;margin-top:12px;position:relative;">
@@ -3239,7 +3353,7 @@ function renderTermsPage(ctx){
           </div>
         </div>
 
-        ${pdfFooter('07', '08', lang)}
+        ${pdfFooter('05', '06', lang)}
       </div>
     </div>
   `;
@@ -3372,7 +3486,7 @@ function renderContactPage(ctx){
     <div class="pdf-page" style="${ps}">
       ${sb}
       <div style="${pad}height:100%;display:flex;flex-direction:column;">
-        ${pdfPageHeader(t.eyebrow, t.title, '04', lang)}
+        ${pdfPageHeader(t.eyebrow, t.title, '06', lang)}
 
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
           <div style="width:4px;height:18px;background:#EC1C23;flex-shrink:0;"></div>
@@ -3415,7 +3529,7 @@ function renderContactPage(ctx){
           ${officeCard(COMPANY_INFO.offices[4])}
         </div>
 
-        ${pdfFooter('05', '05', lang)}
+        ${pdfFooter('06', '06', lang)}
       </div>
     </div>
   `;
@@ -3521,13 +3635,165 @@ function _sectionTotal(label, usd, egp, isEn, st){
   `;
 }
 
-// PAGE 2: Basic Info + Shipping + Customs
+// PAGE 2: ALL COSTS — PREMIUM DARK THEME (Most Important Page)
 function renderCompactCostBreakdownPart1(ctx){
   const r = ctx.r;
   const lang = ctx.lang || 'ar';
   const isEn = lang === 'en';
   const t = _getCompactTranslations(isEn);
-  const st = _getCompactStyles();
+  
+  const usdRate = ctx.formData.usdRate || r.usdRate || 50;
+  
+  // Unique percentages per tax type from products
+  const products = r.products || [];
+  const getUniquePcts = (field) => {
+    const vals = [...new Set(products.map(p => parseFloat(p[field]) || 0).filter(v => v > 0))];
+    return vals.sort((a,b) => b-a);
+  };
+  const dutyPcts = getUniquePcts('customsDutyPct');
+  const vatPcts = getUniquePcts('vatPct');
+  const profitPcts = getUniquePcts('profitTaxPct');
+  const fmtPcts = (arr) => arr.length === 0 ? '' : arr.map(v => `${v}%`).join(isEn ? ' & ' : ' و ');
+  
+  // Translations
+  const tt = {
+    exportTitle: isEn ? '🚢 Expenses in Export Country' : '🚢 المصاريف في بلد التصدير',
+    importTitle: isEn ? '🏛️ Expenses in Import Country' : '🏛️ المصاريف في بلد الاستيراد',
+    commissionsTitle: isEn ? '💼 Commissions & Banking Fees' : '💼 العمولات والمصاريف البنكية',
+    customsNote: isEn ? '(on Accepted Value $' : '(على القيمة المقبولة $',
+    
+    clearanceFees: isEn ? 'Clearance Fees' : 'أتعاب التخليص الجمركي',
+    shippingLineReceipts: isEn ? 'Shipping Line & Port Authority Receipts' : 'إيصالات الخط الملاحي وهيئة الميناء',
+    portSub: isEn ? 'Includes internal transport, tips & miscellaneous' : 'يشمل إيصالات النقل الداخلي وإكراميات ونثريات',
+    
+    grandTitle: isEn ? '💰 Total Costs Summary' : '💰 ملخص إجمالي التكاليف',
+    totalExpenses: isEn ? 'Total all costs & expenses' : 'إجمالي جميع التكاليف والمصاريف',
+    plusGoods: isEn ? '+ Actual goods value (to supplier)' : '+ قيمة البضاعة الفعلية (للمورد)',
+    grandTotal: isEn ? '💰 Grand Total (Total Landed Cost)' : '💰 المجموع الكلي'
+  };
+  
+  // DARK THEME STYLES — premium look
+  const sectionStyle = 'background:#3A393A;border:1px solid #1F1E1F;border-radius:10px;padding:14px 18px;margin-bottom:11px;box-shadow:0 2px 8px rgba(0,0,0,0.08);';
+  const sectionHeaderStyle = 'font-size:14px;font-weight:800;color:#FFF;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid rgba(236,28,35,0.4);display:flex;align-items:center;gap:8px;';
+  const itemStyle = 'display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,0.12);';
+  const lastItemStyle = 'display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;';
+  const labelStyle = 'font-size:12px;font-weight:600;color:#FFF;flex:1;line-height:1.4;';
+  const subStyle = 'font-size:9px;color:rgba(255,255,255,0.55);font-weight:500;margin-top:1px;';
+  const valuesStyle = 'display:flex;gap:16px;align-items:baseline;';
+  const usdStyle = 'font-family:Outfit,sans-serif;font-size:12px;font-weight:700;color:rgba(255,255,255,0.95);min-width:80px;text-align:left;direction:ltr;';
+  const egpStyle = 'font-family:Outfit,sans-serif;font-size:12px;font-weight:800;color:#EC1C23;min-width:100px;text-align:left;direction:ltr;';
+  
+  const item = (label, sub, usd, egp, isLast) => `
+    <div style="${isLast ? lastItemStyle : itemStyle}">
+      <div style="${labelStyle}">
+        <div>${label}</div>
+        ${sub ? `<div style="${subStyle}">${sub}</div>` : ''}
+      </div>
+      <div style="${valuesStyle}">
+        <div style="${usdStyle}">$${fmt(usd, 0)}</div>
+        <div style="${egpStyle}">${fmt(egp, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+      </div>
+    </div>
+  `;
+  
+  const dutyLabel = dutyPcts.length > 0 ? `${t.customsDuty} (${fmtPcts(dutyPcts)})` : t.customsDuty;
+  const vatLabel = vatPcts.length > 0 ? `${t.vat} (${fmtPcts(vatPcts)})` : t.vat;
+  const profitLabel = profitPcts.length > 0 ? `${t.profit} (${fmtPcts(profitPcts)})` : t.profit;
+  
+  // Split internal expenses into 2 items
+  const intB = r.internal.breakdown || {};
+  const clearanceEGP = parseFloat(intB.clearance) || 0;
+  const clearanceUSD = clearanceEGP / usdRate;
+  
+  const restEGP = (parseFloat(intB.shippingLine) || 0) 
+                + (parseFloat(intB.portAuth) || 0) 
+                + (parseFloat(intB.customsOffice) || 0)
+                + (parseFloat(intB.transport) || 0)
+                + (parseFloat(intB.otherReceipts) || 0)
+                + (parseFloat(intB.misc) || 0);
+  const restUSD = restEGP / usdRate;
+  
+  return `
+    <div class="pdf-page">
+      <div style="${getPageStyle(lang)}">
+        ${getSideBars(lang)}
+        <div style="${getContentPadding(lang, '14mm', '14mm', '10mm')}">
+        ${pdfPageHeader(isEn ? 'All Cost Items' : 'جميع بنود التكاليف', isEn ? 'Cost Breakdown' : 'تفاصيل التكاليف', '02', lang)}
+        
+        <!-- Premium "Main Page" Badge -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:7px 14px;background:linear-gradient(${isEn?'90deg':'270deg'}, rgba(236,28,35,0.08) 0%, transparent 100%);border-${isEn?'left':'right'}:3px solid #EC1C23;border-radius:0 6px 6px 0;">
+          <span style="font-size:11px;font-weight:800;color:#EC1C23;letter-spacing:0.5px;">${isEn ? 'COMPLETE COST BREAKDOWN' : 'البيان الكامل لتفاصيل التكاليف'}</span>
+        </div>
+        
+        <!-- SECTION 1: EXPORT COUNTRY -->
+        <div style="${sectionStyle}">
+          <div style="${sectionHeaderStyle}">${tt.exportTitle}</div>
+          ${item(t.intlShipping, ctx.containerCountText || '', r.shipping.shippingUSD, r.shipping.shippingEGP, false)}
+          ${item(t.coo, t.cooSub, r.shipping.originCertUSD, r.shipping.originCertEGP, false)}
+          ${item(t.acid, t.acidSub, r.shipping.acidCargoxUSD, r.shipping.acidCargoxEGP, true)}
+        </div>
+        
+        <!-- SECTION 2: IMPORT COUNTRY (Customs + 2 Internal items) -->
+        <div style="${sectionStyle}">
+          <div style="${sectionHeaderStyle}">${tt.importTitle} <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.65);">${tt.customsNote}${fmt(r.productsTotals.totalAcceptedUSD, 0)})</span></div>
+          
+          ${item(dutyLabel, t.customsSub, r.productsTotals.totalCustomsDutyUSD, r.productsTotals.customsDutyEGP, false)}
+          ${item(vatLabel, t.vatSub, r.productsTotals.totalVatUSD, r.productsTotals.vatEGP, false)}
+          ${item(profitLabel, t.profitSub, r.productsTotals.totalProfitTaxUSD, r.productsTotals.profitTaxEGP, false)}
+          ${item(tt.clearanceFees, '', clearanceUSD, clearanceEGP, false)}
+          ${item(tt.shippingLineReceipts, tt.portSub, restUSD, restEGP, true)}
+        </div>
+        
+        <!-- SECTION 3: COMMISSIONS & BANKING -->
+        <div style="${sectionStyle}">
+          <div style="${sectionHeaderStyle}">${tt.commissionsTitle}</div>
+          ${item(`${t.cardComm} (${ctx.formData.cardCommissionPct || 1.5}%)`, t.cardSub, r.commissions.cardCommissionUSD, r.commissions.cardCommissionEGP, false)}
+          ${item(`${t.sllComm} (${ctx.formData.sllCommissionPct || 3}%)`, t.sllSub, r.commissions.sllCommissionUSD, r.commissions.sllCommissionEGP, false)}
+          ${item(t.bank, '', r.commissions.bankFeesUSD + r.commissions.otherFeesUSD, r.commissions.bankFeesEGP + r.commissions.otherFeesEGP, true)}
+        </div>
+        
+        <!-- GRAND TOTAL — Red accent on dark -->
+        <div style="background:linear-gradient(135deg,#EC1C23 0%,#C71F2D 100%);color:#FFF;padding:16px 20px;border-radius:10px;margin-top:14px;box-shadow:0 4px 12px rgba(236,28,35,0.25);">
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);letter-spacing:0.5px;margin-bottom:10px;">${tt.grandTitle}</div>
+          
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.25);">
+            <div style="font-size:12px;font-weight:700;">${tt.totalExpenses}</div>
+            <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
+              <div>$${fmt(r.totals.totalExpensesUSD, 0)}</div>
+              <div>${fmt(r.totals.totalExpensesEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+            </div>
+          </div>
+          
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.25);">
+            <div style="font-size:12px;font-weight:700;">${tt.plusGoods}</div>
+            <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
+              <div>$${fmt(r.productsTotals.totalRealUSD, 0)}</div>
+              <div>${fmt(r.productsTotals.totalRealEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+            </div>
+          </div>
+          
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:8px;border-top:2px solid #FFF;">
+            <div style="font-size:15px;font-weight:900;">${tt.grandTotal}</div>
+            <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;font-size:17px;font-weight:900;">
+              <div>$${fmt(r.totals.grandTotalUSD, 0)}</div>
+              <div>${fmt(r.totals.grandTotalEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+            </div>
+          </div>
+        </div>
+        
+        ${pdfFooter('02', '06', lang)}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// PAGE 3: Basic Info + Cost Factor + Example
+function renderCompactCostBreakdownPart2(ctx){
+  const r = ctx.r;
+  const lang = ctx.lang || 'ar';
+  const isEn = lang === 'en';
+  const t = _getCompactTranslations(isEn);
   
   const valueDiff = r.productsTotals.totalRealUSD > 0 
     ? ((r.productsTotals.totalAcceptedUSD - r.productsTotals.totalRealUSD) / r.productsTotals.totalRealUSD * 100).toFixed(1)
@@ -3536,231 +3802,194 @@ function renderCompactCostBreakdownPart1(ctx){
   const customsRate = ctx.formData.customsUsdRate || r.customsRate || 51.5;
   const shipmentDesc = ctx.shippingDisplay || ctx.formData.shippingType || '';
   
+  // Build products customs breakdown (only show if products exist)
+  const products = r.products || ctx.formData.products || [];
+  const hasProducts = products.length > 0;
+  const hasAnyHSCode = products.some(p => p.hsCode && String(p.hsCode).trim());
+  
+  // Check if products have varying rates (justifies showing the table)
+  const allDuty = [...new Set(products.map(p => parseFloat(p.customsDutyPct) || 0))];
+  const allVat = [...new Set(products.map(p => parseFloat(p.vatPct) || 0))];
+  const allProfit = [...new Set(products.map(p => parseFloat(p.profitTaxPct) || 0))];
+  const hasVaryingRates = allDuty.length > 1 || allVat.length > 1 || allProfit.length > 1;
+  
+  // Show table if products exist
+  const showCustomsTable = hasProducts;
+  
+  let customsTableHTML = '';
+  if (showCustomsTable) {
+    const rows = products.map((p, idx) => {
+      const name = p.name || (isEn ? `Item ${idx+1}` : `صنف ${idx+1}`);
+      const hsCode = (p.hsCode && String(p.hsCode).trim()) ? p.hsCode : '—';
+      const duty = parseFloat(p.customsDutyPct) || 0;
+      const vat = parseFloat(p.vatPct) || 0;
+      const profit = parseFloat(p.profitTaxPct) || 0;
+      
+      return `
+        <tr style="border-bottom:1px solid #F0EBE2;">
+          <td style="padding:8px 10px;font-size:11px;font-weight:600;color:#3A393A;text-align:${isEn?'left':'right'};">${name}</td>
+          ${hasAnyHSCode ? `<td style="padding:8px 10px;font-family:'Outfit',sans-serif;font-size:10px;font-weight:600;color:#6B7280;direction:ltr;text-align:center;border-${isEn?'left':'right'}:1px solid #F0EBE2;">${hsCode}</td>` : ''}
+          <td style="padding:8px 10px;font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;color:#EC1C23;text-align:center;border-${isEn?'left':'right'}:1px solid #F0EBE2;">${duty}%</td>
+          <td style="padding:8px 10px;font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;color:#EC1C23;text-align:center;border-${isEn?'left':'right'}:1px solid #F0EBE2;">${vat}%</td>
+          <td style="padding:8px 10px;font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;color:#EC1C23;text-align:center;">${profit}%</td>
+        </tr>
+      `;
+    }).join('');
+    
+    customsTableHTML = `
+      <!-- Customs Rates Per Product -->
+      <div style="background:#FFF;border:1px solid #EAE6DD;border-radius:8px;margin-bottom:18px;overflow:hidden;">
+        <div style="background:linear-gradient(${isEn?'90deg':'270deg'},#3A393A 0%,#1F1E1F 100%);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:14px;">🏛️</span>
+            <span style="font-size:13px;font-weight:800;color:#FFF;letter-spacing:0.5px;">${isEn ? 'CUSTOMS RATES BY ITEM' : 'الفئات الجمركية لكل بند'}</span>
+          </div>
+          <span style="font-family:'Outfit',sans-serif;font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.2em;">DUTY • VAT • PROFIT</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#FAF7F2;">
+              <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#6B7280;text-align:${isEn?'left':'right'};text-transform:uppercase;letter-spacing:0.3px;">${isEn ? 'Item' : 'البند'}</th>
+              ${hasAnyHSCode ? `<th style="padding:8px 10px;font-size:10px;font-weight:700;color:#6B7280;text-align:center;text-transform:uppercase;letter-spacing:0.3px;border-${isEn?'left':'right'}:1px solid #F0EBE2;">HS Code</th>` : ''}
+              <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#6B7280;text-align:center;text-transform:uppercase;letter-spacing:0.3px;border-${isEn?'left':'right'}:1px solid #F0EBE2;">${isEn ? 'Duty' : 'جمركي'}</th>
+              <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#6B7280;text-align:center;text-transform:uppercase;letter-spacing:0.3px;border-${isEn?'left':'right'}:1px solid #F0EBE2;">VAT</th>
+              <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#6B7280;text-align:center;text-transform:uppercase;letter-spacing:0.3px;">${isEn ? 'Profit' : 'أرباح'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+  
   return `
     <div class="pdf-page">
       <div style="${getPageStyle(lang)}">
         ${getSideBars(lang)}
         <div style="${getContentPadding(lang, '14mm', '14mm', '10mm')}">
-        ${pdfPageHeader(t.subtitle, t.title, '02', lang)}
+        ${pdfPageHeader(isEn ? 'Summary & Cost Analysis' : 'الملخص وتحليل التكلفة', isEn ? 'Quotation Summary' : 'ملخص العرض', '03', lang)}
+        
+        ${customsTableHTML}
         
         <!-- Basic Info Box - Elegant Design -->
-        <div style="background:linear-gradient(135deg,#FAF7F2 0%,#F5F0E8 100%);border:1px solid #EAE6DD;border-radius:8px;padding:0;margin-bottom:18px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+        <div style="background:linear-gradient(135deg,#FAF7F2 0%,#F5F0E8 100%);border:1px solid #EAE6DD;border-radius:8px;padding:0;margin-bottom:22px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
           <!-- Header Bar -->
-          <div style="background:linear-gradient(${isEn?'90deg':'270deg'},#3A393A 0%,#1F1E1F 100%);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="background:linear-gradient(${isEn?'90deg':'270deg'},#3A393A 0%,#1F1E1F 100%);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="font-size:16px;">📋</span>
-              <span style="font-size:13px;font-weight:800;color:#FFF;letter-spacing:0.5px;">${isEn ? 'BASIC INFORMATION' : 'المعلومات الأساسية'}</span>
+              <span style="font-size:14px;font-weight:800;color:#FFF;letter-spacing:0.5px;">${isEn ? 'BASIC INFORMATION' : 'المعلومات الأساسية'}</span>
             </div>
-            <span style="font-family:'Outfit',sans-serif;font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.2em;">QUOTATION DATA</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:0.2em;">QUOTATION DATA</span>
           </div>
           
           <!-- Grid Content -->
-          <div style="padding:16px 18px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#EAE6DD;">
+          <div style="padding:18px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#EAE6DD;">
             
             <!-- Real Value -->
-            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.realValue}</span><div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div>`}
-                ${isEn ? `<div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.realValue}</span>` : ''}
+            <div style="background:#FFF;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;align-items:${isEn?'flex-start':'flex-end'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div>
+                <span style="font-size:11px;color:#6B7280;font-weight:700;letter-spacing:0.3px;">${t.realValue}</span>
               </div>
-              <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;text-align:${isEn?'left':'right'};">$${fmt(r.productsTotals.totalRealUSD, 0)}</div>
+              <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:900;color:#3A393A;direction:ltr;">$${fmt(r.productsTotals.totalRealUSD, 0)}</div>
             </div>
             
             <!-- Accepted Value -->
-            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.acceptedValue}</span><div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div>`}
-                ${isEn ? `<div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.acceptedValue}</span>` : ''}
+            <div style="background:#FFF;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;align-items:${isEn?'flex-start':'flex-end'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div>
+                <span style="font-size:11px;color:#6B7280;font-weight:700;letter-spacing:0.3px;">${t.acceptedValue}</span>
               </div>
-              <div style="display:flex;align-items:baseline;gap:6px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn 
-                  ? `<div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">$${fmt(r.productsTotals.totalAcceptedUSD, 0)}</div><div style="background:#EC1C23;color:#FFF;padding:2px 7px;border-radius:10px;font-family:'Outfit',sans-serif;font-size:10px;font-weight:800;direction:ltr;">+${valueDiff}%</div>`
-                  : `<div style="background:#EC1C23;color:#FFF;padding:2px 7px;border-radius:10px;font-family:'Outfit',sans-serif;font-size:10px;font-weight:800;direction:ltr;">+${valueDiff}%</div><div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">$${fmt(r.productsTotals.totalAcceptedUSD, 0)}</div>`
-                }
+              <div style="display:flex;align-items:baseline;gap:7px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:900;color:#3A393A;direction:ltr;">$${fmt(r.productsTotals.totalAcceptedUSD, 0)}</div>
+                <div style="background:#EC1C23;color:#FFF;padding:2px 8px;border-radius:10px;font-family:'Outfit',sans-serif;font-size:10px;font-weight:800;direction:ltr;">${valueDiff>=0?'+':''}${valueDiff}%</div>
               </div>
             </div>
             
             <!-- Exchange Rate -->
-            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.exchangeRate}</span><div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div>`}
-                ${isEn ? `<div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.exchangeRate}</span>` : ''}
+            <div style="background:#FFF;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;align-items:${isEn?'flex-start':'flex-end'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div>
+                <span style="font-size:11px;color:#6B7280;font-weight:700;letter-spacing:0.3px;">${t.exchangeRate}</span>
               </div>
-              <div style="display:flex;align-items:baseline;gap:5px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn 
-                  ? `<div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(usdRate, 2)}</div><div style="font-size:11px;color:#6B7280;font-weight:600;">EGP</div>`
-                  : `<div style="font-size:11px;color:#6B7280;font-weight:600;">ج.م</div><div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(usdRate, 2)}</div>`
-                }
+              <div style="display:flex;align-items:baseline;gap:6px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(usdRate, 2)}</div>
+                <div style="font-size:12px;color:#6B7280;font-weight:600;">${isEn ? 'EGP' : 'ج.م'}</div>
               </div>
             </div>
             
             <!-- Customs Rate -->
-            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.customsRate}</span><div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div>`}
-                ${isEn ? `<div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.customsRate}</span>` : ''}
+            <div style="background:#FFF;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;align-items:${isEn?'flex-start':'flex-end'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div>
+                <span style="font-size:11px;color:#6B7280;font-weight:700;letter-spacing:0.3px;">${t.customsRate}</span>
               </div>
-              <div style="display:flex;align-items:baseline;gap:6px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn 
-                  ? `<div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(customsRate, 2)}</div><div style="font-size:11px;color:#6B7280;font-weight:600;">EGP</div>${customsRate !== usdRate ? `<div style="background:#FEE2E2;color:#EC1C23;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:0.3px;">DIFF</div>` : ''}`
-                  : `${customsRate !== usdRate ? `<div style="background:#FEE2E2;color:#EC1C23;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:0.3px;">مختلف</div>` : ''}<div style="font-size:11px;color:#6B7280;font-weight:600;">ج.م</div><div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(customsRate, 2)}</div>`
-                }
+              <div style="display:flex;align-items:baseline;gap:7px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(customsRate, 2)}</div>
+                <div style="font-size:12px;color:#6B7280;font-weight:600;">${isEn ? 'EGP' : 'ج.م'}</div>
+                ${customsRate !== usdRate ? `<div style="background:#FEE2E2;color:#EC1C23;padding:1px 7px;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:0.3px;">${isEn ? 'DIFF' : 'مختلف'}</div>` : ''}
               </div>
             </div>
             
             <!-- Product Count -->
-            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.productCount}</span><div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div>`}
-                ${isEn ? `<div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.productCount}</span>` : ''}
+            <div style="background:#FFF;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;align-items:${isEn?'flex-start':'flex-end'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div>
+                <span style="font-size:11px;color:#6B7280;font-weight:700;letter-spacing:0.3px;">${t.productCount}</span>
               </div>
-              <div style="display:flex;align-items:baseline;gap:5px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn 
-                  ? `<div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${(ctx.formData.products||[]).length || (r.products||[]).length}</div><div style="font-size:11px;color:#6B7280;font-weight:600;">${t.items}</div>`
-                  : `<div style="font-size:11px;color:#6B7280;font-weight:600;">${t.items}</div><div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${(ctx.formData.products||[]).length || (r.products||[]).length}</div>`
-                }
+              <div style="display:flex;align-items:baseline;gap:6px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:900;color:#3A393A;direction:ltr;">${(ctx.formData.products||[]).length || (r.products||[]).length}</div>
+                <div style="font-size:12px;color:#6B7280;font-weight:600;">${t.items}</div>
               </div>
             </div>
             
             <!-- Shipment Type -->
-            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
-                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.shipmentType}</span><div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div>`}
-                ${isEn ? `<div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.shipmentType}</span>` : ''}
+            <div style="background:#FFF;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;align-items:${isEn?'flex-start':'flex-end'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;${isEn?'':'flex-direction:row-reverse;'}">
+                <div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div>
+                <span style="font-size:11px;color:#6B7280;font-weight:700;letter-spacing:0.3px;">${t.shipmentType}</span>
               </div>
-              <div style="font-size:13px;font-weight:800;color:#3A393A;line-height:1.3;">${shipmentDesc}</div>
+              <div style="font-size:14px;font-weight:800;color:#3A393A;line-height:1.3;text-align:${isEn?'left':'right'};">${shipmentDesc}</div>
             </div>
             
           </div>
         </div>
         
-        <!-- International Shipping -->
-        <div style="${st.sectionStyle}">
-          <div style="${st.headerStyle}">
-            <span>${t.intlTitle}</span>
-          </div>
-          ${_costItem(t.intlShipping, ctx.containerCountText || '', r.shipping.shippingUSD, r.shipping.shippingEGP, isEn, st)}
-          ${_costItem(t.coo, t.cooSub, r.shipping.originCertUSD, r.shipping.originCertEGP, isEn, st)}
-          ${_costItem(t.acid, t.acidSub, r.shipping.acidCargoxUSD, r.shipping.acidCargoxEGP, isEn, st)}
-          ${_sectionTotal(t.intlTotal, r.shipping.totalUSD, r.shipping.totalEGP, isEn, st)}
-        </div>
-        
-        <!-- Customs & Taxes -->
-        <div style="${st.sectionStyle}">
-          <div style="${st.headerStyle}">
-            <span>${t.taxTitle} (${isEn ? 'on Accepted Value' : 'على القيمة المقبولة'} $${fmt(r.productsTotals.totalAcceptedUSD, 0)})</span>
-          </div>
-          ${_costItem(`${t.customsDuty} (${ctx.formData.customsDutyPct || 15}%)`, t.customsSub, r.productsTotals.totalCustomsDutyUSD, r.productsTotals.customsDutyEGP, isEn, st)}
-          ${_costItem(`${t.vat} (${ctx.formData.vatPct || 14}%)`, t.vatSub, r.productsTotals.totalVatUSD, r.productsTotals.vatEGP, isEn, st)}
-          ${_costItem(`${t.profit} (${ctx.formData.profitTaxPct || 5}%)`, t.profitSub, r.productsTotals.totalProfitTaxUSD, r.productsTotals.profitTaxEGP, isEn, st)}
-          ${_sectionTotal(t.taxTotal, r.productsTotals.totalCustomsTaxesUSD, r.productsTotals.totalCustomsTaxesEGP, isEn, st)}
-        </div>
-        
-        ${pdfFooter('02', '05', lang)}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// PAGE 3: Internal + Commissions + Grand Total + Factor
-function renderCompactCostBreakdownPart2(ctx){
-  const r = ctx.r;
-  const lang = ctx.lang || 'ar';
-  const isEn = lang === 'en';
-  const t = _getCompactTranslations(isEn);
-  const st = _getCompactStyles();
-  
-  const usdRate = ctx.formData.usdRate || r.usdRate || 50;
-  
-  // Internal breakdown - split into 3 logical groups
-  const intB = r.internal.breakdown || {};
-  const clearanceUSD = (parseFloat(intB.clearance) || 0) / usdRate;
-  const clearanceEGP = parseFloat(intB.clearance) || 0;
-  const portGroupEGP = (parseFloat(intB.shippingLine) || 0) + (parseFloat(intB.portAuth) || 0) + (parseFloat(intB.customsOffice) || 0);
-  const portGroupUSD = portGroupEGP / usdRate;
-  const transportGroupEGP = (parseFloat(intB.transport) || 0) + (parseFloat(intB.otherReceipts) || 0) + (parseFloat(intB.misc) || 0);
-  const transportGroupUSD = transportGroupEGP / usdRate;
-  
-  return `
-    <div class="pdf-page">
-      <div style="${getPageStyle(lang)}">
-        ${getSideBars(lang)}
-        <div style="${getContentPadding(lang, '14mm', '14mm', '10mm')}">
-        ${pdfPageHeader(t.subtitle2, t.title2, '03', lang)}
-        
-        <!-- Internal Egypt -->
-        <div style="${st.sectionStyle}">
-          <div style="${st.headerStyle}">
-            <span>${t.internalTitle}</span>
-          </div>
-          ${_costItem(t.clearance, '', clearanceUSD, clearanceEGP, isEn, st)}
-          ${_costItem(t.port, '', portGroupUSD, portGroupEGP, isEn, st)}
-          ${_costItem(t.transport, '', transportGroupUSD, transportGroupEGP, isEn, st)}
-          ${_sectionTotal(t.internalTotal, r.internal.totalUSD, r.internal.totalEGP, isEn, st)}
-        </div>
-        
-        <!-- Commissions -->
-        <div style="${st.sectionStyle}">
-          <div style="${st.headerStyle}">
-            <span>${t.commTitle}</span>
-          </div>
-          ${_costItem(`${t.cardComm} (${ctx.formData.cardCommissionPct || 1.5}%)`, t.cardSub, r.commissions.cardCommissionUSD, r.commissions.cardCommissionEGP, isEn, st)}
-          ${_costItem(`${t.sllComm} (${ctx.formData.sllCommissionPct || 3}%)`, t.sllSub, r.commissions.sllCommissionUSD, r.commissions.sllCommissionEGP, isEn, st)}
-          ${_costItem(t.bank, '', r.commissions.bankFeesUSD + r.commissions.otherFeesUSD, r.commissions.bankFeesEGP + r.commissions.otherFeesEGP, isEn, st)}
-          ${_sectionTotal(t.commTotal, r.commissions.totalUSD, r.commissions.totalEGP, isEn, st)}
-        </div>
-        
-        <!-- Grand Total -->
-        <div style="background:linear-gradient(135deg,#3A393A 0%,#1F1E1F 100%);color:#FFF;padding:18px 20px;border-radius:8px;margin:14px 0;">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
-            <div style="font-size:13px;font-weight:700;">${t.grandCosts}</div>
-            <div style="display:flex;gap:18px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
-              <div>$${fmt(r.totals.totalExpensesUSD, 0)}</div>
-              <div>${fmt(r.totals.totalExpensesEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
-            </div>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
-            <div style="font-size:13px;font-weight:700;">${t.grandReal}</div>
-            <div style="display:flex;gap:18px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
-              <div>$${fmt(r.productsTotals.totalRealUSD, 0)}</div>
-              <div>${fmt(r.productsTotals.totalRealEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
-            </div>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:8px;border-top:2px solid #EC1C23;">
-            <div style="font-size:15px;font-weight:900;">${t.grandTotal}</div>
-            <div style="display:flex;gap:18px;font-family:Outfit,sans-serif;font-size:16px;font-weight:900;">
-              <div>$${fmt(r.totals.grandTotalUSD, 0)}</div>
-              <div style="color:#EC1C23">${fmt(r.totals.grandTotalEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+        <!-- Cost Factor — Compact -->
+        <div style="background:#FAF7F2;border:1.5px solid #EC1C23;border-radius:8px;padding:10px 14px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:#EC1C23;flex-shrink:0;">${t.factorTitle}</div>
+            <div style="display:flex;gap:8px;flex:1;justify-content:flex-end;">
+              <div style="background:#FFF;border:1px solid #EAE6DD;border-radius:6px;padding:6px 12px;display:flex;align-items:center;gap:8px;">
+                <div style="font-size:9px;color:#6B7280;font-weight:600;">${t.effectiveRate}</div>
+                <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#EC1C23;direction:ltr;">${fmt(r.totals.effectiveUsdRate, 2)}</div>
+                <div style="font-size:9px;color:#6B7280;">${isEn ? 'EGP' : 'ج.م'}</div>
+              </div>
+              <div style="background:#FFF;border:1px solid #EAE6DD;border-radius:6px;padding:6px 12px;display:flex;align-items:center;gap:8px;">
+                <div style="font-size:9px;color:#6B7280;font-weight:600;">${t.costRatio}</div>
+                <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#EC1C23;direction:ltr;">${fmt(r.totals.costRatio, 1)}%</div>
+              </div>
             </div>
           </div>
         </div>
         
-        <!-- Cost Factor -->
-        <div style="background:#FAF7F2;border:2px solid #EC1C23;border-radius:8px;padding:16px;">
-          <div style="font-size:14px;font-weight:800;color:#EC1C23;margin-bottom:12px;text-align:center;">${t.factorTitle}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-            <div style="background:#FFF;border:1.5px solid #EAE6DD;border-radius:6px;padding:14px;text-align:center;">
-              <div style="font-size:11px;color:#6B7280;font-weight:600;margin-bottom:5px;">${t.effectiveRate}</div>
-              <div style="font-family:Outfit,sans-serif;font-size:26px;font-weight:900;color:#EC1C23;direction:ltr;">${fmt(r.totals.effectiveUsdRate, 2)}</div>
-              <div style="font-size:10px;color:#6B7280;margin-top:4px;">${isEn ? 'EGP' : 'ج.م'} ${t.insteadOf} ${fmt(usdRate, 2)})</div>
-            </div>
-            <div style="background:#FFF;border:1.5px solid #EAE6DD;border-radius:6px;padding:14px;text-align:center;">
-              <div style="font-size:11px;color:#6B7280;font-weight:600;margin-bottom:5px;">${t.costRatio}</div>
-              <div style="font-family:Outfit,sans-serif;font-size:26px;font-weight:900;color:#EC1C23;direction:ltr;">${fmt(r.totals.costRatio, 1)}%</div>
-              <div style="font-size:10px;color:#6B7280;margin-top:4px;">${t.aboveGoods}</div>
-            </div>
+        <!-- Practical Example -->
+        <div style="background:linear-gradient(135deg,#FFF 0%,#FAF7F2 100%);border:1px dashed #EC1C23;border-radius:8px;padding:18px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="font-size:20px;">💡</span>
+            <span style="font-size:14px;font-weight:800;color:#EC1C23;">${t.example}</span>
           </div>
-          <div style="background:#FFF;border:1px dashed #6B7280;border-radius:6px;padding:12px;font-size:12px;line-height:1.7;color:#3A393A;">
-            <strong style="color:#EC1C23">${t.example}</strong>
+          <div style="font-size:13px;line-height:1.8;color:#3A393A;">
             ${isEn 
-              ? `Product at <strong>$10</strong> to supplier → Effective cost after all expenses <strong style="color:#EC1C23">≈ ${fmt(10 * r.totals.effectiveUsdRate, 0)} EGP</strong> (instead of ${fmt(10 * usdRate, 0)} EGP at exchange rate only)`
-              : `منتج بسعر <strong>$10</strong> للمورد → التكلفة الفعلية بعد كل المصاريف <strong style="color:#EC1C23">≈ ${fmt(10 * r.totals.effectiveUsdRate, 0)} ج.م</strong> (بدلاً من ${fmt(10 * usdRate, 0)} ج.م بسعر الصرف فقط)`
+              ? `If a product costs <strong style="color:#3A393A;">$10</strong> from the supplier, its effective cost after all expenses will be approximately <strong style="color:#EC1C23;font-family:Outfit,sans-serif;font-size:16px;">${fmt(10 * r.totals.effectiveUsdRate, 0)} EGP</strong> (instead of just <strong>${fmt(10 * usdRate, 0)} EGP</strong> using the exchange rate alone).`
+              : `إذا كان المنتج بسعر <strong style="color:#3A393A;">$10</strong> من المورد، فإن تكلفته الفعلية بعد جميع المصاريف ستكون تقريباً <strong style="color:#EC1C23;font-family:Outfit,sans-serif;font-size:16px;">${fmt(10 * r.totals.effectiveUsdRate, 0)} جنيه مصري</strong> (بدلاً من <strong>${fmt(10 * usdRate, 0)} جنيه</strong> فقط بسعر الصرف).`
             }
           </div>
         </div>
         
-        ${pdfFooter('03', '05', lang)}
+        ${pdfFooter('03', '06', lang)}
         </div>
       </div>
     </div>
@@ -3794,6 +4023,7 @@ async function generatePDF(lang){
       {fn:renderCompactCostBreakdownPart1},  // Info + Shipping + Customs
       {fn:renderCompactCostBreakdownPart2},  // Internal + Commissions + Grand Total + Factor
       {fn:renderPaymentPage},
+      {fn:renderTermsPage},
       {fn:renderContactPage}
     ];
 
