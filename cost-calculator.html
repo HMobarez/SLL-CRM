@@ -3087,7 +3087,7 @@ function renderPaymentPage(ctx){
     <div class="pdf-page" style="${ps}">
       ${sb}
       <div style="${pad}height:100%;display:flex;flex-direction:column;">
-        ${pdfPageHeader(t.eyebrow, t.title, '06', lang)}
+        ${pdfPageHeader(t.eyebrow, t.title, '03', lang)}
 
         <div style="background:#FFF;border:1px solid #EAE6DD;border-${isEn ? 'left' : 'right'}:5px solid #EC1C23;padding:14px 18px;margin-bottom:16px;font-size:12px;color:#3A393A;line-height:1.7;font-weight:500;">
           ${t.intro}
@@ -3129,7 +3129,7 @@ function renderPaymentPage(ctx){
           </div>
         </div>
 
-        ${pdfFooter('06', '08', lang)}
+        ${pdfFooter('04', '05', lang)}
       </div>
     </div>
   `;
@@ -3372,7 +3372,7 @@ function renderContactPage(ctx){
     <div class="pdf-page" style="${ps}">
       ${sb}
       <div style="${pad}height:100%;display:flex;flex-direction:column;">
-        ${pdfPageHeader(t.eyebrow, t.title, '08', lang)}
+        ${pdfPageHeader(t.eyebrow, t.title, '04', lang)}
 
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
           <div style="width:4px;height:18px;background:#EC1C23;flex-shrink:0;"></div>
@@ -3415,7 +3415,353 @@ function renderContactPage(ctx){
           ${officeCard(COMPANY_INFO.offices[4])}
         </div>
 
-        ${pdfFooter('08', '08', lang)}
+        ${pdfFooter('05', '05', lang)}
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// COMPACT COST BREAKDOWN — Split across 2 pages
+// ============================================================
+
+// Shared translations and helpers
+function _getCompactTranslations(isEn){
+  return {
+    title: isEn ? 'Complete Cost Breakdown' : 'تفاصيل التكاليف الكاملة',
+    subtitle: isEn ? 'Import Cost Items - Page 1' : 'بنود تكاليف الاستيراد - الجزء الأول',
+    title2: isEn ? 'Cost Breakdown & Total' : 'تفاصيل التكاليف والإجمالي',
+    subtitle2: isEn ? 'Import Cost Items - Page 2' : 'بنود تكاليف الاستيراد - الجزء الثاني',
+    infoTitle: isEn ? '📋 Basic Information' : '📋 المعلومات الأساسية',
+    realValue: isEn ? 'Actual Goods Value' : 'القيمة الفعلية للبضاعة',
+    acceptedValue: isEn ? 'Customs Accepted Value' : 'القيمة المقبولة جمركياً',
+    exchangeRate: isEn ? 'Exchange Rate' : 'سعر الصرف',
+    customsRate: isEn ? 'Customs Exchange Rate' : 'سعر الدولار الجمركي',
+    differentNote: isEn ? '(different)' : '(مختلف)',
+    productCount: isEn ? 'Number of Products' : 'عدد المنتجات',
+    items: isEn ? 'items' : 'صنف',
+    shipmentType: isEn ? 'Shipment Type' : 'نوع الشحن',
+    intlTitle: isEn ? '🚢 International Shipping & China Expenses' : '🚢 الشحن الدولي والمصاريف في الصين',
+    intlShipping: isEn ? 'International Sea Freight' : 'الشحن الدولي البحري',
+    coo: isEn ? 'Certificate of Origin' : 'شهادة المنشأ',
+    cooSub: isEn ? 'Chamber of Commerce' : 'الغرفة التجارية',
+    acid: isEn ? 'ACID + CargoX' : 'ACID + CargoX',
+    acidSub: isEn ? 'Digital Platform' : 'المنصة الرقمية',
+    intlTotal: isEn ? 'International Shipping Total' : 'إجمالي الشحن الدولي',
+    taxTitle: isEn ? '🏛️ Customs & Taxes' : '🏛️ الجمارك والضرائب',
+    customsDuty: isEn ? 'Customs Duty' : 'الضريبة الجمركية',
+    customsSub: isEn ? 'On customs accepted value' : 'من القيمة المقبولة جمركياً',
+    vat: isEn ? 'Value Added Tax (VAT)' : 'ضريبة القيمة المضافة',
+    vatSub: isEn ? 'On accepted value after customs' : 'على القيمة المقبولة بعد الجمارك',
+    profit: isEn ? 'Commercial Profit Tax' : 'الأرباح التجارية والصناعية',
+    profitSub: isEn ? 'Commercial/Industrial Profit' : 'الأرباح ت/ص',
+    taxTotal: isEn ? 'Customs & Taxes Total' : 'إجمالي الجمارك والضرائب',
+    internalTitle: isEn ? '🏢 Internal Expenses in Egypt' : '🏢 المصاريف الداخلية في مصر',
+    clearance: isEn ? 'Customs Clearance Fees' : 'أتعاب التخليص الجمركي',
+    port: isEn ? 'Port & Shipping Line Receipts' : 'إيصالات هيئة الميناء والخط الملاحي',
+    transport: isEn ? 'Internal Transport & Other Receipts' : 'النقل الداخلي والإيصالات الأخرى',
+    internalTotal: isEn ? 'Internal Expenses Total' : 'إجمالي المصاريف الداخلية',
+    commTitle: isEn ? '💼 Commissions & Financial Expenses' : '💼 العمولات والمصاريف المالية',
+    cardComm: isEn ? 'Import Card Commission' : 'عمولة البطاقة الاستيرادية',
+    cardSub: isEn ? 'From customs accepted value' : 'من القيمة المقبولة جمركياً',
+    sllComm: isEn ? 'SLL Trading Commission' : 'عمولة SLL Trading',
+    sllSub: isEn ? 'From actual goods value' : 'من القيمة الفعلية للبضاعة',
+    bank: isEn ? 'Bank & Transfer Fees' : 'مصاريف بنكية وتحويلات',
+    commTotal: isEn ? 'Commissions & Expenses Total' : 'إجمالي العمولات والمصاريف',
+    grandCosts: isEn ? 'Total All Costs & Expenses' : 'إجمالي جميع التكاليف والمصاريف',
+    grandReal: isEn ? '+ Actual Goods Value (to supplier)' : '+ قيمة البضاعة الفعلية (للمورد)',
+    grandTotal: isEn ? '💰 Grand Total (Total Landed Cost)' : '💰 المجموع الكلي (Total Landed Cost)',
+    factorTitle: isEn ? '💡 Effective Product Cost Factor' : '💡 معامل التكلفة الفعلية للمنتج',
+    effectiveRate: isEn ? 'Effective USD Rate After All Costs' : 'سعر الدولار الفعلي بعد جميع التكاليف',
+    insteadOf: isEn ? '(instead of' : '(بدلاً من',
+    costRatio: isEn ? 'Additional Cost Percentage' : 'نسبة التكلفة الإضافية',
+    aboveGoods: isEn ? 'above goods value' : 'فوق قيمة البضاعة',
+    example: isEn ? '💡 Practical Example:' : '💡 مثال عملي:'
+  };
+}
+
+function _getCompactStyles(){
+  return {
+    sectionStyle: 'background:#FFF;border:1px solid #EAE6DD;border-radius:8px;padding:14px 16px;margin-bottom:12px;',
+    headerStyle: 'display:flex;align-items:center;gap:10px;font-size:14px;font-weight:800;color:#EC1C23;margin-bottom:10px;padding-bottom:7px;border-bottom:2px solid #FAF7F2;',
+    itemStyle: 'display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px dashed #EAE6DD;',
+    labelStyle: 'font-size:12px;font-weight:600;color:#3A393A;flex:1;line-height:1.4;',
+    subStyle: 'font-size:10px;color:#6B7280;font-weight:500;margin-top:2px;',
+    valuesStyle: 'display:flex;gap:16px;align-items:baseline;',
+    usdStyle: 'font-family:Outfit,sans-serif;font-size:12px;font-weight:700;color:#3A393A;min-width:85px;text-align:left;direction:ltr;',
+    egpStyle: 'font-family:Outfit,sans-serif;font-size:12px;font-weight:700;color:#EC1C23;min-width:100px;text-align:left;direction:ltr;',
+    totalStyle: 'background:#FAF7F2;margin-top:6px;padding:8px 10px;border-radius:4px;display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:13px;'
+  };
+}
+
+function _costItem(label, sub, usd, egp, isEn, st){
+  return `
+    <div style="${st.itemStyle}">
+      <div style="${st.labelStyle}">
+        <div>${label}</div>
+        ${sub ? `<div style="${st.subStyle}">${sub}</div>` : ''}
+      </div>
+      <div style="${st.valuesStyle}">
+        <div style="${st.usdStyle}">$${fmt(usd, 0)}</div>
+        <div style="${st.egpStyle}">${fmt(egp, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+      </div>
+    </div>
+  `;
+}
+
+function _sectionTotal(label, usd, egp, isEn, st){
+  return `
+    <div style="${st.totalStyle}">
+      <div>${label}</div>
+      <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;">
+        <div>$${fmt(usd, 0)}</div>
+        <div style="color:#EC1C23">${fmt(egp, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+      </div>
+    </div>
+  `;
+}
+
+// PAGE 2: Basic Info + Shipping + Customs
+function renderCompactCostBreakdownPart1(ctx){
+  const r = ctx.r;
+  const lang = ctx.lang || 'ar';
+  const isEn = lang === 'en';
+  const t = _getCompactTranslations(isEn);
+  const st = _getCompactStyles();
+  
+  const valueDiff = r.productsTotals.totalRealUSD > 0 
+    ? ((r.productsTotals.totalAcceptedUSD - r.productsTotals.totalRealUSD) / r.productsTotals.totalRealUSD * 100).toFixed(1)
+    : '0.0';
+  const usdRate = ctx.formData.usdRate || r.usdRate || 50;
+  const customsRate = ctx.formData.customsUsdRate || r.customsRate || 51.5;
+  const shipmentDesc = ctx.shippingDisplay || ctx.formData.shippingType || '';
+  
+  return `
+    <div class="pdf-page">
+      <div style="${getPageStyle(lang)}">
+        ${getSideBars(lang)}
+        <div style="${getContentPadding(lang, '14mm', '14mm', '10mm')}">
+        ${pdfPageHeader(t.subtitle, t.title, '02', lang)}
+        
+        <!-- Basic Info Box - Elegant Design -->
+        <div style="background:linear-gradient(135deg,#FAF7F2 0%,#F5F0E8 100%);border:1px solid #EAE6DD;border-radius:8px;padding:0;margin-bottom:18px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+          <!-- Header Bar -->
+          <div style="background:linear-gradient(${isEn?'90deg':'270deg'},#3A393A 0%,#1F1E1F 100%);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:16px;">📋</span>
+              <span style="font-size:13px;font-weight:800;color:#FFF;letter-spacing:0.5px;">${isEn ? 'BASIC INFORMATION' : 'المعلومات الأساسية'}</span>
+            </div>
+            <span style="font-family:'Outfit',sans-serif;font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.2em;">QUOTATION DATA</span>
+          </div>
+          
+          <!-- Grid Content -->
+          <div style="padding:16px 18px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#EAE6DD;">
+            
+            <!-- Real Value -->
+            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.realValue}</span><div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div>`}
+                ${isEn ? `<div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.realValue}</span>` : ''}
+              </div>
+              <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;text-align:${isEn?'left':'right'};">$${fmt(r.productsTotals.totalRealUSD, 0)}</div>
+            </div>
+            
+            <!-- Accepted Value -->
+            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.acceptedValue}</span><div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div>`}
+                ${isEn ? `<div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.acceptedValue}</span>` : ''}
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn 
+                  ? `<div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">$${fmt(r.productsTotals.totalAcceptedUSD, 0)}</div><div style="background:#EC1C23;color:#FFF;padding:2px 7px;border-radius:10px;font-family:'Outfit',sans-serif;font-size:10px;font-weight:800;direction:ltr;">+${valueDiff}%</div>`
+                  : `<div style="background:#EC1C23;color:#FFF;padding:2px 7px;border-radius:10px;font-family:'Outfit',sans-serif;font-size:10px;font-weight:800;direction:ltr;">+${valueDiff}%</div><div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">$${fmt(r.productsTotals.totalAcceptedUSD, 0)}</div>`
+                }
+              </div>
+            </div>
+            
+            <!-- Exchange Rate -->
+            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.exchangeRate}</span><div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div>`}
+                ${isEn ? `<div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.exchangeRate}</span>` : ''}
+              </div>
+              <div style="display:flex;align-items:baseline;gap:5px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn 
+                  ? `<div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(usdRate, 2)}</div><div style="font-size:11px;color:#6B7280;font-weight:600;">EGP</div>`
+                  : `<div style="font-size:11px;color:#6B7280;font-weight:600;">ج.م</div><div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(usdRate, 2)}</div>`
+                }
+              </div>
+            </div>
+            
+            <!-- Customs Rate -->
+            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.customsRate}</span><div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div>`}
+                ${isEn ? `<div style="width:3px;height:14px;background:#EC1C23;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.customsRate}</span>` : ''}
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn 
+                  ? `<div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(customsRate, 2)}</div><div style="font-size:11px;color:#6B7280;font-weight:600;">EGP</div>${customsRate !== usdRate ? `<div style="background:#FEE2E2;color:#EC1C23;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:0.3px;">DIFF</div>` : ''}`
+                  : `${customsRate !== usdRate ? `<div style="background:#FEE2E2;color:#EC1C23;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:0.3px;">مختلف</div>` : ''}<div style="font-size:11px;color:#6B7280;font-weight:600;">ج.م</div><div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${fmt(customsRate, 2)}</div>`
+                }
+              </div>
+            </div>
+            
+            <!-- Product Count -->
+            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.productCount}</span><div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div>`}
+                ${isEn ? `<div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.productCount}</span>` : ''}
+              </div>
+              <div style="display:flex;align-items:baseline;gap:5px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn 
+                  ? `<div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${(ctx.formData.products||[]).length || (r.products||[]).length}</div><div style="font-size:11px;color:#6B7280;font-weight:600;">${t.items}</div>`
+                  : `<div style="font-size:11px;color:#6B7280;font-weight:600;">${t.items}</div><div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:900;color:#3A393A;direction:ltr;">${(ctx.formData.products||[]).length || (r.products||[]).length}</div>`
+                }
+              </div>
+            </div>
+            
+            <!-- Shipment Type -->
+            <div style="background:#FFF;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;text-align:${isEn?'left':'right'};">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;justify-content:${isEn?'flex-start':'flex-end'};">
+                ${isEn ? '' : `<span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.shipmentType}</span><div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div>`}
+                ${isEn ? `<div style="width:3px;height:14px;background:#3A393A;border-radius:2px;"></div><span style="font-size:10px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${t.shipmentType}</span>` : ''}
+              </div>
+              <div style="font-size:13px;font-weight:800;color:#3A393A;line-height:1.3;">${shipmentDesc}</div>
+            </div>
+            
+          </div>
+        </div>
+        
+        <!-- International Shipping -->
+        <div style="${st.sectionStyle}">
+          <div style="${st.headerStyle}">
+            <span>${t.intlTitle}</span>
+          </div>
+          ${_costItem(t.intlShipping, ctx.containerCountText || '', r.shipping.shippingUSD, r.shipping.shippingEGP, isEn, st)}
+          ${_costItem(t.coo, t.cooSub, r.shipping.originCertUSD, r.shipping.originCertEGP, isEn, st)}
+          ${_costItem(t.acid, t.acidSub, r.shipping.acidCargoxUSD, r.shipping.acidCargoxEGP, isEn, st)}
+          ${_sectionTotal(t.intlTotal, r.shipping.totalUSD, r.shipping.totalEGP, isEn, st)}
+        </div>
+        
+        <!-- Customs & Taxes -->
+        <div style="${st.sectionStyle}">
+          <div style="${st.headerStyle}">
+            <span>${t.taxTitle} (${isEn ? 'on Accepted Value' : 'على القيمة المقبولة'} $${fmt(r.productsTotals.totalAcceptedUSD, 0)})</span>
+          </div>
+          ${_costItem(`${t.customsDuty} (${ctx.formData.customsDutyPct || 15}%)`, t.customsSub, r.productsTotals.totalCustomsDutyUSD, r.productsTotals.customsDutyEGP, isEn, st)}
+          ${_costItem(`${t.vat} (${ctx.formData.vatPct || 14}%)`, t.vatSub, r.productsTotals.totalVatUSD, r.productsTotals.vatEGP, isEn, st)}
+          ${_costItem(`${t.profit} (${ctx.formData.profitTaxPct || 5}%)`, t.profitSub, r.productsTotals.totalProfitTaxUSD, r.productsTotals.profitTaxEGP, isEn, st)}
+          ${_sectionTotal(t.taxTotal, r.productsTotals.totalCustomsTaxesUSD, r.productsTotals.totalCustomsTaxesEGP, isEn, st)}
+        </div>
+        
+        ${pdfFooter('02', '05', lang)}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// PAGE 3: Internal + Commissions + Grand Total + Factor
+function renderCompactCostBreakdownPart2(ctx){
+  const r = ctx.r;
+  const lang = ctx.lang || 'ar';
+  const isEn = lang === 'en';
+  const t = _getCompactTranslations(isEn);
+  const st = _getCompactStyles();
+  
+  const usdRate = ctx.formData.usdRate || r.usdRate || 50;
+  
+  // Internal breakdown - split into 3 logical groups
+  const intB = r.internal.breakdown || {};
+  const clearanceUSD = (parseFloat(intB.clearance) || 0) / usdRate;
+  const clearanceEGP = parseFloat(intB.clearance) || 0;
+  const portGroupEGP = (parseFloat(intB.shippingLine) || 0) + (parseFloat(intB.portAuth) || 0) + (parseFloat(intB.customsOffice) || 0);
+  const portGroupUSD = portGroupEGP / usdRate;
+  const transportGroupEGP = (parseFloat(intB.transport) || 0) + (parseFloat(intB.otherReceipts) || 0) + (parseFloat(intB.misc) || 0);
+  const transportGroupUSD = transportGroupEGP / usdRate;
+  
+  return `
+    <div class="pdf-page">
+      <div style="${getPageStyle(lang)}">
+        ${getSideBars(lang)}
+        <div style="${getContentPadding(lang, '14mm', '14mm', '10mm')}">
+        ${pdfPageHeader(t.subtitle2, t.title2, '03', lang)}
+        
+        <!-- Internal Egypt -->
+        <div style="${st.sectionStyle}">
+          <div style="${st.headerStyle}">
+            <span>${t.internalTitle}</span>
+          </div>
+          ${_costItem(t.clearance, '', clearanceUSD, clearanceEGP, isEn, st)}
+          ${_costItem(t.port, '', portGroupUSD, portGroupEGP, isEn, st)}
+          ${_costItem(t.transport, '', transportGroupUSD, transportGroupEGP, isEn, st)}
+          ${_sectionTotal(t.internalTotal, r.internal.totalUSD, r.internal.totalEGP, isEn, st)}
+        </div>
+        
+        <!-- Commissions -->
+        <div style="${st.sectionStyle}">
+          <div style="${st.headerStyle}">
+            <span>${t.commTitle}</span>
+          </div>
+          ${_costItem(`${t.cardComm} (${ctx.formData.cardCommissionPct || 1.5}%)`, t.cardSub, r.commissions.cardCommissionUSD, r.commissions.cardCommissionEGP, isEn, st)}
+          ${_costItem(`${t.sllComm} (${ctx.formData.sllCommissionPct || 3}%)`, t.sllSub, r.commissions.sllCommissionUSD, r.commissions.sllCommissionEGP, isEn, st)}
+          ${_costItem(t.bank, '', r.commissions.bankFeesUSD + r.commissions.otherFeesUSD, r.commissions.bankFeesEGP + r.commissions.otherFeesEGP, isEn, st)}
+          ${_sectionTotal(t.commTotal, r.commissions.totalUSD, r.commissions.totalEGP, isEn, st)}
+        </div>
+        
+        <!-- Grand Total -->
+        <div style="background:linear-gradient(135deg,#3A393A 0%,#1F1E1F 100%);color:#FFF;padding:18px 20px;border-radius:8px;margin:14px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+            <div style="font-size:13px;font-weight:700;">${t.grandCosts}</div>
+            <div style="display:flex;gap:18px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
+              <div>$${fmt(r.totals.totalExpensesUSD, 0)}</div>
+              <div>${fmt(r.totals.totalExpensesEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+            <div style="font-size:13px;font-weight:700;">${t.grandReal}</div>
+            <div style="display:flex;gap:18px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
+              <div>$${fmt(r.productsTotals.totalRealUSD, 0)}</div>
+              <div>${fmt(r.productsTotals.totalRealEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:8px;border-top:2px solid #EC1C23;">
+            <div style="font-size:15px;font-weight:900;">${t.grandTotal}</div>
+            <div style="display:flex;gap:18px;font-family:Outfit,sans-serif;font-size:16px;font-weight:900;">
+              <div>$${fmt(r.totals.grandTotalUSD, 0)}</div>
+              <div style="color:#EC1C23">${fmt(r.totals.grandTotalEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Cost Factor -->
+        <div style="background:#FAF7F2;border:2px solid #EC1C23;border-radius:8px;padding:16px;">
+          <div style="font-size:14px;font-weight:800;color:#EC1C23;margin-bottom:12px;text-align:center;">${t.factorTitle}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div style="background:#FFF;border:1.5px solid #EAE6DD;border-radius:6px;padding:14px;text-align:center;">
+              <div style="font-size:11px;color:#6B7280;font-weight:600;margin-bottom:5px;">${t.effectiveRate}</div>
+              <div style="font-family:Outfit,sans-serif;font-size:26px;font-weight:900;color:#EC1C23;direction:ltr;">${fmt(r.totals.effectiveUsdRate, 2)}</div>
+              <div style="font-size:10px;color:#6B7280;margin-top:4px;">${isEn ? 'EGP' : 'ج.م'} ${t.insteadOf} ${fmt(usdRate, 2)})</div>
+            </div>
+            <div style="background:#FFF;border:1.5px solid #EAE6DD;border-radius:6px;padding:14px;text-align:center;">
+              <div style="font-size:11px;color:#6B7280;font-weight:600;margin-bottom:5px;">${t.costRatio}</div>
+              <div style="font-family:Outfit,sans-serif;font-size:26px;font-weight:900;color:#EC1C23;direction:ltr;">${fmt(r.totals.costRatio, 1)}%</div>
+              <div style="font-size:10px;color:#6B7280;margin-top:4px;">${t.aboveGoods}</div>
+            </div>
+          </div>
+          <div style="background:#FFF;border:1px dashed #6B7280;border-radius:6px;padding:12px;font-size:12px;line-height:1.7;color:#3A393A;">
+            <strong style="color:#EC1C23">${t.example}</strong>
+            ${isEn 
+              ? `Product at <strong>$10</strong> to supplier → Effective cost after all expenses <strong style="color:#EC1C23">≈ ${fmt(10 * r.totals.effectiveUsdRate, 0)} EGP</strong> (instead of ${fmt(10 * usdRate, 0)} EGP at exchange rate only)`
+              : `منتج بسعر <strong>$10</strong> للمورد → التكلفة الفعلية بعد كل المصاريف <strong style="color:#EC1C23">≈ ${fmt(10 * r.totals.effectiveUsdRate, 0)} ج.م</strong> (بدلاً من ${fmt(10 * usdRate, 0)} ج.م بسعر الصرف فقط)`
+            }
+          </div>
+        </div>
+        
+        ${pdfFooter('03', '05', lang)}
+        </div>
       </div>
     </div>
   `;
@@ -3445,12 +3791,9 @@ async function generatePDF(lang){
     ctx.isEn = isEn;
     const renderers = [
       {fn:renderCoverPage},
-      {fn:renderBasicsPage},
-      {fn:renderCostsPage},
-      {fn:renderInternalExpensesPage},
-      {fn:renderTotalsPage},
+      {fn:renderCompactCostBreakdownPart1},  // Info + Shipping + Customs
+      {fn:renderCompactCostBreakdownPart2},  // Internal + Commissions + Grand Total + Factor
       {fn:renderPaymentPage},
-      {fn:renderTermsPage},
       {fn:renderContactPage}
     ];
 
