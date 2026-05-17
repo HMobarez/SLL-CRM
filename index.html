@@ -2277,10 +2277,13 @@ function setVisibleLeadCols(keys){
   } catch(e){}
 }
 
+// ★ Track picker open state — يفضل مفتوح أثناء التعديل
+let _colPickerOpen = false;
+
 function toggleColPicker(){
+  _colPickerOpen = !_colPickerOpen;
   const el = $("col-picker");
-  if(!el) return;
-  el.style.display = (el.style.display === "none" || !el.style.display) ? "block" : "none";
+  if(el) el.style.display = _colPickerOpen ? "block" : "none";
 }
 
 function toggleLeadCol(key){
@@ -2288,19 +2291,39 @@ function toggleLeadCol(key){
   if(visible.includes(key)) visible = visible.filter(k => k !== key);
   else visible.push(key);
   setVisibleLeadCols(visible);
+  // ★ نحفظ حالة الـ picker قبل ما نعيد الرسم، عشان يفضل مفتوح
+  const wasOpen = _colPickerOpen;
   renderLeadsContent();
+  // ★ نرجّعه مفتوح لو كان مفتوح
+  if(wasOpen){
+    const el = $("col-picker");
+    if(el) el.style.display = "block";
+    _colPickerOpen = true;
+  }
 }
 
 function resetLeadCols(){
   try { localStorage.removeItem("sll-crm-cols-"+curUser.role); } catch(e){}
+  const wasOpen = _colPickerOpen;
   renderLeadsContent();
+  if(wasOpen){
+    const el = $("col-picker");
+    if(el) el.style.display = "block";
+    _colPickerOpen = true;
+  }
   showToast("✓","تم استعادة الإعدادات الافتراضية");
 }
 
 function showAllLeadCols(){
   const all = getLeadColumnDefs();
   setVisibleLeadCols(all.map(c => c.key));
+  const wasOpen = _colPickerOpen;
   renderLeadsContent();
+  if(wasOpen){
+    const el = $("col-picker");
+    if(el) el.style.display = "block";
+    _colPickerOpen = true;
+  }
 }
 
 function renderTable(el){
@@ -2346,8 +2369,8 @@ function renderTable(el){
   pickerHtml += '<button class="btn sm" onclick="toggleColPicker()" style="display:flex;align-items:center;gap:5px">⚙ Columns ('+visCount+'/'+totalCount+')</button>';
   pickerHtml += '</div></div>';
 
-  // Picker dropdown
-  pickerHtml += '<div id="col-picker" style="display:none;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:10px">';
+  // Picker dropdown — يستخدم الحالة المحفوظة
+  pickerHtml += '<div id="col-picker" style="display:'+(_colPickerOpen?'block':'none')+';background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:10px">';
   pickerHtml += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
   pickerHtml += '<div style="font-size:12px;font-weight:700">⚙ اختر الأعمدة التي تريد عرضها</div>';
   pickerHtml += '<div style="display:flex;gap:6px">';
