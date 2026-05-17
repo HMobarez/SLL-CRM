@@ -430,6 +430,12 @@ tr.sla1-row .sticky-actions{background:rgba(245,82,82,0.06);}
 .empty-icon{font-size:34px;margin-bottom:10px;opacity:.2;}
 .empty-ttl{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;}
 .empty-sub{font-size:11px;color:var(--text3);}
+
+/* ★ Column Picker Drag & Drop */
+.col-pick-item{transition:all .15s ease;user-select:none}
+.col-pick-item:hover{background:var(--surface3)!important;border-color:var(--blue2)!important}
+.col-pick-item:active{cursor:grabbing!important}
+.col-pick-item button:hover:not(:disabled){background:var(--bg3)!important;border-radius:3px;opacity:1!important}
 </style>
 </head>
 <body>
@@ -2255,15 +2261,26 @@ function getLeadColumnDefs(){
 }
 
 // Get visible column keys for current user from localStorage, else defaults
+// ★ الـ storage مرتبط بالـ user id (مش الـ role) — كل واحد له ترتيبه الخاص
+function _colStorageKey(){
+  // نستخدم user id لو موجود، وإلا role كـ fallback
+  const uid = curUser && curUser.id ? curUser.id : (curUser?.role || "default");
+  return "sll-crm-cols-u-" + uid;
+}
+
 function getVisibleLeadCols(){
   const all = getLeadColumnDefs();
   const role = curUser.role;
-  const storageKey = "sll-crm-cols-"+role;
+  const storageKey = _colStorageKey();
   try {
     const saved = localStorage.getItem(storageKey);
     if(saved){
       const parsed = JSON.parse(saved);
-      if(Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if(Array.isArray(parsed) && parsed.length > 0) {
+        // ★ نشيل أي keys مش موجودة في الـ defs (في حالة حذف عمود في النظام)
+        const validKeys = new Set(all.map(c => c.key));
+        return parsed.filter(k => validKeys.has(k));
+      }
     }
   } catch(e){}
   // Defaults: pick columns where defaultFor includes the current role
@@ -2271,9 +2288,8 @@ function getVisibleLeadCols(){
 }
 
 function setVisibleLeadCols(keys){
-  const role = curUser.role;
   try {
-    localStorage.setItem("sll-crm-cols-"+role, JSON.stringify(keys));
+    localStorage.setItem(_colStorageKey(), JSON.stringify(keys));
   } catch(e){}
 }
 
@@ -2303,7 +2319,7 @@ function toggleLeadCol(key){
 }
 
 function resetLeadCols(){
-  try { localStorage.removeItem("sll-crm-cols-"+curUser.role); } catch(e){}
+  try { localStorage.removeItem(_colStorageKey()); } catch(e){}
   const wasOpen = _colPickerOpen;
   renderLeadsContent();
   if(wasOpen){
@@ -2316,7 +2332,10 @@ function resetLeadCols(){
 
 function showAllLeadCols(){
   const all = getLeadColumnDefs();
-  setVisibleLeadCols(all.map(c => c.key));
+  // ★ نحافظ على الترتيب الموجود ونضيف الـ keys الناقصة في الآخر
+  const current = getVisibleLeadCols();
+  const newKeys = all.filter(c => !current.includes(c.key)).map(c => c.key);
+  setVisibleLeadCols([...current, ...newKeys]);
   const wasOpen = _colPickerOpen;
   renderLeadsContent();
   if(wasOpen){
@@ -2324,6 +2343,138 @@ function showAllLeadCols(){
     if(el) el.style.display = "block";
     _colPickerOpen = true;
   }
+}
+
+// ★ NEW: إعادة ترتيب عمود (يستدعى من الـ drag & drop)
+function reorderLeadCol(draggedKey, targetKey, insertAfter){
+  let visible = getVisibleLeadCols();
+  const fromIdx = visible.indexOf(draggedKey);
+  if(fromIdx === -1) return;
+  
+  // نشيل العنصر من مكانه القديم
+  visible.splice(fromIdx, 1);
+  
+  // نلاقي المكان الجديد
+  let targetIdx = visible.indexOf(targetKey);
+  if(targetIdx === -1) targetIdx = visible.length;
+  if(insertAfter) targetIdx += 1;
+  
+  // نضيفه في مكانه الجديد
+  visible.splice(targetIdx, 0, draggedKey);
+  
+  setVisibleLeadCols(visible);
+  
+  // نحفظ حالة الـ picker ونعيد الرسم
+  const wasOpen = _colPickerOpen;
+  renderLeadsContent();
+  if(wasOpen){
+    const el = $("col-picker");
+    if(el) el.style.display = "block";
+    _colPickerOpen = true;
+  }
+}
+
+// ★ NEW: نقل العمود لأعلى/أسفل (للموبايل أو لو الـ drag مش شغال)
+function moveLeadCol(key, direction){
+  let visible = getVisibleLeadCols();
+  const idx = visible.indexOf(key);
+  if(idx === -1) return;
+  
+  if(direction === "up" && idx > 0){
+    [visible[idx-1], visible[idx]] = [visible[idx], visible[idx-1]];
+  } else if(direction === "down" && idx < visible.length - 1){
+    [visible[idx], visible[idx+1]] = [visible[idx+1], visible[idx]];
+  } else {
+    return;
+  }
+  
+  setVisibleLeadCols(visible);
+  const wasOpen = _colPickerOpen;
+  renderLeadsContent();
+  if(wasOpen){
+    const el = $("col-picker");
+    if(el) el.style.display = "block";
+    _colPickerOpen = true;
+  }
+}
+
+// ★ Drag & Drop handlers — لإعادة ترتيب الأعمدة عبر السحب
+let _draggedColKey = null;
+
+function _colDragStart(e, key){
+  _draggedColKey = key;
+  e.dataTransfer.effectAllowed = "move";
+  try { e.dataTransfer.setData("text/plain", key); } catch(err){}
+  // visual feedback
+  const target = e.currentTarget;
+  if(target){
+    target.style.opacity = "0.4";
+  }
+}
+
+function _colDragOver(e){
+  if(!_draggedColKey) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  // visual feedback — نضيف border أعلى الـ item
+  const target = e.currentTarget;
+  if(target && target.dataset.colkey !== _draggedColKey){
+    target.style.borderTopColor = "var(--blue2)";
+    target.style.borderTopWidth = "2px";
+    target.style.borderTopStyle = "solid";
+  }
+}
+
+function _colDragLeave(e){
+  const target = e.currentTarget;
+  if(target){
+    target.style.borderTopColor = "";
+    target.style.borderTopWidth = "";
+    target.style.borderTopStyle = "";
+  }
+}
+
+function _colDrop(e, targetKey){
+  e.preventDefault();
+  e.stopPropagation();
+  
+  const target = e.currentTarget;
+  if(target){
+    target.style.borderTopColor = "";
+    target.style.borderTopWidth = "";
+    target.style.borderTopStyle = "";
+  }
+  
+  if(!_draggedColKey || _draggedColKey === targetKey){
+    _draggedColKey = null;
+    return;
+  }
+  
+  // نلاقي مين قبل مين في الترتيب الحالي
+  const visible = getVisibleLeadCols();
+  const fromIdx = visible.indexOf(_draggedColKey);
+  const toIdx = visible.indexOf(targetKey);
+  
+  // لو الـ dragged كان قبل الـ target، نحطه قبله
+  // لو كان بعده، نحطه قبله برضه (السلوك المتوقع)
+  const insertAfter = fromIdx < toIdx;
+  
+  reorderLeadCol(_draggedColKey, targetKey, insertAfter);
+  _draggedColKey = null;
+}
+
+function _colDragEnd(e){
+  const target = e.currentTarget;
+  if(target){
+    target.style.opacity = "";
+  }
+  // امسح أي visual feedback متبقي
+  document.querySelectorAll(".col-pick-item").forEach(item => {
+    item.style.borderTopColor = "";
+    item.style.borderTopWidth = "";
+    item.style.borderTopStyle = "";
+  });
+  _draggedColKey = null;
 }
 
 function renderTable(el){
@@ -2337,7 +2488,10 @@ function renderTable(el){
   // Get column defs & visibility
   const allCols = getLeadColumnDefs();
   const visKeys = getVisibleLeadCols();
-  const cols = allCols.filter(c => visKeys.includes(c.key));
+  // ★ نرتّب الأعمدة حسب ترتيب الـ user (مش حسب الترتيب الافتراضي)
+  const colsMap = {};
+  allCols.forEach(c => { colsMap[c.key] = c; });
+  const cols = visKeys.map(k => colsMap[k]).filter(c => c); // نشيل الـ undefined
 
   // ★ SLA Filter Banner — يظهر لما اليوزر فعّل فلتر من Dashboard
   let slaBanner = '';
@@ -2378,18 +2532,62 @@ function renderTable(el){
   pickerHtml += '<button class="btn sm" onclick="resetLeadCols()">↺ افتراضي</button>';
   pickerHtml += '<button class="btn sm primary" onclick="toggleColPicker()">✓ تم</button>';
   pickerHtml += '</div></div>';
-  pickerHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px">';
-  allCols.forEach(c => {
-    const checked = visKeys.includes(c.key) ? "checked" : "";
-    const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text2)";
-    pickerHtml += '<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px">';
-    pickerHtml += '<input type="checkbox" '+checked+' onchange="toggleLeadCol(\''+c.key+'\')" style="cursor:pointer">';
-    pickerHtml += '<span style="color:'+roleColor+';font-size:9px">●</span>';
-    pickerHtml += '<span>'+c.label+'</span>';
-    pickerHtml += '</label>';
-  });
+  
+  // ★ تنبيه عن Drag & Drop
+  pickerHtml += '<div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.25);border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px">';
+  pickerHtml += '<span style="font-size:14px">💡</span>';
+  pickerHtml += '<span>اسحب الأعمدة الظاهرة لإعادة ترتيبها، أو استخدم الأسهم ⬆️⬇️. الترتيب بيتحفظ تلقائياً لحسابك.</span>';
   pickerHtml += '</div>';
-  pickerHtml += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);display:flex;gap:12px">';
+  
+  // ★ القسم 1: الأعمدة الظاهرة (Visible) — قابلة للسحب
+  const visibleCols = visKeys.map(k => colsMap[k]).filter(c => c);
+  if(visibleCols.length){
+    pickerHtml += '<div style="margin-bottom:10px">';
+    pickerHtml += '<div style="font-size:10px;font-weight:800;color:var(--text2);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase">✓ الأعمدة الظاهرة في الجدول ('+visibleCols.length+') — اسحب للترتيب</div>';
+    pickerHtml += '<div id="col-picker-visible" style="display:flex;flex-direction:column;gap:4px">';
+    visibleCols.forEach((c, idx) => {
+      const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text2)";
+      const isFirst = idx === 0;
+      const isLast = idx === visibleCols.length - 1;
+      pickerHtml += '<div class="col-pick-item" draggable="true"';
+      pickerHtml += ' data-colkey="'+c.key+'"';
+      pickerHtml += ' ondragstart="_colDragStart(event,\''+c.key+'\')"';
+      pickerHtml += ' ondragover="_colDragOver(event)"';
+      pickerHtml += ' ondrop="_colDrop(event,\''+c.key+'\')"';
+      pickerHtml += ' ondragend="_colDragEnd(event)"';
+      pickerHtml += ' ondragleave="_colDragLeave(event)"';
+      pickerHtml += ' style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:move;transition:all .15s">';
+      pickerHtml += '<span style="color:var(--text3);font-size:14px;cursor:grab" title="اسحب">⋮⋮</span>';
+      pickerHtml += '<span style="color:var(--text3);font-family:Outfit;font-size:9px;min-width:18px">'+(idx+1)+'.</span>';
+      pickerHtml += '<input type="checkbox" checked onchange="toggleLeadCol(\''+c.key+'\')" style="cursor:pointer" onclick="event.stopPropagation()">';
+      pickerHtml += '<span style="color:'+roleColor+';font-size:9px">●</span>';
+      pickerHtml += '<span style="flex:1">'+c.label+'</span>';
+      // أزرار ⬆️ ⬇️ للموبايل أو لو الـ drag صعب
+      pickerHtml += '<button onclick="event.stopPropagation();moveLeadCol(\''+c.key+'\',\'up\')" '+(isFirst?'disabled':'')+' title="تحريك لأعلى" style="background:none;border:none;cursor:'+(isFirst?'not-allowed':'pointer')+';opacity:'+(isFirst?'.3':'.7')+';font-size:12px;padding:2px 4px">⬆</button>';
+      pickerHtml += '<button onclick="event.stopPropagation();moveLeadCol(\''+c.key+'\',\'down\')" '+(isLast?'disabled':'')+' title="تحريك لأسفل" style="background:none;border:none;cursor:'+(isLast?'not-allowed':'pointer')+';opacity:'+(isLast?'.3':'.7')+';font-size:12px;padding:2px 4px">⬇</button>';
+      pickerHtml += '</div>';
+    });
+    pickerHtml += '</div></div>';
+  }
+  
+  // ★ القسم 2: الأعمدة المخفية (Hidden) — checkbox عادي
+  const hiddenCols = allCols.filter(c => !visKeys.includes(c.key));
+  if(hiddenCols.length){
+    pickerHtml += '<div>';
+    pickerHtml += '<div style="font-size:10px;font-weight:800;color:var(--text2);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase">✕ الأعمدة المخفية ('+hiddenCols.length+') — اضغط لإظهارها</div>';
+    pickerHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px">';
+    hiddenCols.forEach(c => {
+      const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text2)";
+      pickerHtml += '<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg);border:1px dashed var(--border);border-radius:6px;cursor:pointer;font-size:11px;opacity:.7">';
+      pickerHtml += '<input type="checkbox" onchange="toggleLeadCol(\''+c.key+'\')" style="cursor:pointer">';
+      pickerHtml += '<span style="color:'+roleColor+';font-size:9px">●</span>';
+      pickerHtml += '<span>'+c.label+'</span>';
+      pickerHtml += '</label>';
+    });
+    pickerHtml += '</div></div>';
+  }
+  
+  pickerHtml += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap">';
   pickerHtml += '<span><span style="color:var(--green2)">●</span> Coordinator Fields</span>';
   pickerHtml += '<span><span style="color:var(--orange2)">●</span> Sales Fields</span>';
   pickerHtml += '<span><span style="color:var(--text2)">●</span> System Fields</span>';
