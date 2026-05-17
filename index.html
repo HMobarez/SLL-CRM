@@ -501,7 +501,11 @@ tr.sla1-row .sticky-actions{background:rgba(245,82,82,0.06);}
   <div class="modal">
     <div class="mhdr"><h2 id="vm-ttl">تفاصيل العميل</h2><button class="mx" onclick="closeM('view-modal')">×</button></div>
     <div class="mbody" id="vm-body"></div>
-    <div class="mftr"><button class="btn" onclick="closeM('view-modal')">إغلاق</button><button class="btn primary" id="vm-edit" style="display:none" onclick="editFV()">✏️ تعديل</button></div>
+    <div class="mftr">
+      <button class="btn" onclick="closeM('view-modal')">إغلاق</button>
+      <button id="vm-del" class="btn" style="display:none;background:rgba(245,82,82,.12);color:var(--red);border-color:var(--red)" onclick="closeM('view-modal');confirmDeleteLead(curLeadId)">🗑️ حذف</button>
+      <button class="btn primary" id="vm-edit" style="display:none" onclick="editFV()">✏️ تعديل</button>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"><span id="t-ic">✓</span><span id="t-msg"></span></div>
@@ -627,18 +631,66 @@ function scoreBadge(s){
   const l=scoreLbl(s),cls=l==="Hot"?"b-hot":l==="Warm"?"b-warm":"b-cold";
   return`<span class="sc-badge ${cls}">${l==="Hot"?"🔴":l==="Warm"?"🟡":"🔵"} ${l} ${s}</span>`;
 }
-// SLA #1 — 24h without any status
+// ═══ SLA CONFIGURATION (Egypt working hours) ═══
+// SLA 1 — "الالتزام بتوقيت التواصل (24 ساعة)"
+// SLA 2 — "الالتزام بتاريخ المتابعة"
+// عطلة نهاية الأسبوع: الخميس 5م (17:00) → الأحد 9ص (09:00)
+// أيام الأسبوع في JS: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+const SLA_CONFIG = {
+  weekendStart: { day: 4, hour: 17 },  // الخميس 5م
+  weekendEnd:   { day: 0, hour: 9  },  // الأحد 9ص
+  warningHrs: 24,
+  breachHrs:  48
+};
+
+// هل اللحظة دي وقت إجازة؟
+function isWeekendTime(d){
+  const dow = d.getDay(), h = d.getHours();
+  // الجمعة (5) و السبت (6) كامل
+  if(dow === 5 || dow === 6) return true;
+  // الخميس بعد الساعة 5م
+  if(dow === 4 && h >= 17) return true;
+  // الأحد قبل الساعة 9ص
+  if(dow === 0 && h < 9) return true;
+  return false;
+}
+
+// حساب ساعات العمل الفعلية بين تاريخين (مع استثناء الإجازة)
+function workingHoursBetween(start, end){
+  if(end <= start) return 0;
+  let hrs = 0;
+  // ندوس بالساعة عشان يبقى الحساب مظبوط
+  const cur = new Date(start.getTime());
+  while(cur < end){
+    if(!isWeekendTime(cur)) hrs++;
+    cur.setTime(cur.getTime() + 3600000); // +1 ساعة
+  }
+  // لو في كسر ساعة في الآخر
+  const lastMs = end.getTime() - (cur.getTime() - 3600000);
+  if(lastMs > 0 && lastMs < 3600000){
+    // اللحظة الأخيرة - لو مش إجازة نحسبها كسر
+    const lastCheck = new Date(cur.getTime() - 3600000);
+    if(!isWeekendTime(lastCheck)){
+      hrs = hrs - 1 + (lastMs / 3600000);
+    }
+  }
+  return Math.round(hrs);
+}
+
+// SLA #1 — الالتزام بتوقيت التواصل (24 ساعة)
 function sla1Hrs(l){
   if(l.st)return 0;
   const reg=new Date(l.dt+"T"+(l.tm||"00:00"));
-  return Math.round((new Date()-reg)/3600000);
+  // نحسب ساعات العمل الفعلية (بدون الإجازة)
+  return workingHoursBetween(reg, new Date());
 }
 function sla1St(l){
   if(l.st)return "ok";
   const h=sla1Hrs(l);
-  return h>48?"breach":h>24?"warn":"ok";
+  return h>SLA_CONFIG.breachHrs?"breach":h>SLA_CONFIG.warningHrs?"warn":"ok";
 }
-// SLA #2 — follow-up date passed
+
+// SLA #2 — الالتزام بتاريخ المتابعة
 function sla2St(l){
   if(!l.fuDate)return "ok";
   if(["عميل فعلي","لاغي","لم يتم الرد"].includes(l.st))return "ok";
@@ -650,7 +702,7 @@ function sla2St(l){
 function slaBadge1(l){
   const st=sla1St(l),h=sla1Hrs(l);
   if(st==="ok")return "";
-  return`<span class="sla-t ${st==="breach"?"sla-b":"sla-w"}">${h}h</span>`;
+  return`<span class="sla-t ${st==="breach"?"sla-b":"sla-w"}" title="ساعات العمل الفعلية (بدون الإجازة)">${h}h</span>`;
 }
 function slaBadge2(l){
   const st=sla2St(l);
@@ -658,6 +710,44 @@ function slaBadge2(l){
   if(st==="today")return`<span class="sla-t sla-w">📅 اليوم</span>`;
   const days=Math.round((new Date()-new Date(l.fuDate+"T00:00"))/86400000);
   return`<span class="sla-t sla-late">⚠ متأخر ${days}د</span>`;
+}
+
+// SLA Filter helpers — للضغط على كروت الـ SLAs من الـ Dashboard
+function applySlaFilter(type){
+  // type: 'sla1' or 'sla2'
+  window.SLA_FILTER = type;
+  pgLeads = 1; // reset pagination
+  // نروح لتاب العملاء (Leads page)
+  if(typeof showPg === 'function'){
+    showPg('leads');
+  } else {
+    // fallback لو showPg مش موجودة
+    if(typeof renderLeadsContent === 'function') renderLeadsContent();
+  }
+  // scroll للجدول
+  setTimeout(() => {
+    const tbl = document.querySelector('#leads-content, .leads-table, table');
+    if(tbl) tbl.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 200);
+}
+function clearSlaFilter(){
+  window.SLA_FILTER = null;
+  pgLeads = 1;
+  if(typeof renderLeadsContent === 'function') renderLeadsContent();
+}
+// بيرجع true لو الـ lead لازم يظهر في الفلتر الحالي
+function passSlaFilter(l){
+  if(!window.SLA_FILTER) return true;
+  if(window.SLA_FILTER === 'sla1'){
+    const st = sla1St(l);
+    return st === 'warn' || st === 'breach';
+  }
+  if(window.SLA_FILTER === 'sla2'){
+    const st = sla2St(l);
+    // فقط الـ leads اللي فات تاريخ متابعتها (مش اللي ميعادهم اليوم)
+    return st === 'late';
+  }
+  return true;
 }
 function waLink(mob){
   let m=String(mob).replace(/\D/g,"");
@@ -1544,10 +1634,27 @@ function kc(lbl,val,clr,sub,dc){
     <div class="kc-lbl">${lbl}</div><div class="kc-val" style="color:${clr}">${val}</div>
     <div class="kc-sub ${dc||""}">${sub}</div></div>`;
 }
+// kc Clickable — لو فيه onclick handler بنخليه ينضغط زي زرار
+function kcClick(lbl,val,clr,sub,dc,onclick,tooltip){
+  const isClickable = !!onclick;
+  const cursorStyle = isClickable ? 'cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;' : '';
+  const hoverHint = isClickable ? 'onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 4px 12px rgba(0,0,0,0.12)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'"' : '';
+  const tip = tooltip ? `title="${tooltip}"` : '';
+  return`<div class="kc" ${isClickable?`onclick="${onclick}"`:''} ${hoverHint} ${tip} style="${cursorStyle}">
+    <div class="kc-acc" style="background:${clr}"></div>
+    <div class="kc-lbl">${lbl}${isClickable && val>0?' <span style="font-size:9px;color:var(--text3);font-weight:500">🔍 اضغط للفلتر</span>':''}</div>
+    <div class="kc-val" style="color:${clr}">${val}</div>
+    <div class="kc-sub ${dc||""}">${sub}</div>
+  </div>`;
+}
 function dashAdmin(){
   const l=LEADS,tot=l.length,act=l.filter(x=>x.st==="عميل فعلي").length;
   const can=l.filter(x=>x.st==="لاغي").length,nl=l.filter(x=>isNew(x)).length;
-  const sla1b=l.filter(x=>sla1St(x)==="breach").length;
+  // SLA 1: نعد breach + warn (الـ leads اللي محتاجة انتباه)
+  const sla1b=l.filter(x=>{const s=sla1St(x);return s==="breach"||s==="warn";}).length;
+  // SLA 2: نعد late فقط (today لسه فرصة طول النهار)
+  const sla2Late=l.filter(x=>sla2St(x)==="late").length;
+  // متابعة اليوم (للعرض فقط، مش مخالفة)
   const tdFU=l.filter(x=>sla2St(x)==="today").length;
   const srcMap={};l.forEach(x=>{srcMap[x.src]=(srcMap[x.src]||0)+1;});
   const topSrc=Object.entries(srcMap).sort((a,b)=>b[1]-a[1]).slice(0,6),sm=topSrc[0]?.[1]||1;
@@ -1559,11 +1666,12 @@ function dashAdmin(){
     ${kc("Total Leads",tot,"var(--blue)","إجمالي","")}
     ${kc("Active Clients",act,"var(--green)",pct(act,tot)+"% conversion","up")}
     ${kc("Leads جديدة",nl,"var(--cyan)",nl>0?"يحتاج حالة":"ممتاز",nl>0?"warn":"")}
-    ${kc("SLA #1 Breach",sla1b,"var(--red)","+24h بدون حالة",sla1b>0?"dn":"")}
-    ${kc("متابعة اليوم",tdFU,"var(--orange)","اتصل بيهم اليوم",tdFU>0?"warn":"")}
+    ${kcClick("SLA 1 — توقيت التواصل",sla1b,"var(--red)","+24h بدون حالة",sla1b>0?"dn":"","applySlaFilter('sla1')","الالتزام بتوقيت التواصل خلال 24 ساعة عمل — اضغط للفلتر")}
+    ${kcClick("SLA 2 — تاريخ المتابعة",sla2Late,"var(--red)","فات تاريخ المتابعة",sla2Late>0?"dn":"","applySlaFilter('sla2')","عملاء فات تاريخ متابعتهم ولم يتم التواصل — اضغط للفلتر")}
   </div>
-  ${sla1b>0?`<div class="alert-banner ab-red">🚨 <strong>${sla1b} Lead</strong> تجاوزت 24h بدون حالة <button class="btn sm" style="margin-right:auto" onclick="showPg('leads')">عرض</button></div>`:""}
-  ${tdFU>0?`<div class="alert-banner ab-orange">📅 <strong>${tdFU} Lead</strong> تاريخ متابعتها اليوم</div>`:""}
+  ${sla1b>0?`<div class="alert-banner ab-red">🚨 <strong>${sla1b} Lead</strong> تجاوزت 24h بدون حالة <button class="btn sm" style="margin-right:auto" onclick="applySlaFilter('sla1')">عرض</button></div>`:""}
+  ${sla2Late>0?`<div class="alert-banner ab-red">⏰ <strong>${sla2Late} Lead</strong> فات تاريخ متابعتهم <button class="btn sm" style="margin-right:auto" onclick="applySlaFilter('sla2')">عرض</button></div>`:""}
+  ${tdFU>0?`<div class="alert-banner ab-orange">📅 <strong>${tdFU} Lead</strong> تاريخ متابعتهم اليوم (لسه في الوقت)</div>`:""}
   <div class="g2">
     <div class="card"><div class="card-title">Source Distribution</div><div class="card-sub">توزيع مصادر الـ Leads</div>
       <div class="bar-list">${topSrc.map(([s,c])=>`<div class="bar-row"><div class="bar-nm">${s}</div><div class="bar-track"><div class="bar-fill" style="width:${pct(c,sm)}%;background:var(--blue)"></div></div><div class="bar-v" style="color:var(--blue2)">${c}</div></div>`).join("")}</div>
@@ -1746,15 +1854,15 @@ function dashSales(){
   const lf=lateFU();
   const newToday=nl.filter(l=>l.dt===today());
   const act=myLeads().filter(x=>x.st==="عميل فعلي");
-  // SLA 1: عملاء جدد لم يتم التواصل معهم في 24 ساعة
-  const sla1b=myLeads().filter(x=>sla1St(x)==="breach");
-  // SLA 2: عملاء تحت المتابعة لم يتم التواصل معهم في الموعد
-  const sla2b=myLeads().filter(x=>x.st==="تحت المتابعة" && sla2St(x)==="late");
+  // SLA 1: عملاء جدد لم يتم التواصل معهم (warn + breach)
+  const sla1b=myLeads().filter(x=>{const s=sla1St(x);return s==="breach"||s==="warn";});
+  // SLA 2: عملاء فات تاريخ متابعتهم فقط (late) — اليوم لسه فرصة
+  const sla2b=myLeads().filter(x=>sla2St(x)==="late");
   let html='<div class="kpi-row c4">';
   html+=kc("🆕 عملاء جدد اليوم",newToday.length,"var(--cyan)","تم استلامهم اليوم",newToday.length>0?"warn":"");
   html+=kc("📅 متابعات اليوم",tf.length,"var(--orange)",tf.length>0?"يحتاجون اتصال اليوم":"لا يوجد",tf.length>0?"warn":"");
-  html+=kc("⚠ SLA 1",sla1b.length,"var(--red)","عملاء جدد >24h","");
-  html+=kc("⏰ SLA 2",sla2b.length,"var(--red)","تأخر التواصل","");
+  html+=kcClick("⚠ SLA 1 — توقيت التواصل",sla1b.length,"var(--red)","+24h بدون حالة","","applySlaFilter('sla1')","الالتزام بتوقيت التواصل خلال 24 ساعة عمل — اضغط للفلتر");
+  html+=kcClick("⏰ SLA 2 — تاريخ المتابعة",sla2b.length,"var(--red)","فات تاريخ المتابعة","","applySlaFilter('sla2')","عملاء فات تاريخ متابعتهم ولم يتم التواصل — اضغط للفلتر");
   html+='</div>';
   html+='<div class="kpi-row c4" style="margin-top:8px">';
   html+=kc("📋 إجمالي عملائي",myLeads().length,"var(--blue)","الكل","");
@@ -1764,8 +1872,8 @@ function dashSales(){
   const lostL=myLeads().filter(x=>x.st==="لاغي").length;
   html+=kc("❌ لاغي",lostL,"var(--text3)",pct(lostL,myLeads().length).toFixed(2)+"% cancel","");
   html+='</div>';
-  if(sla1b.length>0)html+='<div class="alert-banner ab-red">🚨 <strong>'+sla1b.length+' Lead</strong> تجاوزت 24h بدون حالة!</div>';
-  if(lf.length>0)html+='<div class="alert-banner ab-orange">⚠ <strong>'+lf.length+' Lead</strong> تأخرت عن تاريخ المتابعة</div>';
+  if(sla1b.length>0)html+='<div class="alert-banner ab-red">🚨 <strong>'+sla1b.length+' Lead</strong> تجاوزت 24h بدون حالة! <button class="btn sm" style="margin-right:auto" onclick="applySlaFilter(\'sla1\')">عرضهم فقط</button></div>';
+  if(lf.length>0)html+='<div class="alert-banner ab-orange">⚠ <strong>'+lf.length+' Lead</strong> تأخرت عن تاريخ المتابعة <button class="btn sm" style="margin-right:auto" onclick="applySlaFilter(\'sla2\')">عرضهم فقط</button></div>';
   if(tf.length>0){
     html+='<div class="today-fu"><div class="today-fu-title">📅 متابعة اليوم — '+tf.length+' عميل</div>';
     tf.forEach(l=>{html+=buildQuickCard(l,true);});
@@ -2066,6 +2174,10 @@ function filteredL(){
       return regToday||fuToday||newNoAnswer||overdueFU;
     });
   }
+  // ★ SLA Filter — لما اليوزر يضغط على كرت SLA في الـ Dashboard
+  if(window.SLA_FILTER){
+    l = l.filter(passSlaFilter);
+  }
   return l;
 }
 function clearFilters(){
@@ -2073,6 +2185,7 @@ function clearFilters(){
     const el=$(id); if(el) el.value="";
   });
   clearTodayFilter();
+  window.SLA_FILTER = null;  // clear SLA filter
   filterL();
 }
 function filterL(){pgLeads=1;renderLeadsContent();}
@@ -2203,6 +2316,27 @@ function renderTable(el){
   const visKeys = getVisibleLeadCols();
   const cols = allCols.filter(c => visKeys.includes(c.key));
 
+  // ★ SLA Filter Banner — يظهر لما اليوزر فعّل فلتر من Dashboard
+  let slaBanner = '';
+  if(window.SLA_FILTER){
+    const slaTitle = window.SLA_FILTER === 'sla1' 
+      ? 'SLA 1 — الالتزام بتوقيت التواصل (24 ساعة)'
+      : 'SLA 2 — الالتزام بتاريخ المتابعة';
+    const slaDesc = window.SLA_FILTER === 'sla1'
+      ? 'يعرض فقط العملاء اللي تجاوزوا 24 ساعة بدون تسجيل حالة'
+      : 'يعرض فقط العملاء اللي فات تاريخ متابعتهم ولم يتم التواصل';
+    slaBanner = `
+      <div style="background:linear-gradient(135deg,rgba(245,82,82,.12) 0%,rgba(245,82,82,.04) 100%);border:1.5px solid var(--red);border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:22px;flex-shrink:0;">⚠️</span>
+        <div style="flex:1;min-width:200px;">
+          <div style="font-weight:800;font-size:13px;color:var(--red);margin-bottom:2px;">فلتر نشط: ${slaTitle}</div>
+          <div style="font-size:11px;color:var(--text2);">${slaDesc} · <strong style="font-family:Outfit;color:var(--red)">${tot}</strong> Lead متأخر</div>
+        </div>
+        <button class="btn sm" onclick="clearSlaFilter()" style="background:var(--red);color:#fff;border-color:var(--red);font-weight:700;">✕ إلغاء الفلتر</button>
+      </div>
+    `;
+  }
+
   // Build column picker UI
   const totalCount = allCols.length;
   const visCount = cols.length;
@@ -2266,6 +2400,8 @@ function renderTable(el){
       if(canEdit) tableHtml += '<div class="ract ed" onclick="editLead('+l.id+')" title="تعديل">✏️</div>';
       if(canReactivate(l)) tableHtml += '<div class="ract" style="color:var(--purple2);background:rgba(168,85,247,.12)" onclick="event.stopPropagation();openReactivate('+l.id+')" title="إعادة تفعيل">♻️</div>';
       tableHtml += '<a href="'+waLink(l.mob)+'" target="_blank" class="ract wa" title="واتساب">💬</a>';
+      // Admin-only: Delete button
+      if(isA) tableHtml += '<div class="ract" style="color:var(--red);background:rgba(245,82,82,.10)" onclick="event.stopPropagation();confirmDeleteLead('+l.id+')" title="حذف نهائي (Admin فقط)">🗑️</div>';
       tableHtml += '</div></td>';
       // Data cells
       cols.forEach(c => {
@@ -2285,7 +2421,7 @@ function renderTable(el){
   tableHtml += '<div class="pag-btns">'+Array.from({length:pages},(_,i)=>'<button class="pag-btn'+(i+1===pgLeads?" on":"")+'" onclick="pgLeads='+(i+1)+';renderLeadsContent()">'+(i+1)+'</button>').join("")+'</div>';
   tableHtml += '</div></div>';
 
-  el.innerHTML = pickerHtml + tableHtml;
+  el.innerHTML = slaBanner + pickerHtml + tableHtml;
 }
 function renderKanban(el){
   const cols=[
@@ -2376,6 +2512,179 @@ function onRepChangeSelect(sel){
 function openAddLead(){curLeadId=null;$("lm-ttl").textContent="New Lead";$("lm-body").innerHTML=buildForm(null);$("lead-modal").classList.add("open");bindForm();}
 function editLead(id){curLeadId=id;const l=LEADS.find(x=>x.id===id);$("lm-ttl").textContent="تعديل Lead";$("lm-body").innerHTML=buildForm(l);$("lead-modal").classList.add("open");bindForm();}
 function editFV(){closeM("view-modal");editLead(curLeadId);}
+
+// ═══ ADMIN DELETE LEAD ═══
+function confirmDeleteLead(id){
+  if(curUser.role !== "admin"){
+    showToast("⚠","غير مسموح — للأدمن فقط");
+    return;
+  }
+  const l = LEADS.find(x => x.id === id);
+  if(!l){ showToast("✕","Lead غير موجود"); return; }
+  
+  // ندي بيانات الـ lead للأدمن قبل ما يأكد
+  const leadInfo = `
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:12px">
+      <div style="margin-bottom:4px"><strong>العميل:</strong> ${l.nm || "—"}</div>
+      <div style="margin-bottom:4px"><strong>الموبايل:</strong> ${l.mob || "—"}</div>
+      <div style="margin-bottom:4px"><strong>الشركة:</strong> ${l.company || "—"}</div>
+      <div style="margin-bottom:4px"><strong>تاريخ التسجيل:</strong> ${l.dt || "—"} ${l.tm || ""}</div>
+      <div><strong>الحالة:</strong> ${l.st || "جديد"}</div>
+    </div>
+  `;
+  
+  // Modal للحذف - بنفس structure باقي الـ modals في الـ CRM
+  const modalHtml = `
+    <div id="del-lead-modal" class="mov open" style="z-index:9999">
+      <div class="modal" style="max-width:520px">
+        <div class="mhdr" style="background:linear-gradient(135deg,rgba(245,82,82,.15) 0%,rgba(245,82,82,.05) 100%);border-bottom:2px solid var(--red)">
+          <h2 style="display:flex;align-items:center;gap:8px;color:var(--red);font-size:15px;margin:0">
+            <span style="font-size:22px">🗑️</span>
+            <span>حذف Lead نهائياً</span>
+          </h2>
+          <button class="mx" onclick="closeDelLeadModal()">×</button>
+        </div>
+        <div class="mbody" style="padding:18px">
+          <div style="background:rgba(245,82,82,.08);border:1px solid var(--red);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--text);line-height:1.6;margin-bottom:12px">
+            <strong style="color:var(--red)">⚠ تحذير:</strong> هذا الإجراء سيقوم بحذف الـ Lead نهائياً ولا يمكن التراجع عنه. سيتم حذف جميع البيانات بما فيها:
+            <ul style="margin:6px 0 0;padding-right:18px">
+              <li>بيانات العميل الأساسية</li>
+              <li>سجلات الاتصال والملاحظات</li>
+              <li>تاريخ المتابعات</li>
+            </ul>
+          </div>
+          
+          ${leadInfo}
+          
+          <div style="margin:12px 0">
+            <label style="display:block;font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">
+              للتأكيد، اكتب <strong style="color:var(--red);font-family:Outfit">DELETE</strong> في الخانة:
+            </label>
+            <input type="text" id="del-confirm-input" placeholder="اكتب DELETE هنا..." 
+              style="width:100%;padding:10px 12px;background:var(--bg2);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;font-family:Outfit;box-sizing:border-box"
+              oninput="onDelConfirmInput()" autofocus>
+          </div>
+          
+          <div style="margin:12px 0">
+            <label style="display:block;font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">
+              سبب الحذف (اختياري — للسجل):
+            </label>
+            <input type="text" id="del-reason-input" placeholder="مثال: lead مكرر / بيانات خاطئة..." 
+              style="width:100%;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;box-sizing:border-box">
+          </div>
+        </div>
+        <div class="mftr">
+          <button class="btn" onclick="closeDelLeadModal()">إلغاء</button>
+          <button id="del-confirm-btn" class="btn" disabled
+            style="background:var(--text3);color:#fff;border-color:var(--text3);cursor:not-allowed"
+            onclick="executeDeleteLead(${id})">🗑️ حذف نهائي</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // نضيف الـ modal للـ DOM
+  const div = document.createElement('div');
+  div.innerHTML = modalHtml;
+  document.body.appendChild(div.firstElementChild);
+  
+  setTimeout(() => $("del-confirm-input")?.focus(), 100);
+}
+
+function onDelConfirmInput(){
+  const v = ($("del-confirm-input")?.value || "").trim();
+  const btn = $("del-confirm-btn");
+  if(!btn) return;
+  if(v === "DELETE"){
+    btn.disabled = false;
+    btn.style.background = "var(--red)";
+    btn.style.borderColor = "var(--red)";
+    btn.style.cursor = "pointer";
+  } else {
+    btn.disabled = true;
+    btn.style.background = "var(--text3)";
+    btn.style.borderColor = "var(--text3)";
+    btn.style.cursor = "not-allowed";
+  }
+}
+
+function closeDelLeadModal(){
+  const m = $("del-lead-modal");
+  if(m) m.remove();
+}
+
+async function executeDeleteLead(id){
+  if(curUser.role !== "admin"){
+    showToast("⚠","غير مسموح");
+    return;
+  }
+  const v = ($("del-confirm-input")?.value || "").trim();
+  if(v !== "DELETE"){
+    showToast("⚠","اكتب DELETE للتأكيد");
+    return;
+  }
+  
+  const reason = ($("del-reason-input")?.value || "").trim();
+  const l = LEADS.find(x => x.id === id);
+  if(!l){ showToast("✕","Lead غير موجود"); closeDelLeadModal(); return; }
+  
+  // Disable الزرار أثناء الحذف
+  const btn = $("del-confirm-btn");
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = "⏳ جاري الحذف...";
+    btn.style.background = "var(--text3)";
+  }
+  
+  try {
+    // 1) حذف من Supabase
+    const supaId = l._supaId || l.id;
+    const {error} = await supa.from("leads").delete().eq("id", supaId);
+    
+    if(error){
+      console.error("[Delete Lead] Supabase error:", error);
+      showToast("✕", "خطأ في الحذف: " + (error.message || "فشل الاتصال"));
+      if(btn){
+        btn.disabled = false;
+        btn.textContent = "🗑️ حذف نهائي";
+        btn.style.background = "var(--red)";
+      }
+      return;
+    }
+    
+    // 2) حذف من الـ memory
+    const idx = LEADS.findIndex(x => x.id === id);
+    if(idx !== -1) LEADS.splice(idx, 1);
+    
+    // 3) Log في الـ console للتتبع
+    console.log("[Admin Delete]", {
+      leadId: id,
+      supaId: supaId,
+      name: l.nm,
+      mobile: l.mob,
+      deletedBy: curUser.name,
+      reason: reason || "(no reason)",
+      timestamp: new Date().toISOString()
+    });
+    
+    // 4) Close modal + toast + refresh
+    closeDelLeadModal();
+    showToast("✓", `تم حذف Lead "${l.nm || 'بدون اسم'}" نهائياً`);
+    
+    // 5) Refresh المعروض
+    if(typeof renderLeadsContent === 'function') renderLeadsContent();
+    if(typeof renderDash === 'function' && document.querySelector('#pg-dashboard.active')) renderDash();
+    
+  } catch(err){
+    console.error("[Delete Lead] Exception:", err);
+    showToast("✕", "خطأ غير متوقع: " + (err.message || err));
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = "🗑️ حذف نهائي";
+      btn.style.background = "var(--red)";
+    }
+  }
+}
 
 function buildForm(l){
   const u=curUser,isS=u.role==="sales",isC=u.role==="coordinator",isA=u.role==="admin";
@@ -2954,6 +3263,9 @@ function viewLead(id){
   const u=curUser;
   const canEdit=u.role==="admin"||(u.role==="coordinator"&&l.byId===u.id)||(u.role==="sales"&&l.repId===u.id);
   $("vm-edit").style.display=canEdit?"flex":"none";
+  // Show Delete button for Admin only
+  const vmDel = $("vm-del");
+  if(vmDel) vmDel.style.display = u.role==="admin" ? "flex" : "none";
   // Show Reactivate button if applicable
   let vmReact=$("vm-react");
   if(!vmReact){
