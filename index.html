@@ -2509,8 +2509,34 @@ function onRepChangeSelect(sel){
   }
 }
 
-function openAddLead(){curLeadId=null;$("lm-ttl").textContent="New Lead";$("lm-body").innerHTML=buildForm(null);$("lead-modal").classList.add("open");bindForm();}
-function editLead(id){curLeadId=id;const l=LEADS.find(x=>x.id===id);$("lm-ttl").textContent="تعديل Lead";$("lm-body").innerHTML=buildForm(l);$("lead-modal").classList.add("open");bindForm();}
+// ★ Variable لتخزين الـ sales المحجوز للفورم الحالي
+let RESERVED_REP = null;
+
+async function openAddLead(){
+  curLeadId = null;
+  RESERVED_REP = null;
+  
+  // ★ نحجز sales من الـ DB فوراً (atomic — مفيش 2 coordinators ياخدوا نفس sales)
+  if(curUser.role === "coordinator" || curUser.role === "admin"){
+    try {
+      const reserved = await getNextRRFromDB();
+      if(reserved && reserved.id && reserved.name){
+        RESERVED_REP = reserved;
+        console.log("[openAddLead] Reserved sales:", reserved.name, "(id:"+reserved.id+")");
+      } else {
+        console.warn("[openAddLead] DB reservation failed, will fall back to local at save time");
+      }
+    } catch(e) {
+      console.warn("[openAddLead] Error reserving sales:", e);
+    }
+  }
+  
+  $("lm-ttl").textContent = "New Lead";
+  $("lm-body").innerHTML = buildForm(null);
+  $("lead-modal").classList.add("open");
+  bindForm();
+}
+function editLead(id){curLeadId=id;RESERVED_REP=null;const l=LEADS.find(x=>x.id===id);$("lm-ttl").textContent="تعديل Lead";$("lm-body").innerHTML=buildForm(l);$("lead-modal").classList.add("open");bindForm();}
 function editFV(){closeM("view-modal");editLead(curLeadId);}
 
 // ═══ ADMIN DELETE LEAD ═══
@@ -2688,7 +2714,20 @@ async function executeDeleteLead(id){
 
 function buildForm(l){
   const u=curUser,isS=u.role==="sales",isC=u.role==="coordinator",isA=u.role==="admin";
-  const rr=l?USERS.find(x=>x.id===l.repId):(getNextRRLocal()||SALES_USERS[0]);
+  // ★ لو في sales محجوز من الـ DB (لـ new lead) → استخدمه
+  // ★ لو edit lead → استخدم الـ rep الموجود
+  // ★ Fallback: local RR لو الـ DB reservation فشل
+  let rr;
+  if(l){
+    // Edit mode — استخدم الموجود
+    rr = USERS.find(x => x.id === l.repId);
+  } else if(RESERVED_REP && RESERVED_REP.id){
+    // New lead — استخدم اللي اتحجز من الـ DB
+    rr = USERS.find(x => x.id === RESERVED_REP.id) || RESERVED_REP;
+  } else {
+    // Fallback — local computation
+    rr = getNextRRLocal() || SALES_USERS[0];
+  }
   function sel(nm,opts,val,dis){
     return`<select name="${nm}"${dis?" disabled":""} style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;width:100%;${dis?"opacity:.35":""}">
       <option value="">— اختر —</option>${opts.map(o=>'<option'+(o===val?' selected':'')+'>'+o+'</option>').join('')}</select>`;
@@ -2733,6 +2772,7 @@ function buildForm(l){
         <div style="flex:1">
           <div style="font-size:9px;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Sales Rep ${l?'(تعديل المسؤول)':'(الافتراضي: Round Robin — يمكن تغييره)'}</div>
           <div class="rr-name" id="rr-display-name">${l?.rep||rr?.name||"—"}</div>
+          ${!l && RESERVED_REP && RESERVED_REP.id ? '<div style="font-size:9px;color:var(--green);margin-top:3px;font-weight:600">🔒 محجوز من نظام التوزيع — لن يتكرر لـ Lead آخر</div>' : ''}
         </div>
         <select name="rep_id_change" id="rep-id-change-sel" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;min-width:180px" onchange="onRepChangeSelect(this)">
           <option value="">${l?'— احتفظ بالحالي —':'— استخدم Round Robin —'}</option>
@@ -2869,8 +2909,16 @@ async function saveLead(){
   try {
     if(isNew2){
       // Insert new lead
-      // Determine final rep: manual override OR atomic Round Robin from DB
-      const rrDefault = await getNextRRFromDB();
+      // ★ الـ Sales اتحجز بالفعل عند فتح الفورم (في openAddLead)
+      // ★ هنا بنستخدمه مباشرة بدل ما نستدعي getNextRRFromDB تاني
+      let rrDefault = RESERVED_REP;
+      
+      // Fallback: لو الحجز فشل وقت فتح الفورم، نحاول دلوقتي
+      if(!rrDefault || !rrDefault.id){
+        console.warn("[saveLead] No reserved rep, calling DB function as fallback");
+        rrDefault = await getNextRRFromDB();
+      }
+      
       const overrideId = get("rep_id_change");
       let rr = rrDefault;
       let wasOverridden = false;
@@ -2892,7 +2940,7 @@ async function saveLead(){
         return;
       }
 
-      console.log("[saveLead] Final rep assigned:", {id: rr.id, name: rr.name, manual: wasOverridden});
+      console.log("[saveLead] Final rep assigned:", {id: rr.id, name: rr.name, manual: wasOverridden, fromReservation: !!RESERVED_REP});
       
       const newLead = {
         cc: "CLT-"+Date.now(),
@@ -2927,6 +2975,7 @@ async function saveLead(){
       });
       
       showToast("✓", wasOverridden ? "تم الإضافة — Sales: "+rr.name+" (يدوي)" : "تم الإضافة — Sales: "+rr.name);
+      RESERVED_REP = null;  // ★ نظف الحجز بعد ما اتسجل
     } else {
       // Update existing lead
       const l = LEADS.find(x=>x.id===curLeadId);
