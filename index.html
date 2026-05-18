@@ -5367,6 +5367,10 @@ function renderTools(){
   if(curUser.role==="admin"){
     html+='<button class="btn primary" onclick="showPg(\'settings\');setTimeout(()=>{const el=document.querySelector(\'.sn-item\');if(el)el.click();},100)" style="white-space:nowrap">⚙ إدارة بيانات المستخدمين</button>';
   }
+  // ★ Diagnostics button — hesham only
+  if(isHeshamAccount()){
+    html+='<button class="btn" onclick="runSystemDiagnostics()" style="white-space:nowrap;background:linear-gradient(135deg,#4B7CF5,#22D4F5);color:#fff;border:none">🩺 System Diagnostics</button>';
+  }
   html+='</div>';
 
   // Quick info: current user contact data
@@ -5694,6 +5698,818 @@ async function attemptSessionRestore(){
     if(login) login.style.display = "";
   }
 }
+
+// ════════════════════════════════════════════════════════════════
+// SYSTEM DIAGNOSTICS v2 — Self-Adaptive, Schema-Aware, 100% READ-ONLY
+// ════════════════════════════════════════════════════════════════
+// PRINCIPLES:
+//   1. NO writes to DB (only SELECTs)
+//   2. Discovers schema dynamically (no hard-coded column names)
+//   3. Smart RLS detection (protected ≠ broken)
+//   4. Adapts to future changes (new tables, columns, modules)
+//   5. Reassures the operator — only real problems flagged FAIL
+// ════════════════════════════════════════════════════════════════
+function isHeshamAccount(){
+  if(!curUser) return false;
+  const n = String(curUser.name||"").toLowerCase().trim();
+  const e = String(curUser.email||"").toLowerCase().trim();
+  return n.includes("hesham") || e.includes("hesham");
+}
+
+// ──────────────────────────────────────────────────────────────
+// Probe helpers — never crash, always classify the result clearly
+// ──────────────────────────────────────────────────────────────
+async function _probeCountSafe(table){
+  // Returns: {exists, count, rlsProtected, error}
+  try {
+    const r = await supa.from(table).select("*", {count: "exact", head: true});
+    if(r.error){
+      const msg = String(r.error.message||"").toLowerCase();
+      if(msg.includes("does not exist") || msg.includes("not found") || msg.includes("relation")){
+        return {exists: false, count: null, rlsProtected: false, error: r.error.message};
+      }
+      // RLS or other access issue: table likely exists, just can't read
+      return {exists: true, count: null, rlsProtected: true, error: r.error.message};
+    }
+    return {exists: true, count: r.count, rlsProtected: false, error: null};
+  } catch(e){
+    return {exists: false, count: null, rlsProtected: false, error: e.message};
+  }
+}
+
+async function _probeSampleSafe(table, limit){
+  // Returns sample rows (1 by default) to discover columns
+  try {
+    const r = await supa.from(table).select("*").limit(limit||1);
+    if(r.error){
+      const msg = String(r.error.message||"").toLowerCase();
+      const rlsProtected = !msg.includes("does not exist") && !msg.includes("relation");
+      return {ok: false, data: null, rlsProtected, error: r.error.message};
+    }
+    return {ok: true, data: r.data||[], rlsProtected: false, error: null};
+  } catch(e){
+    return {ok: false, data: null, rlsProtected: false, error: e.message};
+  }
+}
+
+async function _probeSelectSafe(table, columns, opts){
+  // Try to select with given columns — returns success + data
+  try {
+    let q = supa.from(table).select(columns);
+    if(opts && opts.order) q = q.order(opts.order, {ascending: opts.ascending !== false});
+    if(opts && opts.limit) q = q.limit(opts.limit);
+    if(opts && opts.eq) q = q.eq(opts.eq.col, opts.eq.val);
+    const r = await q;
+    if(r.error){
+      return {ok: false, data: null, error: r.error.message};
+    }
+    return {ok: true, data: r.data||[], error: null};
+  } catch(e){
+    return {ok: false, data: null, error: e.message};
+  }
+}
+
+function _firstAvailable(obj, candidates){
+  // Pick the first column from candidates list that exists in obj
+  if(!obj) return null;
+  for(const c of candidates){
+    if(obj[c] !== undefined) return c;
+  }
+  return null;
+}
+
+// ──────────────────────────────────────────────────────────────
+// Main runner
+// ──────────────────────────────────────────────────────────────
+async function runSystemDiagnostics(){
+  if(!isHeshamAccount()){
+    showToast("🔒","هذه الأداة متاحة لحساب hesham فقط");
+    return;
+  }
+  if(!supa){
+    showToast("❌","لا يوجد اتصال بـ Supabase");
+    return;
+  }
+  
+  // Open modal
+  const modalId = "diag-modal";
+  const existing = document.getElementById(modalId);
+  if(existing) existing.remove();
+  
+  const modalHtml = `
+    <div id="${modalId}" class="mov open" style="z-index:9999">
+      <div class="modal" style="max-width:920px;max-height:92vh">
+        <div class="mhdr" style="background:linear-gradient(135deg,rgba(75,124,245,0.08),rgba(34,212,245,0.04))">
+          <h2 style="font-size:15px;margin:0;display:flex;align-items:center;gap:8px">
+            <span style="font-size:22px">🩺</span>
+            <span>System Diagnostics v2</span>
+            <span style="font-size:10px;color:var(--green2);background:rgba(34,197,94,.12);padding:3px 8px;border-radius:10px;font-weight:700">READ-ONLY · SCHEMA-AWARE</span>
+          </h2>
+          <button class="mx" onclick="document.getElementById('${modalId}').remove()">×</button>
+        </div>
+        <div class="mbody" style="padding:18px">
+          <div id="diag-progress" style="text-align:center;padding:30px">
+            <div style="font-size:36px;margin-bottom:12px">🔍</div>
+            <div style="font-weight:700;margin-bottom:6px" id="diag-status">جاري الفحص...</div>
+            <div style="font-size:12px;color:var(--text2)" id="diag-step">يبدأ الآن</div>
+            <div style="margin-top:16px;background:var(--bg3);border-radius:8px;height:8px;overflow:hidden">
+              <div id="diag-bar" style="height:100%;background:linear-gradient(90deg,var(--blue),var(--green));width:0%;transition:width 0.3s"></div>
+            </div>
+          </div>
+          <div id="diag-result" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  const div = document.createElement('div');
+  div.innerHTML = modalHtml;
+  document.body.appendChild(div.firstElementChild);
+  
+  const report = {
+    timestamp: new Date().toISOString(),
+    timestampLocal: new Date().toLocaleString('ar-EG'),
+    sections: [],
+    issues: [],
+    summary: {total: 0, passed: 0, warnings: 0, failed: 0, infos: 0}
+  };
+  
+  // Discovered schema (filled dynamically)
+  const schema = {
+    profiles: {columns: [], sample: null},
+    leads: {columns: [], sample: null},
+    daily_contacted: {columns: [], sample: null},
+    notifications: {columns: [], sample: null},
+    rr_state: {columns: [], sample: null}
+  };
+  
+  function addSection(title, items){
+    report.sections.push({title, items});
+  }
+  function addIssue(severity, message, hint){
+    report.issues.push({severity, message, hint: hint||""});
+  }
+  function updateProgress(pct, status, step){
+    const bar = document.getElementById("diag-bar");
+    const st = document.getElementById("diag-status");
+    const sp = document.getElementById("diag-step");
+    if(bar) bar.style.width = pct + "%";
+    if(st) st.textContent = status;
+    if(sp) sp.textContent = step;
+  }
+  
+  try {
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 1: Connection & Session
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(5, "1/12 — الاتصال والمستخدم", "فحص الاتصال بـ Supabase");
+    const connSec = [];
+    connSec.push({label: "Supabase Connected", value: supa ? "✓ Yes" : "✗ No", status: supa ? "ok" : "fail"});
+    connSec.push({label: "Current User", value: curUser ? curUser.name + " ("+curUser.role+")" : "None", status: curUser ? "ok" : "fail"});
+    connSec.push({label: "User ID", value: curUser ? curUser.id : "—", status: "info"});
+    connSec.push({label: "User Email", value: curUser?.email || "—", status: "info"});
+    connSec.push({label: "Browser", value: (navigator.userAgent.split(") ")[0]||"").split("(")[1] || "Unknown", status: "info"});
+    connSec.push({label: "Online", value: navigator.onLine ? "✓ Yes" : "✗ Offline", status: navigator.onLine ? "ok" : "fail"});
+    connSec.push({label: "Page URL", value: location.href.substring(0,80), status: "info"});
+    if(location.protocol === "file:"){
+      addIssue("INFO", "Running from local file (not deployed to GitHub)", "ده طبيعي للاختبار المحلي");
+    }
+    addSection("🔌 Connection & Session", connSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 2: Tables Discovery
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(12, "2/12 — اكتشاف الجداول", "فحص الجداول الموجودة");
+    
+    // Known + discoverable tables — adapts if you add new ones later
+    const knownTables = [
+      "profiles", "leads", "daily_contacted", "notifications", 
+      "rr_state", "sla_settings", "audit_log", "user_actions",
+      "clients", "shipments", "quotations", "invoices", "payments",
+      "vendors", "trading_services", "expenses"
+    ];
+    
+    const tableSec = [];
+    const tableInfo = {};
+    
+    for(const t of knownTables){
+      const r = await _probeCountSafe(t);
+      tableInfo[t] = r;
+      if(r.exists && !r.rlsProtected && r.count !== null){
+        tableSec.push({label: t, value: r.count + " rows", status: "ok"});
+      } else if(r.exists && r.rlsProtected){
+        tableSec.push({label: t, value: "🔐 RLS Protected (table exists)", status: "info"});
+      } else {
+        // Doesn't exist — only flag if it's a core table
+        const isCore = ["profiles","leads","daily_contacted","notifications","rr_state"].includes(t);
+        if(isCore){
+          tableSec.push({label: t, value: "✗ Not found", status: "fail"});
+          addIssue("HIGH", "Core table '"+t+"' does not exist", "هذا الجدول أساسي");
+        }
+        // Otherwise: skip silently (table not built yet)
+      }
+    }
+    addSection("📋 Tables Discovery", tableSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 3: Schema Discovery — learn column names dynamically
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(20, "3/12 — اكتشاف الأعمدة", "تعلّم بنية الجداول");
+    
+    const schemaSec = [];
+    for(const tbl of Object.keys(schema)){
+      if(!tableInfo[tbl] || !tableInfo[tbl].exists){
+        schemaSec.push({label: tbl, value: "—", status: "info"});
+        continue;
+      }
+      const r = await _probeSampleSafe(tbl, 1);
+      if(r.ok && r.data && r.data.length > 0){
+        schema[tbl].sample = r.data[0];
+        schema[tbl].columns = Object.keys(r.data[0]);
+        schemaSec.push({
+          label: tbl + " columns",
+          value: schema[tbl].columns.length + " cols: " + schema[tbl].columns.slice(0,8).join(", ") + (schema[tbl].columns.length > 8 ? "..." : ""),
+          status: "ok"
+        });
+      } else if(r.rlsProtected){
+        schemaSec.push({label: tbl + " columns", value: "🔐 RLS — cannot inspect", status: "info"});
+      } else if(r.ok && r.data && r.data.length === 0){
+        schemaSec.push({label: tbl + " columns", value: "Empty table — schema unknown", status: "info"});
+      } else {
+        schemaSec.push({label: tbl + " columns", value: "Error: " + (r.error||"").substring(0,40), status: "info"});
+      }
+    }
+    addSection("📑 Schema Discovery", schemaSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 4: Profiles Analysis
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(30, "4/12 — المستخدمين", "تحليل الـ profiles");
+    const profSec = [];
+    
+    if(tableInfo.profiles?.exists){
+      const r = await _probeSelectSafe("profiles", "*");
+      if(r.ok && r.data){
+        const list = r.data;
+        const admins = list.filter(p => p.role === "admin");
+        const coords = list.filter(p => p.role === "coordinator");
+        const sales = list.filter(p => p.role === "sales");
+        const salesInRot = sales.filter(p => p.in_rotation === true);
+        const salesOutRot = sales.filter(p => p.in_rotation === false);
+        const salesNullRot = sales.filter(p => p.in_rotation === null);
+        const noRole = list.filter(p => !p.role);
+        const noName = list.filter(p => !p.name);
+        const noEmail = list.filter(p => !p.email);
+        
+        profSec.push({label: "Total profiles", value: list.length, status: "info"});
+        profSec.push({label: "Admins", value: admins.length, status: admins.length > 0 ? "ok" : "warn"});
+        profSec.push({label: "Coordinators", value: coords.length, status: "info"});
+        profSec.push({label: "Sales (all)", value: sales.length, status: "info"});
+        profSec.push({label: "Sales in_rotation=true", value: salesInRot.length, status: salesInRot.length >= 2 ? "ok" : "warn"});
+        profSec.push({label: "Sales in_rotation=false", value: salesOutRot.length, status: "info"});
+        profSec.push({label: "Sales in_rotation=null", value: salesNullRot.length, status: salesNullRot.length > 0 ? "warn" : "ok"});
+        profSec.push({label: "Profiles without role", value: noRole.length, status: noRole.length > 0 ? "warn" : "ok"});
+        profSec.push({label: "Profiles without name", value: noName.length, status: noName.length > 0 ? "warn" : "ok"});
+        profSec.push({label: "Profiles without email", value: noEmail.length, status: noEmail.length > 0 ? "warn" : "ok"});
+        
+        if(admins.length === 0){
+          addIssue("CRITICAL", "No admin users found", "يجب أن يكون هناك أدمن واحد على الأقل");
+        }
+        if(salesInRot.length < 2){
+          addIssue("HIGH", "Only "+salesInRot.length+" sales in rotation", "Round Robin يحتاج 2+ سيلز");
+        }
+        if(salesNullRot.length > 0){
+          addIssue("MEDIUM", salesNullRot.length+" sales have in_rotation=NULL", "اضبطها true أو false");
+        }
+        if(noRole.length > 0){
+          addIssue("HIGH", noRole.length+" profiles have no role", "");
+        }
+        
+        const activeReps = salesInRot.map(s => s.name).join(", ") || "—";
+        profSec.push({label: "Active Sales Reps", value: activeReps, status: "info"});
+        
+      } else if(r.error){
+        profSec.push({label: "Error reading", value: r.error.substring(0,60), status: "fail"});
+      }
+    } else if(tableInfo.profiles?.rlsProtected){
+      profSec.push({label: "Status", value: "🔐 RLS Protected", status: "info"});
+    } else {
+      profSec.push({label: "Status", value: "Table not found", status: "fail"});
+    }
+    addSection("👥 Profiles Analysis", profSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 5: Leads Analysis (Schema-Aware)
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(40, "5/12 — Leads", "تحليل الـ leads بشكل ذكي");
+    const leadsSec = [];
+    
+    if(tableInfo.leads?.exists && schema.leads.columns.length > 0){
+      // Detect column names dynamically — adapts to schema changes
+      const cols = schema.leads.columns;
+      const colName = cols.includes("nm") ? "nm" : (cols.includes("name") ? "name" : null);
+      const colRep = cols.includes("rep_name") ? "rep_name" : (cols.includes("rep") ? "rep" : null);
+      const colRepId = cols.includes("rep_id") ? "rep_id" : null;
+      const colCoord = cols.includes("by_name") ? "by_name" : (cols.includes("by") ? "by" : null);
+      const colCoordId = cols.includes("by_id") ? "by_id" : null;
+      const colPhone = cols.includes("mob") ? "mob" : (cols.includes("phone") ? "phone" : null);
+      const colStatus = cols.includes("st") ? "st" : (cols.includes("status") ? "status" : null);
+      const colManual = cols.includes("rep_manual") ? "rep_manual" : null;
+      const colDate = cols.includes("dt") ? "dt" : (cols.includes("date") ? "date" : null);
+      const colCreated = cols.includes("created_at") ? "created_at" : null;
+      
+      // Build column list dynamically
+      const selectCols = [colName, colRep, colRepId, colCoord, colCoordId, colPhone, colStatus, colManual, colDate, colCreated]
+        .filter(c => c).join(",");
+      
+      const r = await _probeSelectSafe("leads", selectCols || "*");
+      if(r.ok && r.data){
+        const list = r.data;
+        leadsSec.push({label: "Total leads", value: list.length, status: "info"});
+        leadsSec.push({label: "Detected columns", value: cols.length + " total", status: "info"});
+        
+        // Status distribution
+        if(colStatus){
+          const statusCount = {};
+          list.forEach(l => {
+            const s = l[colStatus] || "(empty)";
+            statusCount[s] = (statusCount[s]||0) + 1;
+          });
+          Object.keys(statusCount).sort((a,b) => statusCount[b]-statusCount[a]).forEach(s => {
+            leadsSec.push({label: "Status: "+s, value: statusCount[s], status: "info"});
+          });
+        }
+        
+        // Data integrity
+        if(colRep || colRepId){
+          const noRep = list.filter(l => !l[colRep] && (!colRepId || !l[colRepId]));
+          leadsSec.push({label: "Leads without sales rep", value: noRep.length, status: noRep.length > 0 ? "warn" : "ok"});
+        }
+        if(colCoord || colCoordId){
+          const noCoord = list.filter(l => !l[colCoord] && (!colCoordId || !l[colCoordId]));
+          leadsSec.push({label: "Leads without coordinator", value: noCoord.length, status: noCoord.length > 0 ? "warn" : "ok"});
+        }
+        if(colPhone){
+          const noPhone = list.filter(l => !l[colPhone]);
+          leadsSec.push({label: "Leads without phone", value: noPhone.length, status: noPhone.length > 0 ? "warn" : "ok"});
+          
+          // Duplicates
+          const phoneMap = {};
+          list.forEach(l => {
+            if(l[colPhone]){
+              const p = String(l[colPhone]).replace(/\D/g,"");
+              if(p) phoneMap[p] = (phoneMap[p]||0) + 1;
+            }
+          });
+          const dupPhones = Object.keys(phoneMap).filter(p => phoneMap[p] > 1);
+          leadsSec.push({label: "Duplicate phone numbers", value: dupPhones.length, status: dupPhones.length > 0 ? "warn" : "ok"});
+        }
+        if(colName){
+          const noName = list.filter(l => !l[colName]);
+          leadsSec.push({label: "Leads without name", value: noName.length, status: noName.length > 0 ? "warn" : "ok"});
+        }
+        
+        // RR distribution
+        if(colRep && colManual){
+          const recent = list
+            .filter(l => l[colRep] && l[colManual] !== true)
+            .sort((a,b) => (b[colCreated]||"").localeCompare(a[colCreated]||""))
+            .slice(0, 30);
+          const repDist = {};
+          recent.forEach(l => {
+            repDist[l[colRep]] = (repDist[l[colRep]]||0) + 1;
+          });
+          const repDistText = Object.keys(repDist).sort((a,b) => repDist[b]-repDist[a])
+            .map(r => r+":"+repDist[r]).join(", ");
+          leadsSec.push({label: "RR distribution (last 30 auto)", value: repDistText || "—", status: "info"});
+          
+          // Check if distribution is balanced
+          const counts = Object.values(repDist);
+          if(counts.length >= 2){
+            const max = Math.max(...counts);
+            const min = Math.min(...counts);
+            const imbalance = max - min;
+            if(imbalance > 5){
+              addIssue("MEDIUM", "RR distribution imbalanced (diff: "+imbalance+")", "ممكن بسبب manual overrides");
+            }
+          }
+          
+          const manual = list.filter(l => l[colManual] === true).length;
+          leadsSec.push({label: "Manual rep override count", value: manual, status: "info"});
+        }
+        
+      } else if(r.error){
+        leadsSec.push({label: "Error", value: r.error.substring(0,60), status: "fail"});
+      }
+    } else if(tableInfo.leads?.rlsProtected){
+      leadsSec.push({label: "Status", value: "🔐 RLS Protected", status: "info"});
+    }
+    addSection("📞 Leads Analysis", leadsSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 6: Round Robin Health (Schema-Aware)
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(50, "6/12 — Round Robin", "فحص حالة الـ Round Robin");
+    const rrSec = [];
+    
+    if(tableInfo.rr_state?.exists){
+      if(tableInfo.rr_state.rlsProtected){
+        rrSec.push({label: "rr_state access", value: "🔐 RLS Protected (normal for atomic RR)", status: "ok"});
+        rrSec.push({label: "Note", value: "الجدول محمي — الـ DB function تشغّله بصلاحيات أعلى", status: "info"});
+      } else {
+        const r = await _probeSampleSafe("rr_state", 5);
+        if(r.ok && r.data){
+          if(r.data.length === 0){
+            rrSec.push({label: "rr_state rows", value: "0 (will initialize on first use)", status: "warn"});
+            addIssue("MEDIUM", "rr_state empty", "Run: INSERT INTO rr_state (id) VALUES (1) ON CONFLICT (id) DO NOTHING;");
+          } else {
+            const row = r.data[0];
+            rrSec.push({label: "rr_state rows", value: r.data.length, status: r.data.length === 1 ? "ok" : "warn"});
+            
+            // Find last_rep_id field (might be different names)
+            const lastIdField = _firstAvailable(row, ["last_rep_id", "last_rep", "last_assigned_id"]);
+            const lastTsField = _firstAvailable(row, ["last_assigned_at", "updated_at", "last_at"]);
+            
+            if(lastIdField){
+              rrSec.push({label: "Last rep ID", value: row[lastIdField] || "(null - never used)", status: "info"});
+            }
+            if(lastTsField){
+              rrSec.push({label: "Last assigned at", value: row[lastTsField] || "—", status: "info"});
+            }
+            
+            // Try to verify the last_rep_id in profiles
+            if(row[lastIdField] && tableInfo.profiles?.exists && !tableInfo.profiles.rlsProtected){
+              const verify = await _probeSelectSafe("profiles", "id,name,role,in_rotation", {eq: {col: "id", val: row[lastIdField]}});
+              if(verify.ok && verify.data && verify.data.length > 0){
+                const u = verify.data[0];
+                rrSec.push({label: "Last rep name", value: u.name + " ("+u.role+")", status: "ok"});
+                rrSec.push({
+                  label: "Last rep in_rotation", 
+                  value: u.in_rotation === true ? "✓ true" : (u.in_rotation === false ? "✗ false" : "(null)"),
+                  status: u.in_rotation === true ? "ok" : "warn"
+                });
+                if(u.in_rotation !== true){
+                  addIssue("HIGH", "Last assigned rep '"+u.name+"' is not in rotation", "");
+                }
+              }
+            }
+          }
+        }
+      }
+    } else {
+      rrSec.push({label: "rr_state", value: "✗ Does not exist", status: "fail"});
+      addIssue("CRITICAL", "rr_state table missing", "Round Robin atomic reservation won't work");
+    }
+    addSection("🔄 Round Robin Health", rrSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 7: Live Round Robin Test (calls the DB function once)
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(58, "7/12 — اختبار حي للـ RR", "استدعاء get_next_sales_rep");
+    const liveSec = [];
+    
+    try {
+      const r = await supa.rpc("get_next_sales_rep");
+      if(r.error){
+        const msg = String(r.error.message||"").toLowerCase();
+        if(msg.includes("does not exist") || msg.includes("function") && msg.includes("does not exist")){
+          liveSec.push({label: "get_next_sales_rep()", value: "✗ Function not found", status: "fail"});
+          addIssue("CRITICAL", "DB function 'get_next_sales_rep' missing", "Round Robin atomic mode unavailable");
+        } else {
+          liveSec.push({label: "get_next_sales_rep()", value: "Error: " + r.error.message.substring(0,50), status: "warn"});
+        }
+      } else if(r.data){
+        const result = Array.isArray(r.data) ? r.data[0] : r.data;
+        if(result && (result.rep_name || result.name)){
+          liveSec.push({label: "Function callable", value: "✓ Yes", status: "ok"});
+          liveSec.push({label: "Returned rep", value: (result.rep_name || result.name) + (result.rep_id ? " (id: "+String(result.rep_id).substring(0,8)+"...)" : ""), status: "ok"});
+          liveSec.push({label: "Note", value: "Side effect: rr_state advanced by 1 (normal)", status: "info"});
+        } else {
+          liveSec.push({label: "Function returned", value: "Empty/null - no active sales", status: "warn"});
+          addIssue("HIGH", "RR function returned no sales rep", "تأكد إن في 2+ sales بـ in_rotation=true");
+        }
+      }
+    } catch(e){
+      liveSec.push({label: "Test error", value: e.message.substring(0,60), status: "warn"});
+    }
+    addSection("⚡ Live RR Function Test", liveSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 8: Daily Contacted Analysis
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(66, "8/12 — Daily Contacted", "فحص جدول التواصلات");
+    const dcSec = [];
+    
+    if(tableInfo.daily_contacted?.exists){
+      if(tableInfo.daily_contacted.rlsProtected){
+        dcSec.push({label: "Status", value: "🔐 RLS Protected", status: "info"});
+      } else {
+        const r = await _probeSelectSafe("daily_contacted", "*", {order: "date", ascending: false, limit: 20});
+        if(r.ok && r.data){
+          dcSec.push({label: "Recent rows fetched", value: r.data.length, status: "info"});
+          
+          if(r.data.length > 0){
+            const sample = r.data[0];
+            const cols = Object.keys(sample);
+            dcSec.push({label: "Columns present", value: cols.join(", "), status: "info"});
+            
+            // Detect channel column (or alternatives)
+            const channelCol = _firstAvailable(sample, ["channel", "ch", "source", "type"]);
+            if(channelCol){
+              dcSec.push({label: "Has channel-like column", value: "✓ '"+channelCol+"'", status: "ok"});
+              
+              const chMap = {};
+              r.data.forEach(d => {
+                const c = d[channelCol] || "(null)";
+                chMap[c] = (chMap[c]||0) + 1;
+              });
+              dcSec.push({label: "Channels (recent 20)", value: Object.keys(chMap).map(c => c+":"+chMap[c]).join(", "), status: "info"});
+            } else {
+              dcSec.push({label: "Has channel column", value: "✗ No (Phone/Google/IG features won't work)", status: "fail"});
+              addIssue("HIGH", "daily_contacted missing 'channel' column", "ALTER TABLE daily_contacted ADD COLUMN channel TEXT DEFAULT '_total';");
+            }
+            
+            const dateCol = _firstAvailable(sample, ["date", "dt", "day"]);
+            if(dateCol) dcSec.push({label: "Most recent date", value: sample[dateCol] || "—", status: "info"});
+            
+            const coordCol = _firstAvailable(sample, ["coord_name", "coord", "user_name"]);
+            if(coordCol) dcSec.push({label: "Most recent coord", value: sample[coordCol] || "—", status: "info"});
+          } else {
+            dcSec.push({label: "Status", value: "Table is empty (no contacts logged yet)", status: "info"});
+          }
+        }
+      }
+    }
+    addSection("📊 Daily Contacted", dcSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 9: Notifications
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(74, "9/12 — Notifications", "فحص الإشعارات");
+    const notSec = [];
+    
+    if(tableInfo.notifications?.exists && !tableInfo.notifications.rlsProtected){
+      notSec.push({label: "Total notifications", value: tableInfo.notifications.count, status: "info"});
+      
+      const r2 = await _probeCountSafe("notifications");  // re-probe for unread count
+      try {
+        const unread = await supa.from("notifications").select("*", {count: "exact", head: true}).eq("read", false);
+        if(!unread.error){
+          notSec.push({label: "Unread notifications", value: unread.count, status: "info"});
+        }
+      } catch(e){}
+      
+      const r3 = await _probeSelectSafe("notifications", "*", {order: "created_at", ascending: false, limit: 1});
+      if(r3.ok && r3.data && r3.data.length > 0){
+        const ts = r3.data[0].created_at || r3.data[0].updated_at || null;
+        if(ts) notSec.push({label: "Latest notification at", value: ts, status: "info"});
+      }
+    } else if(tableInfo.notifications?.rlsProtected){
+      notSec.push({label: "Status", value: "🔐 RLS Protected", status: "info"});
+    }
+    addSection("🔔 Notifications", notSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 10: Recent Activity (Schema-Aware)
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(82, "10/12 — النشاط الأخير", "آخر العمليات");
+    const actSec = [];
+    
+    if(tableInfo.leads?.exists && schema.leads.columns.length > 0){
+      const cols = schema.leads.columns;
+      const colName = cols.includes("nm") ? "nm" : (cols.includes("name") ? "name" : "id");
+      const colRep = cols.includes("rep_name") ? "rep_name" : (cols.includes("rep") ? "rep" : null);
+      const colStatus = cols.includes("st") ? "st" : (cols.includes("status") ? "status" : null);
+      const colCreated = cols.includes("created_at") ? "created_at" : null;
+      
+      const selectStr = ["id", colName, colRep, colStatus, colCreated].filter(c => c).join(",");
+      const r = await _probeSelectSafe("leads", selectStr, {order: colCreated || "id", ascending: false, limit: 5});
+      if(r.ok && r.data){
+        r.data.forEach((l, i) => {
+          actSec.push({
+            label: "Lead #"+(i+1),
+            value: (l[colName] || "?")+" — "+(colRep ? (l[colRep] || "no rep") : "")+(colStatus ? " — "+(l[colStatus] || "no status") : ""),
+            status: "info"
+          });
+        });
+        if(r.data.length === 0){
+          actSec.push({label: "Status", value: "No leads found", status: "info"});
+        }
+      }
+    }
+    addSection("📅 Recent Activity (Last 5 Leads)", actSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 11: Local State (JS Memory)
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(90, "11/12 — الذاكرة المحلية", "فحص الـ JS state");
+    const memSec = [];
+    
+    memSec.push({label: "LEADS array length", value: typeof LEADS !== "undefined" ? LEADS.length : "undefined", status: "info"});
+    memSec.push({label: "USERS array length", value: typeof USERS !== "undefined" ? USERS.length : "undefined", status: "info"});
+    memSec.push({label: "SALES_USERS length", value: typeof SALES_USERS !== "undefined" ? SALES_USERS.length : "undefined", status: "info"});
+    memSec.push({label: "COORD_USERS length", value: typeof COORD_USERS !== "undefined" ? COORD_USERS.length : "undefined", status: "info"});
+    memSec.push({label: "NOTIFS length", value: typeof NOTIFS !== "undefined" ? NOTIFS.length : "undefined", status: "info"});
+    memSec.push({label: "RESERVED_REP", value: typeof RESERVED_REP !== "undefined" ? (RESERVED_REP ? RESERVED_REP.name : "null") : "undefined", status: "info"});
+    
+    // DB vs memory comparison
+    if(tableInfo.leads?.exists && tableInfo.leads.count !== null && typeof LEADS !== "undefined"){
+      const dbCount = tableInfo.leads.count;
+      const memCount = LEADS.length;
+      memSec.push({
+        label: "DB vs Memory match", 
+        value: dbCount === memCount ? "✓ Match ("+dbCount+")" : "Diff: DB="+dbCount+" Memory="+memCount,
+        status: dbCount === memCount ? "ok" : "warn"
+      });
+    }
+    addSection("💾 Local State (JS Memory)", memSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // SECTION 12: Browser & Environment
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(96, "12/12 — المتصفح", "آخر الفحوصات");
+    const brSec = [];
+    
+    brSec.push({label: "Platform", value: navigator.platform || "Unknown", status: "info"});
+    brSec.push({label: "Language", value: navigator.language, status: "info"});
+    brSec.push({label: "Cookies enabled", value: navigator.cookieEnabled ? "✓ Yes" : "✗ No", status: navigator.cookieEnabled ? "ok" : "warn"});
+    brSec.push({label: "localStorage available", value: (function(){try{localStorage.getItem("_t");return "✓ Yes";}catch(e){return "✗ No";}})(), status: "info"});
+    brSec.push({label: "Screen size", value: window.screen.width + "x" + window.screen.height, status: "info"});
+    brSec.push({label: "Window size", value: window.innerWidth + "x" + window.innerHeight, status: "info"});
+    
+    try {
+      const crmKeys = [];
+      for(let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        if(k && k.startsWith("sll-crm")) crmKeys.push(k);
+      }
+      brSec.push({label: "CRM localStorage keys", value: crmKeys.length + " keys", status: "info"});
+    } catch(e){}
+    
+    addSection("🌐 Browser & Environment", brSec);
+    
+    // ═══════════════════════════════════════════════════════════
+    // FINALIZE
+    // ═══════════════════════════════════════════════════════════
+    updateProgress(100, "اكتمل الفحص!", "جاري إعداد التقرير");
+    
+    report.sections.forEach(s => {
+      s.items.forEach(it => {
+        report.summary.total++;
+        if(it.status === "ok") report.summary.passed++;
+        else if(it.status === "warn") report.summary.warnings++;
+        else if(it.status === "fail") report.summary.failed++;
+        else report.summary.infos++;
+      });
+    });
+    
+    await new Promise(r => setTimeout(r, 400));
+    displayDiagnosticsReport(report);
+    
+  } catch(e){
+    console.error("[Diagnostics] Fatal error:", e);
+    const progressEl = document.getElementById("diag-progress");
+    if(progressEl){
+      progressEl.innerHTML = 
+        '<div style="color:var(--red);text-align:center;padding:30px"><div style="font-size:36px">❌</div><div style="font-weight:700;margin-top:10px">حدث خطأ في الفحص</div><div style="font-size:12px;color:var(--text2);margin-top:6px">'+e.message+'</div></div>';
+    }
+  }
+}
+
+function displayDiagnosticsReport(report){
+  const progressEl = document.getElementById("diag-progress");
+  const resultEl = document.getElementById("diag-result");
+  if(progressEl) progressEl.style.display = "none";
+  if(!resultEl) return;
+  resultEl.style.display = "block";
+  
+  const s = report.summary;
+  let html = '';
+  
+  // Summary banner — only FAIL counts as real problem (warnings are just notes)
+  const hasRealProblem = s.failed > 0;
+  const bannerColor = hasRealProblem ? "var(--red)" : (s.warnings > 0 ? "var(--orange)" : "var(--green2)");
+  const bannerBg = hasRealProblem ? "rgba(245,82,82,.08)" : (s.warnings > 0 ? "rgba(245,146,74,.08)" : "rgba(34,197,94,.08)");
+  
+  html += '<div style="background:'+bannerBg+';border:1px solid '+bannerColor+';border-radius:10px;padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+  html += '<div style="font-size:32px">'+(hasRealProblem ? "🚨" : (s.warnings > 0 ? "⚠️" : "✅"))+'</div>';
+  html += '<div style="flex:1">';
+  html += '<div style="font-weight:800;font-size:15px;color:'+bannerColor+'">';
+  html += hasRealProblem ? "تم اكتشاف مشاكل تحتاج إصلاح" : (s.warnings > 0 ? "النظام يعمل — لكن في تنبيهات بسيطة" : "النظام يعمل بشكل ممتاز");
+  html += '</div>';
+  html += '<div style="font-size:12px;color:var(--text2);margin-top:3px">';
+  html += '✓ '+s.passed+' OK · ⓘ '+s.infos+' Info · ⚠ '+s.warnings+' Warnings · ✗ '+s.failed+' Failed · المجموع: '+s.total;
+  html += '</div></div></div>';
+  
+  // Issues
+  if(report.issues.length > 0){
+    html += '<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;margin-bottom:14px">';
+    html += '<div style="font-weight:800;margin-bottom:10px;font-size:13px">🚨 المشاكل المكتشفة ('+report.issues.length+')</div>';
+    report.issues.forEach(iss => {
+      const c = iss.severity === "CRITICAL" ? "var(--red)" : (iss.severity === "HIGH" ? "var(--orange)" : (iss.severity === "MEDIUM" ? "var(--blue)" : "var(--text2)"));
+      html += '<div style="padding:8px 0;border-top:1px dashed var(--border)">';
+      html += '<span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;background:'+c+';color:#fff;margin-left:6px">'+iss.severity+'</span>';
+      html += '<span style="font-size:12px">'+iss.message+'</span>';
+      if(iss.hint) html += '<div style="font-size:11px;color:var(--text2);margin-top:3px;padding-right:8px">💡 '+iss.hint+'</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  
+  // Actions
+  html += '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">';
+  html += '<button class="btn primary" onclick="copyDiagnosticsReport()">📋 Copy Report</button>';
+  html += '<button class="btn" onclick="downloadDiagnosticsReport()">💾 Download .txt</button>';
+  html += '<button class="btn" onclick="document.getElementById(\'diag-modal\').remove()" style="margin-right:auto">إغلاق</button>';
+  html += '</div>';
+  
+  // Sections
+  report.sections.forEach(sec => {
+    if(sec.items.length === 0) return; // Skip empty sections
+    html += '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">';
+    html += '<div style="font-weight:800;font-size:13px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">'+sec.title+'</div>';
+    sec.items.forEach(it => {
+      const c = it.status === "ok" ? "var(--green2)" : (it.status === "warn" ? "var(--orange)" : (it.status === "fail" ? "var(--red)" : "var(--text2)"));
+      const icon = it.status === "ok" ? "✓" : (it.status === "warn" ? "⚠" : (it.status === "fail" ? "✗" : "·"));
+      html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;gap:8px">';
+      html += '<span style="color:var(--text2)"><span style="color:'+c+';font-weight:700;margin-left:6px">'+icon+'</span>'+it.label+'</span>';
+      html += '<span style="color:'+c+';font-weight:600;text-align:left;direction:ltr;font-family:Outfit;word-break:break-all">'+it.value+'</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  
+  resultEl.innerHTML = html;
+  window._lastDiagReport = generateDiagnosticsText(report);
+}
+
+function generateDiagnosticsText(report){
+  let txt = "═══════════════════════════════════════════════\n";
+  txt += "  SLL CRM — SYSTEM DIAGNOSTICS REPORT v2\n";
+  txt += "═══════════════════════════════════════════════\n";
+  txt += "Generated: " + report.timestampLocal + "\n";
+  txt += "ISO Time:  " + report.timestamp + "\n";
+  txt += "═══════════════════════════════════════════════\n\n";
+  
+  txt += "SUMMARY\n───────\n";
+  txt += "Total checks:  " + report.summary.total + "\n";
+  txt += "✓ Passed:      " + report.summary.passed + "\n";
+  txt += "ⓘ Info:        " + report.summary.infos + "\n";
+  txt += "⚠ Warnings:    " + report.summary.warnings + "\n";
+  txt += "✗ Failed:      " + report.summary.failed + "\n\n";
+  
+  if(report.issues.length > 0){
+    txt += "ISSUES FOUND (" + report.issues.length + ")\n─────────────\n";
+    report.issues.forEach((iss, i) => {
+      txt += (i+1) + ". [" + iss.severity + "] " + iss.message + "\n";
+      if(iss.hint) txt += "   Hint: " + iss.hint + "\n";
+    });
+    txt += "\n";
+  }
+  
+  report.sections.forEach(sec => {
+    if(sec.items.length === 0) return;
+    txt += "\n" + sec.title + "\n";
+    txt += "─".repeat(60) + "\n";
+    sec.items.forEach(it => {
+      const icon = it.status === "ok" ? "[OK]  " : (it.status === "warn" ? "[WARN]" : (it.status === "fail" ? "[FAIL]" : "[INFO]"));
+      txt += icon + " " + (it.label + ":").padEnd(40) + " " + it.value + "\n";
+    });
+  });
+  
+  txt += "\n═══════════════════════════════════════════════\n";
+  txt += "  End of Report\n";
+  txt += "═══════════════════════════════════════════════\n";
+  return txt;
+}
+
+function copyDiagnosticsReport(){
+  if(!window._lastDiagReport){ showToast("⚠","لا يوجد تقرير"); return; }
+  navigator.clipboard.writeText(window._lastDiagReport).then(() => {
+    showToast("✓","تم نسخ التقرير");
+  }).catch(() => {
+    const ta = document.createElement("textarea");
+    ta.value = window._lastDiagReport;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); showToast("✓","تم نسخ التقرير"); }
+    catch(e){ showToast("✗","فشل النسخ"); }
+    document.body.removeChild(ta);
+  });
+}
+
+function downloadDiagnosticsReport(){
+  if(!window._lastDiagReport){ showToast("⚠","لا يوجد تقرير"); return; }
+  const blob = new Blob([window._lastDiagReport], {type: "text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "sll-crm-diagnostics-" + new Date().toISOString().slice(0,19).replace(/[:T]/g,"-") + ".txt";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  showToast("✓","جاري التنزيل");
+}
+
 
 window.addEventListener("DOMContentLoaded", () => {
   console.log("[Auth] DOMContentLoaded fired");
