@@ -430,12 +430,6 @@ tr.sla1-row .sticky-actions{background:rgba(245,82,82,0.06);}
 .empty-icon{font-size:34px;margin-bottom:10px;opacity:.2;}
 .empty-ttl{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;}
 .empty-sub{font-size:11px;color:var(--text3);}
-
-/* ★ Column Picker Drag & Drop */
-.col-pick-item{transition:all .15s ease;user-select:none}
-.col-pick-item:hover{background:var(--surface3)!important;border-color:var(--blue2)!important}
-.col-pick-item:active{cursor:grabbing!important}
-.col-pick-item button:hover:not(:disabled){background:var(--bg3)!important;border-radius:3px;opacity:1!important}
 </style>
 </head>
 <body>
@@ -489,6 +483,7 @@ tr.sla1-row .sticky-actions{background:rgba(245,82,82,0.06);}
     </div>
     <div class="page active" id="pg-dashboard"></div>
     <div class="page" id="pg-leads"></div>
+    <div class="page" id="pg-clients"></div>
     <div class="page" id="pg-reports"></div>
     <div class="page" id="pg-myreports"></div>
     <div class="page" id="pg-tools"></div>
@@ -594,7 +589,8 @@ const seedCh={"Whatsapp":[6950,7200,6800,6500,7100,6900,7300,6600,7000,6800,7200
 Object.entries(seedCh).forEach(([ch,arr])=>{if(MC.channels[ch])arr.forEach((v,i)=>{MC.channels[ch][i]=v;});});
 
 let LEADS=[];
-let nextId=9419,rrIdx=0,curUser=null,curLeadId=null,pgLeads=1,PER=10,lView="table",NOTIFS=[],charts={};
+let CLIENTS=[];
+let nextId=9419,rrIdx=0,curUser=null,curLeadId=null,curClientId=null,pgLeads=1,pgClients=1,PER=10,lView="table",NOTIFS=[],charts={};
 let dashPeriod="all", coordRptPeriod="month", salesRptPeriod="month";
 let msSelected={};
 // ═══ HELPERS ═══
@@ -1097,9 +1093,52 @@ async function loadAllData(){
       _supaId: n.id
     }));
     
+    // Load clients
+    try {
+      const {data:clients, error:clientsErr} = await supa.from("clients").select("*").order("client_code", {ascending:true});
+      if(clientsErr){
+        console.warn("[loadAllData] clients table not ready:", clientsErr.message);
+        CLIENTS = [];
+      } else {
+        CLIENTS = (clients||[]).map(c => ({
+          id: c.id,
+          client_code: c.client_code,
+          old_code: c.old_code || "",
+          name: c.name,
+          company: c.company || "",
+          phone: c.phone,
+          phone_alt: c.phone_alt || "",
+          email: c.email || "",
+          address: c.address || "",
+          city: c.city || "",
+          client_type: c.client_type || "عادي",
+          rating: c.rating || 3,
+          tax_number: c.tax_number || "",
+          commercial_register: c.commercial_register || "",
+          industry: c.industry || "",
+          primary_sales_rep_id: c.primary_sales_rep_id,
+          primary_sales_rep_name: c.primary_sales_rep_name || "",
+          source: c.source || "",
+          notes: c.notes || "",
+          total_leads: c.total_leads || 0,
+          total_shipments: c.total_shipments || 0,
+          total_invoices: c.total_invoices || 0,
+          lifetime_value_usd: c.lifetime_value_usd || 0,
+          first_deal_date: c.first_deal_date || "",
+          last_activity_date: c.last_activity_date || "",
+          status: c.status || "نشط",
+          is_active: c.is_active !== false,
+          created_at: c.created_at
+        }));
+      }
+    } catch(e){
+      console.warn("[loadAllData] clients load error:", e.message);
+      CLIENTS = [];
+    }
+    
     nextId = LEADS.length > 0 ? Math.max(...LEADS.map(l=>l.id)) + 1 : 100;
     
-    console.log("[loadAllData] DONE: ", USERS.length, "users,", LEADS.length, "leads");
+    console.log("[loadAllData] DONE: ", USERS.length, "users,", LEADS.length, "leads,", CLIENTS.length, "clients");
   } catch(err) {
     console.error("[loadAllData] FATAL error:", err);
     if(typeof showToast === "function") showToast("⚠", "خطأ في تحميل البيانات: " + (err.message||"unknown"));
@@ -1122,6 +1161,7 @@ function debounceReload(){
       // Re-render current page
       if($("pg-dashboard")?.classList.contains("active")) renderDash();
       if($("pg-leads")?.classList.contains("active")) renderLeadsContent();
+      if($("pg-clients")?.classList.contains("active") && typeof renderClientsPage==="function") renderClientsPage();
       if($("pg-myreports")?.classList.contains("active") && typeof renderMyReports==="function") renderMyReports();
       if($("pg-reports")?.classList.contains("active") && typeof renderReports==="function") renderReports();
       renderNotifs();
@@ -1343,6 +1383,7 @@ function initApp(){
   const rc={admin:"var(--purple2)",coordinator:"var(--green2)",sales:"var(--orange2)"};
   $("sb-urole").textContent=rl[u.role];$("sb-urole").style.color=rc[u.role];
   const nav=[{id:"dashboard",icon:"⊞",lbl:"Dashboard"},{id:"leads",icon:"☰",lbl:"Leads"},
+    {id:"clients",icon:"🏢",lbl:"Clients"},
     ...((u.role==="coordinator"||u.role==="sales")?[{id:"myreports",icon:"📊",lbl:"My Reports"}]:[]),
     ...((u.role==="admin"||u.role==="sales")?[{id:"tools",icon:"🛠️",lbl:"Tools"}]:[]),
     ...(u.role==="admin"?[{id:"reports",icon:"📊",lbl:"Reports"},{id:"settings",icon:"⚙",lbl:"Settings"}]:[])];
@@ -1420,14 +1461,19 @@ function showPg(id){
   document.querySelectorAll(".sb-item").forEach(n=>n.classList.remove("active"));
   $("pg-"+id)?.classList.add("active");
   document.querySelector(`.sb-item[data-pg="${id}"]`)?.classList.add("active");
-  const ttls={dashboard:"Dashboard",leads:"Leads",reports:"Reports",settings:"Settings",tools:"🛠️ Tools"};
+  const ttls={dashboard:"Dashboard",leads:"Leads",clients:"Clients",reports:"Reports",settings:"Settings",tools:"🛠️ Tools"};
   $("topbar-title").textContent=ttls[id]||id;
   const ex=$("topbar-extra");ex.innerHTML="";
   if(id==="leads"&&curUser.role!=="sales"){
     const b=document.createElement("button");b.className="btn primary";b.innerHTML="+ New Lead";b.onclick=openAddLead;ex.appendChild(b);
   }
+  if(id==="clients"&&(curUser.role==="admin"||curUser.role==="coordinator")){
+    const imp=document.createElement("button");imp.className="btn";imp.innerHTML="📥 Import";imp.onclick=openImportClients;ex.appendChild(imp);
+    const b=document.createElement("button");b.className="btn primary";b.innerHTML="+ Add Client";b.onclick=openAddClient;ex.appendChild(b);
+  }
   if(id==="dashboard")renderDash();
   if(id==="leads"){pgLeads=1;renderLeadsPage();}
+  if(id==="clients"){pgClients=1;renderClientsPage();}
   if(id==="reports")renderReports();
   if(id==="myreports")renderMyReports();
   if(id==="settings")renderSettings();
@@ -2261,26 +2307,15 @@ function getLeadColumnDefs(){
 }
 
 // Get visible column keys for current user from localStorage, else defaults
-// ★ الـ storage مرتبط بالـ user id (مش الـ role) — كل واحد له ترتيبه الخاص
-function _colStorageKey(){
-  // نستخدم user id لو موجود، وإلا role كـ fallback
-  const uid = curUser && curUser.id ? curUser.id : (curUser?.role || "default");
-  return "sll-crm-cols-u-" + uid;
-}
-
 function getVisibleLeadCols(){
   const all = getLeadColumnDefs();
   const role = curUser.role;
-  const storageKey = _colStorageKey();
+  const storageKey = "sll-crm-cols-"+role;
   try {
     const saved = localStorage.getItem(storageKey);
     if(saved){
       const parsed = JSON.parse(saved);
-      if(Array.isArray(parsed) && parsed.length > 0) {
-        // ★ نشيل أي keys مش موجودة في الـ defs (في حالة حذف عمود في النظام)
-        const validKeys = new Set(all.map(c => c.key));
-        return parsed.filter(k => validKeys.has(k));
-      }
+      if(Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch(e){}
   // Defaults: pick columns where defaultFor includes the current role
@@ -2288,18 +2323,16 @@ function getVisibleLeadCols(){
 }
 
 function setVisibleLeadCols(keys){
+  const role = curUser.role;
   try {
-    localStorage.setItem(_colStorageKey(), JSON.stringify(keys));
+    localStorage.setItem("sll-crm-cols-"+role, JSON.stringify(keys));
   } catch(e){}
 }
 
-// ★ Track picker open state — يفضل مفتوح أثناء التعديل
-let _colPickerOpen = false;
-
 function toggleColPicker(){
-  _colPickerOpen = !_colPickerOpen;
   const el = $("col-picker");
-  if(el) el.style.display = _colPickerOpen ? "block" : "none";
+  if(!el) return;
+  el.style.display = (el.style.display === "none" || !el.style.display) ? "block" : "none";
 }
 
 function toggleLeadCol(key){
@@ -2307,174 +2340,19 @@ function toggleLeadCol(key){
   if(visible.includes(key)) visible = visible.filter(k => k !== key);
   else visible.push(key);
   setVisibleLeadCols(visible);
-  // ★ نحفظ حالة الـ picker قبل ما نعيد الرسم، عشان يفضل مفتوح
-  const wasOpen = _colPickerOpen;
   renderLeadsContent();
-  // ★ نرجّعه مفتوح لو كان مفتوح
-  if(wasOpen){
-    const el = $("col-picker");
-    if(el) el.style.display = "block";
-    _colPickerOpen = true;
-  }
 }
 
 function resetLeadCols(){
-  try { localStorage.removeItem(_colStorageKey()); } catch(e){}
-  const wasOpen = _colPickerOpen;
+  try { localStorage.removeItem("sll-crm-cols-"+curUser.role); } catch(e){}
   renderLeadsContent();
-  if(wasOpen){
-    const el = $("col-picker");
-    if(el) el.style.display = "block";
-    _colPickerOpen = true;
-  }
   showToast("✓","تم استعادة الإعدادات الافتراضية");
 }
 
 function showAllLeadCols(){
   const all = getLeadColumnDefs();
-  // ★ نحافظ على الترتيب الموجود ونضيف الـ keys الناقصة في الآخر
-  const current = getVisibleLeadCols();
-  const newKeys = all.filter(c => !current.includes(c.key)).map(c => c.key);
-  setVisibleLeadCols([...current, ...newKeys]);
-  const wasOpen = _colPickerOpen;
+  setVisibleLeadCols(all.map(c => c.key));
   renderLeadsContent();
-  if(wasOpen){
-    const el = $("col-picker");
-    if(el) el.style.display = "block";
-    _colPickerOpen = true;
-  }
-}
-
-// ★ NEW: إعادة ترتيب عمود (يستدعى من الـ drag & drop)
-function reorderLeadCol(draggedKey, targetKey, insertAfter){
-  let visible = getVisibleLeadCols();
-  const fromIdx = visible.indexOf(draggedKey);
-  if(fromIdx === -1) return;
-  
-  // نشيل العنصر من مكانه القديم
-  visible.splice(fromIdx, 1);
-  
-  // نلاقي المكان الجديد
-  let targetIdx = visible.indexOf(targetKey);
-  if(targetIdx === -1) targetIdx = visible.length;
-  if(insertAfter) targetIdx += 1;
-  
-  // نضيفه في مكانه الجديد
-  visible.splice(targetIdx, 0, draggedKey);
-  
-  setVisibleLeadCols(visible);
-  
-  // نحفظ حالة الـ picker ونعيد الرسم
-  const wasOpen = _colPickerOpen;
-  renderLeadsContent();
-  if(wasOpen){
-    const el = $("col-picker");
-    if(el) el.style.display = "block";
-    _colPickerOpen = true;
-  }
-}
-
-// ★ NEW: نقل العمود لأعلى/أسفل (للموبايل أو لو الـ drag مش شغال)
-function moveLeadCol(key, direction){
-  let visible = getVisibleLeadCols();
-  const idx = visible.indexOf(key);
-  if(idx === -1) return;
-  
-  if(direction === "up" && idx > 0){
-    [visible[idx-1], visible[idx]] = [visible[idx], visible[idx-1]];
-  } else if(direction === "down" && idx < visible.length - 1){
-    [visible[idx], visible[idx+1]] = [visible[idx+1], visible[idx]];
-  } else {
-    return;
-  }
-  
-  setVisibleLeadCols(visible);
-  const wasOpen = _colPickerOpen;
-  renderLeadsContent();
-  if(wasOpen){
-    const el = $("col-picker");
-    if(el) el.style.display = "block";
-    _colPickerOpen = true;
-  }
-}
-
-// ★ Drag & Drop handlers — لإعادة ترتيب الأعمدة عبر السحب
-let _draggedColKey = null;
-
-function _colDragStart(e, key){
-  _draggedColKey = key;
-  e.dataTransfer.effectAllowed = "move";
-  try { e.dataTransfer.setData("text/plain", key); } catch(err){}
-  // visual feedback
-  const target = e.currentTarget;
-  if(target){
-    target.style.opacity = "0.4";
-  }
-}
-
-function _colDragOver(e){
-  if(!_draggedColKey) return;
-  e.preventDefault();
-  e.dataTransfer.dropEffect = "move";
-  // visual feedback — نضيف border أعلى الـ item
-  const target = e.currentTarget;
-  if(target && target.dataset.colkey !== _draggedColKey){
-    target.style.borderTopColor = "var(--blue2)";
-    target.style.borderTopWidth = "2px";
-    target.style.borderTopStyle = "solid";
-  }
-}
-
-function _colDragLeave(e){
-  const target = e.currentTarget;
-  if(target){
-    target.style.borderTopColor = "";
-    target.style.borderTopWidth = "";
-    target.style.borderTopStyle = "";
-  }
-}
-
-function _colDrop(e, targetKey){
-  e.preventDefault();
-  e.stopPropagation();
-  
-  const target = e.currentTarget;
-  if(target){
-    target.style.borderTopColor = "";
-    target.style.borderTopWidth = "";
-    target.style.borderTopStyle = "";
-  }
-  
-  if(!_draggedColKey || _draggedColKey === targetKey){
-    _draggedColKey = null;
-    return;
-  }
-  
-  // نلاقي مين قبل مين في الترتيب الحالي
-  const visible = getVisibleLeadCols();
-  const fromIdx = visible.indexOf(_draggedColKey);
-  const toIdx = visible.indexOf(targetKey);
-  
-  // لو الـ dragged كان قبل الـ target، نحطه قبله
-  // لو كان بعده، نحطه قبله برضه (السلوك المتوقع)
-  const insertAfter = fromIdx < toIdx;
-  
-  reorderLeadCol(_draggedColKey, targetKey, insertAfter);
-  _draggedColKey = null;
-}
-
-function _colDragEnd(e){
-  const target = e.currentTarget;
-  if(target){
-    target.style.opacity = "";
-  }
-  // امسح أي visual feedback متبقي
-  document.querySelectorAll(".col-pick-item").forEach(item => {
-    item.style.borderTopColor = "";
-    item.style.borderTopWidth = "";
-    item.style.borderTopStyle = "";
-  });
-  _draggedColKey = null;
 }
 
 function renderTable(el){
@@ -2488,10 +2366,7 @@ function renderTable(el){
   // Get column defs & visibility
   const allCols = getLeadColumnDefs();
   const visKeys = getVisibleLeadCols();
-  // ★ نرتّب الأعمدة حسب ترتيب الـ user (مش حسب الترتيب الافتراضي)
-  const colsMap = {};
-  allCols.forEach(c => { colsMap[c.key] = c; });
-  const cols = visKeys.map(k => colsMap[k]).filter(c => c); // نشيل الـ undefined
+  const cols = allCols.filter(c => visKeys.includes(c.key));
 
   // ★ SLA Filter Banner — يظهر لما اليوزر فعّل فلتر من Dashboard
   let slaBanner = '';
@@ -2523,8 +2398,8 @@ function renderTable(el){
   pickerHtml += '<button class="btn sm" onclick="toggleColPicker()" style="display:flex;align-items:center;gap:5px">⚙ Columns ('+visCount+'/'+totalCount+')</button>';
   pickerHtml += '</div></div>';
 
-  // Picker dropdown — يستخدم الحالة المحفوظة
-  pickerHtml += '<div id="col-picker" style="display:'+(_colPickerOpen?'block':'none')+';background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:10px">';
+  // Picker dropdown
+  pickerHtml += '<div id="col-picker" style="display:none;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:10px">';
   pickerHtml += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
   pickerHtml += '<div style="font-size:12px;font-weight:700">⚙ اختر الأعمدة التي تريد عرضها</div>';
   pickerHtml += '<div style="display:flex;gap:6px">';
@@ -2532,62 +2407,18 @@ function renderTable(el){
   pickerHtml += '<button class="btn sm" onclick="resetLeadCols()">↺ افتراضي</button>';
   pickerHtml += '<button class="btn sm primary" onclick="toggleColPicker()">✓ تم</button>';
   pickerHtml += '</div></div>';
-  
-  // ★ تنبيه عن Drag & Drop
-  pickerHtml += '<div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.25);border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px">';
-  pickerHtml += '<span style="font-size:14px">💡</span>';
-  pickerHtml += '<span>اسحب الأعمدة الظاهرة لإعادة ترتيبها، أو استخدم الأسهم ⬆️⬇️. الترتيب بيتحفظ تلقائياً لحسابك.</span>';
+  pickerHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px">';
+  allCols.forEach(c => {
+    const checked = visKeys.includes(c.key) ? "checked" : "";
+    const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text2)";
+    pickerHtml += '<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px">';
+    pickerHtml += '<input type="checkbox" '+checked+' onchange="toggleLeadCol(\''+c.key+'\')" style="cursor:pointer">';
+    pickerHtml += '<span style="color:'+roleColor+';font-size:9px">●</span>';
+    pickerHtml += '<span>'+c.label+'</span>';
+    pickerHtml += '</label>';
+  });
   pickerHtml += '</div>';
-  
-  // ★ القسم 1: الأعمدة الظاهرة (Visible) — قابلة للسحب
-  const visibleCols = visKeys.map(k => colsMap[k]).filter(c => c);
-  if(visibleCols.length){
-    pickerHtml += '<div style="margin-bottom:10px">';
-    pickerHtml += '<div style="font-size:10px;font-weight:800;color:var(--text2);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase">✓ الأعمدة الظاهرة في الجدول ('+visibleCols.length+') — اسحب للترتيب</div>';
-    pickerHtml += '<div id="col-picker-visible" style="display:flex;flex-direction:column;gap:4px">';
-    visibleCols.forEach((c, idx) => {
-      const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text2)";
-      const isFirst = idx === 0;
-      const isLast = idx === visibleCols.length - 1;
-      pickerHtml += '<div class="col-pick-item" draggable="true"';
-      pickerHtml += ' data-colkey="'+c.key+'"';
-      pickerHtml += ' ondragstart="_colDragStart(event,\''+c.key+'\')"';
-      pickerHtml += ' ondragover="_colDragOver(event)"';
-      pickerHtml += ' ondrop="_colDrop(event,\''+c.key+'\')"';
-      pickerHtml += ' ondragend="_colDragEnd(event)"';
-      pickerHtml += ' ondragleave="_colDragLeave(event)"';
-      pickerHtml += ' style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:move;transition:all .15s">';
-      pickerHtml += '<span style="color:var(--text3);font-size:14px;cursor:grab" title="اسحب">⋮⋮</span>';
-      pickerHtml += '<span style="color:var(--text3);font-family:Outfit;font-size:9px;min-width:18px">'+(idx+1)+'.</span>';
-      pickerHtml += '<input type="checkbox" checked onchange="toggleLeadCol(\''+c.key+'\')" style="cursor:pointer" onclick="event.stopPropagation()">';
-      pickerHtml += '<span style="color:'+roleColor+';font-size:9px">●</span>';
-      pickerHtml += '<span style="flex:1">'+c.label+'</span>';
-      // أزرار ⬆️ ⬇️ للموبايل أو لو الـ drag صعب
-      pickerHtml += '<button onclick="event.stopPropagation();moveLeadCol(\''+c.key+'\',\'up\')" '+(isFirst?'disabled':'')+' title="تحريك لأعلى" style="background:none;border:none;cursor:'+(isFirst?'not-allowed':'pointer')+';opacity:'+(isFirst?'.3':'.7')+';font-size:12px;padding:2px 4px">⬆</button>';
-      pickerHtml += '<button onclick="event.stopPropagation();moveLeadCol(\''+c.key+'\',\'down\')" '+(isLast?'disabled':'')+' title="تحريك لأسفل" style="background:none;border:none;cursor:'+(isLast?'not-allowed':'pointer')+';opacity:'+(isLast?'.3':'.7')+';font-size:12px;padding:2px 4px">⬇</button>';
-      pickerHtml += '</div>';
-    });
-    pickerHtml += '</div></div>';
-  }
-  
-  // ★ القسم 2: الأعمدة المخفية (Hidden) — checkbox عادي
-  const hiddenCols = allCols.filter(c => !visKeys.includes(c.key));
-  if(hiddenCols.length){
-    pickerHtml += '<div>';
-    pickerHtml += '<div style="font-size:10px;font-weight:800;color:var(--text2);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase">✕ الأعمدة المخفية ('+hiddenCols.length+') — اضغط لإظهارها</div>';
-    pickerHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px">';
-    hiddenCols.forEach(c => {
-      const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text2)";
-      pickerHtml += '<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg);border:1px dashed var(--border);border-radius:6px;cursor:pointer;font-size:11px;opacity:.7">';
-      pickerHtml += '<input type="checkbox" onchange="toggleLeadCol(\''+c.key+'\')" style="cursor:pointer">';
-      pickerHtml += '<span style="color:'+roleColor+';font-size:9px">●</span>';
-      pickerHtml += '<span>'+c.label+'</span>';
-      pickerHtml += '</label>';
-    });
-    pickerHtml += '</div></div>';
-  }
-  
-  pickerHtml += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap">';
+  pickerHtml += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);display:flex;gap:12px">';
   pickerHtml += '<span><span style="color:var(--green2)">●</span> Coordinator Fields</span>';
   pickerHtml += '<span><span style="color:var(--orange2)">●</span> Sales Fields</span>';
   pickerHtml += '<span><span style="color:var(--text2)">●</span> System Fields</span>';
@@ -3125,6 +2956,33 @@ async function saveLead(){
   }
   if(!supa){showToast("❌","لا يوجد اتصال بالسيرفر");return;}
   
+  // ★ NEW: لو الحالة "عميل فعلي" وما فيش client_id مربوط → نفتح modal لإنشاء/ربط العميل
+  const newSt = get("st");
+  if(newSt === "عميل فعلي"){
+    const phone = get("mob");
+    const nm = get("nm");
+    const company = get("company");
+    
+    // نشوف الـ lead الحالي (للـ edit) أو نتأكد إنه مفيش client_id
+    const currentLead = curLeadId ? LEADS.find(x => x.id === curLeadId) : null;
+    const existingClientId = currentLead?.client_id || null;
+    
+    if(!existingClientId){
+      // ندور على عميل بنفس الموبايل
+      const matched = findClientByPhone(phone);
+      
+      // نفتح modal لتأكيد/إنشاء العميل
+      const proceed = await promptClientLink(matched, {nm, company, phone, leadId: curLeadId});
+      if(!proceed) return; // المستخدم لغى
+      // proceed.clientId هيتحط في الـ lead عند الحفظ
+      window._pendingClientId = proceed.clientId;
+    } else {
+      window._pendingClientId = existingClientId;
+    }
+  } else {
+    window._pendingClientId = null;
+  }
+  
   showToast("⏳","جاري الحفظ...");
   
   try {
@@ -3180,6 +3038,7 @@ async function saveLead(){
         svc: [...(msSelected["svc"]||[])],
         cnotes: get("cnotes"),
         st: "",
+        client_id: window._pendingClientId || null,  // ← ربط العميل لو موجود
         rep_manual: wasOverridden  // ← Manual override flag
       };
       const {data, error} = await supa.from("leads").insert(newLead).select().single();
@@ -3241,6 +3100,11 @@ async function saveLead(){
             if(v!==undefined) updates[f]=v;
           }
         });
+      }
+      
+      // ★ NEW: لو الحالة "عميل فعلي" وفيه pending client_id من الـ flow → نحفظه
+      if(window._pendingClientId){
+        updates.client_id = window._pendingClientId;
       }
       
       const {error} = await supa.from("leads").update(updates).eq("id", l._supaId||l.id);
@@ -5367,10 +5231,6 @@ function renderTools(){
   if(curUser.role==="admin"){
     html+='<button class="btn primary" onclick="showPg(\'settings\');setTimeout(()=>{const el=document.querySelector(\'.sn-item\');if(el)el.click();},100)" style="white-space:nowrap">⚙ إدارة بيانات المستخدمين</button>';
   }
-  // ★ Diagnostics button — hesham only
-  if(isHeshamAccount()){
-    html+='<button class="btn" onclick="runSystemDiagnostics()" style="white-space:nowrap;background:linear-gradient(135deg,#4B7CF5,#22D4F5);color:#fff;border:none">🩺 System Diagnostics</button>';
-  }
   html+='</div>';
 
   // Quick info: current user contact data
@@ -5700,816 +5560,943 @@ async function attemptSessionRestore(){
 }
 
 // ════════════════════════════════════════════════════════════════
-// SYSTEM DIAGNOSTICS v2 — Self-Adaptive, Schema-Aware, 100% READ-ONLY
+// PROMPT CLIENT LINK — لما lead يبقى "عميل فعلي"
 // ════════════════════════════════════════════════════════════════
-// PRINCIPLES:
-//   1. NO writes to DB (only SELECTs)
-//   2. Discovers schema dynamically (no hard-coded column names)
-//   3. Smart RLS detection (protected ≠ broken)
-//   4. Adapts to future changes (new tables, columns, modules)
-//   5. Reassures the operator — only real problems flagged FAIL
-// ════════════════════════════════════════════════════════════════
-function isHeshamAccount(){
-  if(!curUser) return false;
-  const n = String(curUser.name||"").toLowerCase().trim();
-  const e = String(curUser.email||"").toLowerCase().trim();
-  return n.includes("hesham") || e.includes("hesham");
-}
-
-// ──────────────────────────────────────────────────────────────
-// Probe helpers — never crash, always classify the result clearly
-// ──────────────────────────────────────────────────────────────
-async function _probeCountSafe(table){
-  // Returns: {exists, count, rlsProtected, error}
-  try {
-    const r = await supa.from(table).select("*", {count: "exact", head: true});
-    if(r.error){
-      const msg = String(r.error.message||"").toLowerCase();
-      if(msg.includes("does not exist") || msg.includes("not found") || msg.includes("relation")){
-        return {exists: false, count: null, rlsProtected: false, error: r.error.message};
-      }
-      // RLS or other access issue: table likely exists, just can't read
-      return {exists: true, count: null, rlsProtected: true, error: r.error.message};
-    }
-    return {exists: true, count: r.count, rlsProtected: false, error: null};
-  } catch(e){
-    return {exists: false, count: null, rlsProtected: false, error: e.message};
-  }
-}
-
-async function _probeSampleSafe(table, limit){
-  // Returns sample rows (1 by default) to discover columns
-  try {
-    const r = await supa.from(table).select("*").limit(limit||1);
-    if(r.error){
-      const msg = String(r.error.message||"").toLowerCase();
-      const rlsProtected = !msg.includes("does not exist") && !msg.includes("relation");
-      return {ok: false, data: null, rlsProtected, error: r.error.message};
-    }
-    return {ok: true, data: r.data||[], rlsProtected: false, error: null};
-  } catch(e){
-    return {ok: false, data: null, rlsProtected: false, error: e.message};
-  }
-}
-
-async function _probeSelectSafe(table, columns, opts){
-  // Try to select with given columns — returns success + data
-  try {
-    let q = supa.from(table).select(columns);
-    if(opts && opts.order) q = q.order(opts.order, {ascending: opts.ascending !== false});
-    if(opts && opts.limit) q = q.limit(opts.limit);
-    if(opts && opts.eq) q = q.eq(opts.eq.col, opts.eq.val);
-    const r = await q;
-    if(r.error){
-      return {ok: false, data: null, error: r.error.message};
-    }
-    return {ok: true, data: r.data||[], error: null};
-  } catch(e){
-    return {ok: false, data: null, error: e.message};
-  }
-}
-
-function _firstAvailable(obj, candidates){
-  // Pick the first column from candidates list that exists in obj
-  if(!obj) return null;
-  for(const c of candidates){
-    if(obj[c] !== undefined) return c;
-  }
-  return null;
-}
-
-// ──────────────────────────────────────────────────────────────
-// Main runner
-// ──────────────────────────────────────────────────────────────
-async function runSystemDiagnostics(){
-  if(!isHeshamAccount()){
-    showToast("🔒","هذه الأداة متاحة لحساب hesham فقط");
-    return;
-  }
-  if(!supa){
-    showToast("❌","لا يوجد اتصال بـ Supabase");
-    return;
-  }
-  
-  // Open modal
-  const modalId = "diag-modal";
-  const existing = document.getElementById(modalId);
-  if(existing) existing.remove();
-  
-  const modalHtml = `
-    <div id="${modalId}" class="mov open" style="z-index:9999">
-      <div class="modal" style="max-width:920px;max-height:92vh">
-        <div class="mhdr" style="background:linear-gradient(135deg,rgba(75,124,245,0.08),rgba(34,212,245,0.04))">
-          <h2 style="font-size:15px;margin:0;display:flex;align-items:center;gap:8px">
-            <span style="font-size:22px">🩺</span>
-            <span>System Diagnostics v2</span>
-            <span style="font-size:10px;color:var(--green2);background:rgba(34,197,94,.12);padding:3px 8px;border-radius:10px;font-weight:700">READ-ONLY · SCHEMA-AWARE</span>
-          </h2>
-          <button class="mx" onclick="document.getElementById('${modalId}').remove()">×</button>
+// 1. لو لقينا عميل بنفس الموبايل → نعرضه ونقترح الربط
+// 2. لو ما لقيناش → نعرض اقتراح إنشاء عميل جديد (مع كود تلقائي)
+// 3. السيلز يقدر يبحث يدوياً
+// بترجع {clientId} عند الموافقة، أو null لو لغى
+async function promptClientLink(matched, ctx){
+  return new Promise(resolve => {
+    const nextCode = nextClientCodePreview();
+    
+    const html = `
+      <div id="link-client-modal" class="mov open" style="z-index:10000">
+        <div class="modal" style="max-width:600px">
+          <div class="mhdr" style="background:linear-gradient(135deg,rgba(22,163,74,.08) 0%,rgba(37,99,235,.04) 100%);border-bottom:2px solid var(--green)">
+            <h2 style="display:flex;align-items:center;gap:8px;font-size:15px;margin:0">
+              <span style="font-size:22px">🎉</span>
+              <span>تحويل إلى عميل فعلي</span>
+            </h2>
+            <button class="mx" onclick="_resolveLink(null)">×</button>
+          </div>
+          <div class="mbody" style="padding:18px">
+            
+            ${matched ? `
+              <!-- لقينا عميل موجود -->
+              <div style="background:rgba(22,163,74,.08);border:1.5px solid var(--green);border-radius:10px;padding:14px;margin-bottom:14px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                  <span style="font-size:20px">✅</span>
+                  <strong style="color:var(--green);font-size:13px">العميل موجود بالفعل بنفس الموبايل</strong>
+                </div>
+                <div style="background:var(--bg);border-radius:8px;padding:12px;font-size:12px;line-height:1.7">
+                  <div><strong>الكود:</strong> <span style="font-family:Outfit;color:var(--blue);font-weight:800">${matched.client_code}</span></div>
+                  <div><strong>الاسم:</strong> ${matched.name}</div>
+                  ${matched.company ? '<div><strong>الشركة:</strong> '+matched.company+'</div>' : ''}
+                  <div><strong>الموبايل:</strong> <span style="font-family:Outfit">${matched.phone}</span></div>
+                  ${matched.client_type ? '<div><strong>النوع:</strong> '+matched.client_type+'</div>' : ''}
+                </div>
+                <div style="margin-top:10px;font-size:11px;color:var(--text2)">
+                  💡 الـ Lead الحالي هيتربط بنفس العميل ده، عشان كل الـ leads بتاعته تظهر مع بعض.
+                </div>
+              </div>
+              
+              <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">
+                <button class="btn primary" onclick="_resolveLink({clientId:${matched.id}})">✓ ربط بالعميل ده</button>
+                <button class="btn" onclick="_showNewClientForm()">إنشاء عميل جديد بدلاً منه</button>
+              </div>
+            ` : `
+              <!-- ما لقيناش عميل، اقترح إنشاء جديد -->
+              <div style="background:rgba(37,99,235,.06);border:1.5px solid var(--blue);border-radius:10px;padding:14px;margin-bottom:14px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                  <span style="font-size:20px">✨</span>
+                  <strong style="color:var(--blue);font-size:13px">عميل جديد — تخصيص كود</strong>
+                </div>
+                <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:10px">
+                  مفيش عميل مسجل بالموبايل ده. هيتم إنشاء عميل جديد:
+                </div>
+              </div>
+              <div id="new-client-form-area"></div>
+            `}
+            
+            <!-- بحث يدوي -->
+            <details style="margin-top:14px">
+              <summary style="cursor:pointer;font-weight:700;font-size:12px;color:var(--text2);padding:6px 0">🔍 أو ابحث يدوياً عن عميل آخر</summary>
+              <div style="margin-top:8px">
+                <input id="link-search" placeholder="ابحث بالاسم، الشركة، الكود..." 
+                  oninput="_searchClientsForLink(this.value)"
+                  style="width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;font-size:12px;color:var(--text);font-family:inherit">
+                <div id="link-search-results" style="margin-top:8px;max-height:200px;overflow-y:auto"></div>
+              </div>
+            </details>
+            
+          </div>
+          <div class="mftr">
+            <button class="btn" onclick="_resolveLink(null)">إلغاء (الرجوع للفورم)</button>
+          </div>
         </div>
-        <div class="mbody" style="padding:18px">
-          <div id="diag-progress" style="text-align:center;padding:30px">
-            <div style="font-size:36px;margin-bottom:12px">🔍</div>
-            <div style="font-weight:700;margin-bottom:6px" id="diag-status">جاري الفحص...</div>
-            <div style="font-size:12px;color:var(--text2)" id="diag-step">يبدأ الآن</div>
-            <div style="margin-top:16px;background:var(--bg3);border-radius:8px;height:8px;overflow:hidden">
-              <div id="diag-bar" style="height:100%;background:linear-gradient(90deg,var(--blue),var(--green));width:0%;transition:width 0.3s"></div>
+      </div>
+    `;
+    
+    window._resolveLink = (result) => {
+      const m = $("link-client-modal");
+      if(m) m.remove();
+      delete window._resolveLink;
+      delete window._showNewClientForm;
+      delete window._searchClientsForLink;
+      delete window._linkContext;
+      resolve(result);
+    };
+    
+    window._linkContext = ctx;
+    
+    window._showNewClientForm = () => {
+      const area = $("new-client-form-area") || document.querySelector("#link-client-modal .mbody");
+      if(!area) return;
+      const formHtml = `
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label style="font-size:11px;color:var(--text2);font-weight:700;display:block;margin-bottom:3px">الكود (تلقائي)</label>
+              <input id="nc-code" value="${nextCode}" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;font-size:12px;font-family:Outfit;font-weight:700">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text2);font-weight:700;display:block;margin-bottom:3px">الكود القديم</label>
+              <input id="nc-old" placeholder="اختياري" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;font-size:12px">
+            </div>
+            <div style="grid-column:span 2">
+              <label style="font-size:11px;color:var(--text2);font-weight:700;display:block;margin-bottom:3px">الاسم *</label>
+              <input id="nc-name" value="${ctx.nm||''}" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;font-size:12px">
+            </div>
+            <div style="grid-column:span 2">
+              <label style="font-size:11px;color:var(--text2);font-weight:700;display:block;margin-bottom:3px">الشركة</label>
+              <input id="nc-company" value="${ctx.company||''}" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;font-size:12px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text2);font-weight:700;display:block;margin-bottom:3px">الموبايل</label>
+              <input id="nc-phone" value="${ctx.phone||''}" readonly style="width:100%;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:Outfit;opacity:0.7">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text2);font-weight:700;display:block;margin-bottom:3px">النوع</label>
+              <select id="nc-type" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;font-size:12px">
+                <option value="عادي">عادي</option>
+                <option value="VIP">VIP</option>
+                <option value="استراتيجي">استراتيجي</option>
+              </select>
             </div>
           </div>
-          <div id="diag-result" style="display:none"></div>
+          <button class="btn primary" style="margin-top:12px;width:100%" onclick="_createAndLink()">✨ إنشاء العميل وربطه</button>
+        </div>
+      `;
+      area.innerHTML = formHtml;
+      setTimeout(() => $("nc-name")?.focus(), 100);
+    };
+    
+    // لو ما لقيناش matched، نعرض الفورم تلقائياً
+    if(!matched){
+      setTimeout(() => window._showNewClientForm(), 50);
+    }
+    
+    window._createAndLink = async () => {
+      const code = ($("nc-code")?.value || "").trim();
+      const name = ($("nc-name")?.value || "").trim();
+      const company = ($("nc-company")?.value || "").trim();
+      const phone = ($("nc-phone")?.value || "").trim();
+      const old_code = ($("nc-old")?.value || "").trim();
+      const client_type = $("nc-type")?.value || "عادي";
+      
+      if(!name){ showToast("⚠","الاسم مطلوب"); return; }
+      if(!phone){ showToast("⚠","الموبايل مطلوب"); return; }
+      
+      try {
+        const data = {
+          client_code: code || null,
+          old_code: old_code || null,
+          name, company: company || null, phone,
+          client_type,
+          primary_sales_rep_id: curUser.role === "sales" ? curUser.id : null,
+          primary_sales_rep_name: curUser.role === "sales" ? curUser.name : null,
+          source: "Lead conversion",
+          created_by: curUser.id
+        };
+        const {data: newC, error} = await supa.from("clients").insert(data).select().single();
+        if(error) throw error;
+        showToast("✓", "تم إنشاء العميل: " + newC.client_code);
+        CLIENTS.push({
+          id: newC.id, client_code: newC.client_code, old_code: newC.old_code||"",
+          name: newC.name, company: newC.company||"", phone: newC.phone,
+          client_type: newC.client_type, rating: newC.rating||3, status: newC.status||"نشط"
+        });
+        window._resolveLink({clientId: newC.id});
+      } catch(err){
+        console.error("[createAndLink]", err);
+        showToast("✕","خطأ: " + err.message);
+      }
+    };
+    
+    window._searchClientsForLink = (q) => {
+      const resEl = $("link-search-results");
+      if(!resEl) return;
+      if(!q || q.length < 2){ resEl.innerHTML = ""; return; }
+      const results = searchClientsByName(q);
+      if(!results.length){
+        resEl.innerHTML = '<div style="padding:8px;color:var(--text3);font-size:11px;text-align:center">لا توجد نتائج</div>';
+        return;
+      }
+      resEl.innerHTML = results.map(c => 
+        '<div onclick="_resolveLink({clientId:'+c.id+'})" style="padding:8px 10px;background:var(--bg3);border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px">' +
+        '<span style="font-family:Outfit;font-weight:800;color:var(--blue);min-width:60px">'+c.client_code+'</span>' +
+        '<span style="flex:1">'+c.name+(c.company?' <span style="color:var(--text3);font-size:11px">— '+c.company+'</span>':'')+'</span>' +
+        '<span style="font-family:Outfit;color:var(--text2);font-size:11px">'+c.phone+'</span>' +
+        '</div>'
+      ).join("");
+    };
+    
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    document.body.appendChild(div.firstElementChild);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// CLIENTS MODULE — كل ال functions الخاصة بالعملاء
+// ════════════════════════════════════════════════════════════════
+
+let _clientFilter = "";
+let _clientStatusFilter = "all";
+
+// ── البحث عن عميل بالموبايل (يستخدم عند تحويل lead لعميل فعلي)
+function findClientByPhone(phone){
+  if(!phone) return null;
+  const norm = String(phone).replace(/\s+/g,"").replace(/-/g,"");
+  return CLIENTS.find(c => {
+    const cp = String(c.phone||"").replace(/\s+/g,"").replace(/-/g,"");
+    const cp2 = String(c.phone_alt||"").replace(/\s+/g,"").replace(/-/g,"");
+    return cp === norm || cp2 === norm;
+  });
+}
+
+// ── البحث بالاسم (للبحث اليدوي)
+function searchClientsByName(query){
+  if(!query) return [];
+  const q = query.toLowerCase().trim();
+  return CLIENTS.filter(c => 
+    (c.name||"").toLowerCase().includes(q) ||
+    (c.company||"").toLowerCase().includes(q) ||
+    (c.client_code||"").toLowerCase().includes(q)
+  ).slice(0, 10);
+}
+
+// ── توليد كود عميل جديد (للعرض في الـ UI - الـ DB بيولّد الفعلي)
+function nextClientCodePreview(){
+  if(!CLIENTS.length) return "C001";
+  const nums = CLIENTS
+    .map(c => c.client_code||"")
+    .filter(code => /^C\d+$/.test(code))
+    .map(code => parseInt(code.slice(1)));
+  const max = nums.length ? Math.max(...nums) : 0;
+  const next = max + 1;
+  return "C" + String(next).padStart(3, "0");
+}
+
+// ════════════════════════════════════════════════════════════════
+// CLIENTS PAGE RENDER
+// ════════════════════════════════════════════════════════════════
+function renderClientsPage(){
+  const el = $("pg-clients");
+  if(!el) return;
+  
+  // KPI cards
+  const total = CLIENTS.length;
+  const vip = CLIENTS.filter(c => c.client_type === "VIP").length;
+  const strategic = CLIENTS.filter(c => c.client_type === "استراتيجي").length;
+  const active = CLIENTS.filter(c => c.status === "نشط").length;
+  
+  let html = '<div style="padding:16px">';
+  
+  // KPIs
+  html += '<div class="kpi-row c4" style="margin-bottom:16px">';
+  html += kc("🏢 إجمالي العملاء", total, "var(--blue)", "كل العملاء المسجلين", "");
+  html += kc("✅ عملاء نشطون", active, "var(--green)", pct(active, total) + "% من الإجمالي", "up");
+  html += kc("⭐ عملاء VIP", vip, "var(--purple)", "عملاء مميزون", "");
+  html += kc("💎 عملاء استراتيجيين", strategic, "var(--orange)", "عملاء رئيسيين", "");
+  html += '</div>';
+  
+  // Search & Filters
+  html += '<div class="card" style="margin-bottom:14px;padding:14px">';
+  html += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
+  html += '<input id="clients-search" placeholder="🔍 ابحث بالاسم، الشركة، الموبايل، أو الكود..." ';
+  html += 'value="' + (_clientFilter||"") + '" ';
+  html += 'oninput="_clientFilter=this.value;pgClients=1;renderClientsContent()" ';
+  html += 'style="flex:1;min-width:240px;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-size:13px;font-family:inherit">';
+  
+  html += '<select onchange="_clientStatusFilter=this.value;pgClients=1;renderClientsContent()" ';
+  html += 'style="padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-size:13px;font-family:inherit">';
+  html += '<option value="all"' + (_clientStatusFilter==="all"?" selected":"") + '>كل التصنيفات</option>';
+  html += '<option value="VIP"' + (_clientStatusFilter==="VIP"?" selected":"") + '>VIP فقط</option>';
+  html += '<option value="استراتيجي"' + (_clientStatusFilter==="استراتيجي"?" selected":"") + '>استراتيجي فقط</option>';
+  html += '<option value="عادي"' + (_clientStatusFilter==="عادي"?" selected":"") + '>عادي فقط</option>';
+  html += '</select>';
+  
+  if(_clientFilter || _clientStatusFilter !== "all"){
+    html += '<button class="btn" onclick="_clientFilter=\'\';_clientStatusFilter=\'all\';pgClients=1;renderClientsContent()">✕ إلغاء الفلاتر</button>';
+  }
+  html += '</div></div>';
+  
+  // Content container
+  html += '<div id="clients-content"></div>';
+  html += '</div>';
+  
+  el.innerHTML = html;
+  renderClientsContent();
+}
+
+function renderClientsContent(){
+  const el = $("clients-content");
+  if(!el) return;
+  
+  // Filter
+  let list = CLIENTS.slice();
+  const q = (_clientFilter||"").toLowerCase().trim();
+  if(q){
+    list = list.filter(c =>
+      (c.name||"").toLowerCase().includes(q) ||
+      (c.company||"").toLowerCase().includes(q) ||
+      (c.phone||"").includes(q) ||
+      (c.client_code||"").toLowerCase().includes(q) ||
+      (c.old_code||"").toLowerCase().includes(q)
+    );
+  }
+  if(_clientStatusFilter !== "all"){
+    list = list.filter(c => c.client_type === _clientStatusFilter);
+  }
+  
+  // Sort by code
+  list.sort((a,b) => (a.client_code||"").localeCompare(b.client_code||""));
+  
+  if(!list.length){
+    el.innerHTML = '<div class="card" style="padding:40px;text-align:center;color:var(--text3)">' +
+      '<div style="font-size:48px;margin-bottom:10px">🏢</div>' +
+      '<div style="font-weight:700;font-size:14px;margin-bottom:6px">لا يوجد عملاء حالياً</div>' +
+      '<div style="font-size:12px;color:var(--text3)">اضغط "+ Add Client" لإضافة عميل جديد، أو "📥 Import" لاستيراد من Excel</div>' +
+      '</div>';
+    return;
+  }
+  
+  const tot = list.length;
+  const perPage = 20;
+  const totalPages = Math.ceil(tot/perPage);
+  if(pgClients > totalPages) pgClients = totalPages;
+  if(pgClients < 1) pgClients = 1;
+  const slice = list.slice((pgClients-1)*perPage, pgClients*perPage);
+  
+  let html = '<div class="card" style="padding:0;overflow:hidden">';
+  
+  // Header info
+  html += '<div style="padding:10px 16px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:11px;color:var(--text2);display:flex;justify-content:space-between;align-items:center">';
+  html += '<span><strong style="color:var(--text)">' + tot + '</strong> عميل</span>';
+  if(totalPages > 1){
+    html += '<span>صفحة ' + pgClients + ' من ' + totalPages + '</span>';
+  }
+  html += '</div>';
+  
+  // Table
+  html += '<div style="overflow-x:auto"><table class="leads-table" style="width:100%;border-collapse:collapse">';
+  html += '<thead><tr style="background:var(--bg3);border-bottom:1px solid var(--border)">';
+  html += '<th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:800;color:var(--text2)">الكود</th>';
+  html += '<th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:800;color:var(--text2)">الاسم</th>';
+  html += '<th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:800;color:var(--text2)">الشركة</th>';
+  html += '<th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:800;color:var(--text2)">الموبايل</th>';
+  html += '<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:800;color:var(--text2)">النوع</th>';
+  html += '<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:800;color:var(--text2)">Leads</th>';
+  html += '<th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:800;color:var(--text2)">السيلز</th>';
+  html += '<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:800;color:var(--text2)">إجراءات</th>';
+  html += '</tr></thead><tbody>';
+  
+  slice.forEach(c => {
+    const leadsCount = LEADS.filter(l => l.client_id === c.id).length;
+    const typeColor = c.client_type === "VIP" ? "var(--purple)" : (c.client_type === "استراتيجي" ? "var(--orange)" : "var(--text2)");
+    const typeBg = c.client_type === "VIP" ? "rgba(168,85,247,.12)" : (c.client_type === "استراتيجي" ? "rgba(234,88,12,.12)" : "var(--bg3)");
+    
+    html += '<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="openClientProfile(' + c.id + ')">';
+    html += '<td style="padding:10px 12px;font-family:Outfit;font-weight:800;color:var(--blue);font-size:13px">' + (c.client_code||"—") + '</td>';
+    html += '<td style="padding:10px 12px;font-weight:700;font-size:13px">' + (c.name||"—") + '</td>';
+    html += '<td style="padding:10px 12px;font-size:12px;color:var(--text2)">' + (c.company||"—") + '</td>';
+    html += '<td style="padding:10px 12px;font-family:Outfit;font-size:12px">' + (c.phone||"—") + '</td>';
+    html += '<td style="padding:10px 12px;text-align:center">';
+    html += '<span style="background:' + typeBg + ';color:' + typeColor + ';padding:3px 9px;border-radius:10px;font-size:10px;font-weight:700">' + (c.client_type||"عادي") + '</span>';
+    html += '</td>';
+    html += '<td style="padding:10px 12px;text-align:center;font-family:Outfit;font-weight:700">' + leadsCount + '</td>';
+    html += '<td style="padding:10px 12px;font-size:12px;color:var(--text2)">' + (c.primary_sales_rep_name||"—") + '</td>';
+    html += '<td style="padding:10px 12px;text-align:center" onclick="event.stopPropagation()">';
+    html += '<button onclick="event.stopPropagation();openClientProfile(' + c.id + ')" style="background:var(--bg3);border:1px solid var(--border);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin:0 2px" title="عرض">👁</button>';
+    if(curUser.role === "admin" || curUser.role === "coordinator"){
+      html += '<button onclick="event.stopPropagation();openEditClient(' + c.id + ')" style="background:rgba(37,99,235,.1);border:1px solid var(--blue);color:var(--blue);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin:0 2px" title="تعديل">✏️</button>';
+    }
+    if(curUser.role === "admin"){
+      html += '<button onclick="event.stopPropagation();confirmDeleteClient(' + c.id + ')" style="background:rgba(245,82,82,.1);border:1px solid var(--red);color:var(--red);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin:0 2px" title="حذف">🗑️</button>';
+    }
+    html += '</td>';
+    html += '</tr>';
+  });
+  
+  html += '</tbody></table></div>';
+  
+  // Pagination
+  if(totalPages > 1){
+    html += '<div style="padding:12px 16px;display:flex;gap:8px;align-items:center;justify-content:center;border-top:1px solid var(--border)">';
+    html += '<button class="btn" ' + (pgClients<=1?"disabled":"") + ' onclick="pgClients=Math.max(1,pgClients-1);renderClientsContent()">‹ السابق</button>';
+    html += '<span style="font-family:Outfit;font-size:12px;color:var(--text2)">' + pgClients + ' / ' + totalPages + '</span>';
+    html += '<button class="btn" ' + (pgClients>=totalPages?"disabled":"") + ' onclick="pgClients=Math.min('+totalPages+',pgClients+1);renderClientsContent()">التالي ›</button>';
+    html += '</div>';
+  }
+  
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════════
+// ADD / EDIT CLIENT MODAL
+// ════════════════════════════════════════════════════════════════
+function openAddClient(){
+  curClientId = null;
+  showClientModal(null);
+}
+
+function openEditClient(id){
+  const c = CLIENTS.find(x => x.id === id);
+  if(!c){ showToast("✕","العميل غير موجود"); return; }
+  curClientId = id;
+  showClientModal(c);
+}
+
+function showClientModal(c){
+  const isNew = !c;
+  const code = c ? c.client_code : nextClientCodePreview();
+  
+  const salesOpts = SALES_USERS.map(s => 
+    '<option value="' + s.id + '"' + (c && c.primary_sales_rep_id === s.id ? " selected" : "") + '>' + s.name + '</option>'
+  ).join("");
+  
+  const modalHtml = `
+    <div id="client-modal" class="mov open" style="z-index:9999">
+      <div class="modal" style="max-width:720px">
+        <div class="mhdr">
+          <h2 style="display:flex;align-items:center;gap:8px;font-size:15px;margin:0">
+            <span style="font-size:22px">🏢</span>
+            <span>${isNew ? "إضافة عميل جديد" : "تعديل بيانات العميل"}</span>
+            ${!isNew ? '<span style="font-family:Outfit;color:var(--blue);font-size:13px;margin-right:auto">'+code+'</span>' : ''}
+          </h2>
+          <button class="mx" onclick="closeClientModal()">×</button>
+        </div>
+        <div class="mbody" style="padding:18px">
+          
+          <div class="fsec">
+            <div class="fsec-ttl"><div class="fdot" style="background:var(--blue)"></div>المعلومات الأساسية</div>
+            <div class="fg2">
+              <div class="ff"><label>كود العميل ${isNew ? "(تلقائي)" : ""}</label>
+                <input id="cl-code" value="${code}" ${isNew ? '' : 'readonly style="background:var(--bg3);opacity:0.7"'} style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;font-family:Outfit;font-weight:700">
+              </div>
+              <div class="ff"><label>الكود القديم (اختياري)</label>
+                <input id="cl-old-code" value="${c?.old_code||''}" placeholder="ALM-001" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+              </div>
+              <div class="ff s2"><label>اسم العميل *</label>
+                <input id="cl-name" value="${c?.name||''}" placeholder="مثال: شركة الأمل" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+              </div>
+              <div class="ff s2"><label>اسم الشركة</label>
+                <input id="cl-company" value="${c?.company||''}" placeholder="شركة الأمل للسيارات" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+              </div>
+              <div class="ff"><label>الموبايل *</label>
+                <input id="cl-phone" value="${c?.phone||''}" placeholder="01001234567" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;font-family:Outfit">
+              </div>
+              <div class="ff"><label>موبايل بديل</label>
+                <input id="cl-phone-alt" value="${c?.phone_alt||''}" placeholder="اختياري" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;font-family:Outfit">
+              </div>
+              <div class="ff"><label>الإيميل</label>
+                <input id="cl-email" value="${c?.email||''}" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;font-family:Outfit">
+              </div>
+              <div class="ff"><label>المدينة</label>
+                <input id="cl-city" value="${c?.city||''}" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+              </div>
+              <div class="ff s2"><label>العنوان</label>
+                <input id="cl-address" value="${c?.address||''}" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+              </div>
+            </div>
+          </div>
+          
+          <div class="fsec">
+            <div class="fsec-ttl"><div class="fdot" style="background:var(--purple)"></div>التصنيف والتقييم</div>
+            <div class="fg2">
+              <div class="ff"><label>نوع العميل</label>
+                <select id="cl-type" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+                  <option value="عادي" ${(c?.client_type||'عادي')==='عادي'?'selected':''}>عادي</option>
+                  <option value="VIP" ${c?.client_type==='VIP'?'selected':''}>VIP</option>
+                  <option value="استراتيجي" ${c?.client_type==='استراتيجي'?'selected':''}>استراتيجي</option>
+                </select>
+              </div>
+              <div class="ff"><label>التقييم (1-5)</label>
+                <input id="cl-rating" type="number" min="1" max="5" value="${c?.rating||3}" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;font-family:Outfit">
+              </div>
+              <div class="ff"><label>المجال / الصناعة</label>
+                <input id="cl-industry" value="${c?.industry||''}" placeholder="مثل: السيارات، الأقمشة، إلخ" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+              </div>
+              <div class="ff"><label>الحالة</label>
+                <select id="cl-status" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+                  <option value="نشط" ${(c?.status||'نشط')==='نشط'?'selected':''}>نشط</option>
+                  <option value="غير نشط" ${c?.status==='غير نشط'?'selected':''}>غير نشط</option>
+                  <option value="محظور" ${c?.status==='محظور'?'selected':''}>محظور</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div class="fsec">
+            <div class="fsec-ttl"><div class="fdot" style="background:var(--orange)"></div>بيانات تجارية وSales</div>
+            <div class="fg2">
+              <div class="ff"><label>الرقم الضريبي</label>
+                <input id="cl-tax" value="${c?.tax_number||''}" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;font-family:Outfit">
+              </div>
+              <div class="ff"><label>السجل التجاري</label>
+                <input id="cl-cr" value="${c?.commercial_register||''}" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;font-family:Outfit">
+              </div>
+              <div class="ff"><label>السيلز المسؤول</label>
+                <select id="cl-rep" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+                  <option value="">— غير محدد —</option>
+                  ${salesOpts}
+                </select>
+              </div>
+              <div class="ff"><label>مصدر العميل</label>
+                <input id="cl-source" value="${c?.source||''}" placeholder="Facebook, Referral, ..." style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px">
+              </div>
+              <div class="ff s2"><label>ملاحظات</label>
+                <textarea id="cl-notes" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:7px 8px;height:60px;color:var(--text);font-size:12px;resize:vertical;width:100%">${c?.notes||''}</textarea>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+        <div class="mftr">
+          <button class="btn" onclick="closeClientModal()">إلغاء</button>
+          <button class="btn primary" onclick="saveClient()">${isNew ? "💾 حفظ" : "💾 تحديث"}</button>
         </div>
       </div>
     </div>
   `;
+  
   const div = document.createElement('div');
   div.innerHTML = modalHtml;
   document.body.appendChild(div.firstElementChild);
+  setTimeout(() => $("cl-name")?.focus(), 100);
+}
+
+function closeClientModal(){
+  const m = $("client-modal");
+  if(m) m.remove();
+}
+
+async function saveClient(){
+  const name = ($("cl-name")?.value || "").trim();
+  const phone = ($("cl-phone")?.value || "").trim();
   
-  const report = {
-    timestamp: new Date().toISOString(),
-    timestampLocal: new Date().toLocaleString('ar-EG'),
-    sections: [],
-    issues: [],
-    summary: {total: 0, passed: 0, warnings: 0, failed: 0, infos: 0}
+  if(!name){ showToast("⚠","اسم العميل مطلوب"); $("cl-name")?.focus(); return; }
+  if(!phone){ showToast("⚠","الموبايل مطلوب"); $("cl-phone")?.focus(); return; }
+  
+  // التحقق من تكرار الموبايل
+  const existing = findClientByPhone(phone);
+  if(existing && existing.id !== curClientId){
+    if(!confirm("⚠ هذا الموبايل مسجل لعميل آخر:\n" + existing.client_code + " - " + existing.name + "\n\nهل تريد المتابعة على أي حال؟")){
+      return;
+    }
+  }
+  
+  const code = ($("cl-code")?.value || "").trim();
+  
+  const data = {
+    client_code: code || null,  // null → الـ DB trigger يولّد كود
+    old_code: ($("cl-old-code")?.value || "").trim() || null,
+    name,
+    company: ($("cl-company")?.value || "").trim() || null,
+    phone,
+    phone_alt: ($("cl-phone-alt")?.value || "").trim() || null,
+    email: ($("cl-email")?.value || "").trim() || null,
+    address: ($("cl-address")?.value || "").trim() || null,
+    city: ($("cl-city")?.value || "").trim() || null,
+    client_type: $("cl-type")?.value || "عادي",
+    rating: parseInt($("cl-rating")?.value) || 3,
+    industry: ($("cl-industry")?.value || "").trim() || null,
+    status: $("cl-status")?.value || "نشط",
+    tax_number: ($("cl-tax")?.value || "").trim() || null,
+    commercial_register: ($("cl-cr")?.value || "").trim() || null,
+    primary_sales_rep_id: $("cl-rep")?.value ? parseInt($("cl-rep").value) : null,
+    primary_sales_rep_name: $("cl-rep")?.selectedOptions[0]?.text === "— غير محدد —" ? null : $("cl-rep")?.selectedOptions[0]?.text,
+    source: ($("cl-source")?.value || "").trim() || null,
+    notes: ($("cl-notes")?.value || "").trim() || null,
+    created_by: curUser.id
   };
   
-  // Discovered schema (filled dynamically)
-  const schema = {
-    profiles: {columns: [], sample: null},
-    leads: {columns: [], sample: null},
-    daily_contacted: {columns: [], sample: null},
-    notifications: {columns: [], sample: null},
-    rr_state: {columns: [], sample: null}
-  };
+  try {
+    if(curClientId){
+      // UPDATE
+      const {error} = await supa.from("clients").update(data).eq("id", curClientId);
+      if(error) throw error;
+      showToast("✓","تم تحديث العميل");
+    } else {
+      // INSERT
+      const {data:newC, error} = await supa.from("clients").insert(data).select().single();
+      if(error) throw error;
+      showToast("✓","تم إضافة العميل: " + newC.client_code);
+    }
+    closeClientModal();
+    await loadAllData();
+    renderClientsPage();
+  } catch(err){
+    console.error("[saveClient]", err);
+    showToast("✕","خطأ: " + (err.message||"فشل الحفظ"));
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// DELETE CLIENT (Admin only)
+// ════════════════════════════════════════════════════════════════
+function confirmDeleteClient(id){
+  if(curUser.role !== "admin"){ showToast("⚠","للأدمن فقط"); return; }
+  const c = CLIENTS.find(x => x.id === id);
+  if(!c){ return; }
   
-  function addSection(title, items){
-    report.sections.push({title, items});
+  const leadsCount = LEADS.filter(l => l.client_id === id).length;
+  
+  if(!confirm("حذف العميل: " + c.client_code + " - " + c.name + "?\n" + 
+              (leadsCount ? "تنبيه: مرتبط بـ " + leadsCount + " lead. حذف العميل لن يحذف الـ leads.\n" : "") +
+              "هذا الإجراء لا يمكن التراجع عنه.")){
+    return;
   }
-  function addIssue(severity, message, hint){
-    report.issues.push({severity, message, hint: hint||""});
+  
+  (async () => {
+    try {
+      const {error} = await supa.from("clients").delete().eq("id", id);
+      if(error) throw error;
+      showToast("✓","تم حذف العميل");
+      await loadAllData();
+      renderClientsPage();
+    } catch(err){
+      showToast("✕","خطأ: " + err.message);
+    }
+  })();
+}
+
+// ════════════════════════════════════════════════════════════════
+// CLIENT PROFILE (صفحة العميل الكاملة)
+// ════════════════════════════════════════════════════════════════
+function openClientProfile(id){
+  const c = CLIENTS.find(x => x.id === id);
+  if(!c){ showToast("✕","العميل غير موجود"); return; }
+  
+  // كل الـ leads المرتبطة بالعميل
+  const myLeads = LEADS.filter(l => l.client_id === id).sort((a,b) => (b.dt||"").localeCompare(a.dt||""));
+  const activeLeads = myLeads.filter(l => l.st === "عميل فعلي").length;
+  const lostLeads = myLeads.filter(l => l.st === "لاغي").length;
+  const pendingLeads = myLeads.filter(l => !["عميل فعلي","لاغي"].includes(l.st)).length;
+  
+  // الـ stats
+  const typeColor = c.client_type === "VIP" ? "var(--purple)" : (c.client_type === "استراتيجي" ? "var(--orange)" : "var(--text2)");
+  
+  let html = `
+    <div id="client-profile-modal" class="mov open" style="z-index:9998">
+      <div class="modal" style="max-width:920px;max-height:92vh">
+        <div class="mhdr" style="background:linear-gradient(135deg,rgba(37,99,235,.08) 0%,rgba(168,85,247,.04) 100%);border-bottom:2px solid var(--blue)">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:24px">🏢</span>
+              <h2 style="font-size:16px;margin:0">${c.name}</h2>
+              <span style="font-family:Outfit;color:var(--blue);font-weight:800;font-size:14px;background:rgba(37,99,235,.1);padding:3px 10px;border-radius:6px">${c.client_code}</span>
+              <span style="background:${typeColor==='var(--text2)'?'var(--bg3)':typeColor==='var(--purple)'?'rgba(168,85,247,.12)':'rgba(234,88,12,.12)'};color:${typeColor};padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700">${c.client_type||"عادي"}</span>
+            </div>
+            ${c.company ? '<div style="font-size:12px;color:var(--text2);margin-top:4px">'+c.company+'</div>' : ''}
+          </div>
+          <button class="mx" onclick="closeM('client-profile-modal')">×</button>
+        </div>
+        <div class="mbody" style="padding:18px">
+          
+          <!-- Stats KPIs -->
+          <div class="kpi-row c4" style="margin-bottom:16px">
+            <div class="kc"><div class="kc-acc" style="background:var(--blue)"></div>
+              <div class="kc-lbl">إجمالي Leads</div>
+              <div class="kc-val" style="color:var(--blue)">${myLeads.length}</div>
+              <div class="kc-sub">${activeLeads} فعلي · ${pendingLeads} نشط · ${lostLeads} لاغي</div>
+            </div>
+            <div class="kc"><div class="kc-acc" style="background:var(--green)"></div>
+              <div class="kc-lbl">📦 الشحنات</div>
+              <div class="kc-val" style="color:var(--text3)">—</div>
+              <div class="kc-sub">قريباً عند ربط Customs</div>
+            </div>
+            <div class="kc"><div class="kc-acc" style="background:var(--orange)"></div>
+              <div class="kc-lbl">💰 الفواتير</div>
+              <div class="kc-val" style="color:var(--text3)">—</div>
+              <div class="kc-sub">قريباً عند ربط Invoicing</div>
+            </div>
+            <div class="kc"><div class="kc-acc" style="background:var(--purple)"></div>
+              <div class="kc-lbl">⭐ التقييم</div>
+              <div class="kc-val" style="color:var(--purple)">${'★'.repeat(c.rating||3)}${'☆'.repeat(5-(c.rating||3))}</div>
+              <div class="kc-sub">${c.rating||3} من 5</div>
+            </div>
+          </div>
+          
+          <!-- Basic info -->
+          <div class="card" style="padding:14px;margin-bottom:14px;background:var(--bg)">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;font-size:12px">
+              <div>
+                <div style="color:var(--text3);font-size:10px;font-weight:700;margin-bottom:3px">الموبايل</div>
+                <div style="font-family:Outfit;font-weight:700">${c.phone||"—"}</div>
+                ${c.phone_alt ? '<div style="font-family:Outfit;color:var(--text2);font-size:11px;margin-top:2px">'+c.phone_alt+'</div>' : ''}
+              </div>
+              <div>
+                <div style="color:var(--text3);font-size:10px;font-weight:700;margin-bottom:3px">الإيميل</div>
+                <div style="font-family:Outfit;font-weight:600">${c.email||"—"}</div>
+              </div>
+              <div>
+                <div style="color:var(--text3);font-size:10px;font-weight:700;margin-bottom:3px">المدينة</div>
+                <div style="font-weight:600">${c.city||"—"}</div>
+              </div>
+              <div>
+                <div style="color:var(--text3);font-size:10px;font-weight:700;margin-bottom:3px">السيلز المسؤول</div>
+                <div style="font-weight:600">${c.primary_sales_rep_name||"—"}</div>
+              </div>
+              <div>
+                <div style="color:var(--text3);font-size:10px;font-weight:700;margin-bottom:3px">المجال</div>
+                <div style="font-weight:600">${c.industry||"—"}</div>
+              </div>
+              <div>
+                <div style="color:var(--text3);font-size:10px;font-weight:700;margin-bottom:3px">الكود القديم</div>
+                <div style="font-family:Outfit;font-weight:600">${c.old_code||"—"}</div>
+              </div>
+            </div>
+            ${c.notes ? '<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);font-size:12px;color:var(--text2)"><strong>ملاحظات:</strong> '+c.notes+'</div>' : ''}
+          </div>
+          
+          <!-- Leads list -->
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="padding:10px 14px;background:var(--bg3);border-bottom:1px solid var(--border);font-weight:700;font-size:13px">
+              📋 Leads العميل (${myLeads.length})
+            </div>
+            ${myLeads.length === 0 ? 
+              '<div style="padding:24px;text-align:center;color:var(--text3);font-size:12px">لا يوجد leads مرتبطة بهذا العميل</div>' :
+              '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg);border-bottom:1px solid var(--border)">' +
+                '<th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--text2);font-weight:800">التاريخ</th>' +
+                '<th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--text2);font-weight:800">الحالة</th>' +
+                '<th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--text2);font-weight:800">المسؤول</th>' +
+                '<th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--text2);font-weight:800">المنتج/الخدمة</th>' +
+                '<th style="padding:8px 12px;text-align:center;font-size:10px;color:var(--text2);font-weight:800">إجراء</th>' +
+              '</tr></thead><tbody>' +
+              myLeads.map(l => {
+                const stColor = l.st === "عميل فعلي" ? "var(--green)" : (l.st === "لاغي" ? "var(--text3)" : "var(--orange)");
+                return '<tr style="border-bottom:1px solid var(--border)">' +
+                  '<td style="padding:8px 12px;font-family:Outfit;font-size:11px">'+(l.dt||"—")+'</td>' +
+                  '<td style="padding:8px 12px"><span style="color:'+stColor+';font-weight:700;font-size:11px">'+(l.st||"جديد")+'</span></td>' +
+                  '<td style="padding:8px 12px;font-size:11px">'+(l.rep||"—")+'</td>' +
+                  '<td style="padding:8px 12px;font-size:11px">'+(l.prod||"—")+'</td>' +
+                  '<td style="padding:8px 12px;text-align:center"><button onclick="closeM(\'client-profile-modal\');viewLead('+l.id+')" style="background:var(--bg3);border:1px solid var(--border);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">👁 عرض</button></td>' +
+                '</tr>';
+              }).join("") +
+              '</tbody></table>'
+            }
+          </div>
+          
+          <!-- Placeholder للـ Shipments/Invoices -->
+          <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="card" style="padding:14px;text-align:center;background:var(--bg);opacity:0.7">
+              <div style="font-size:32px;margin-bottom:6px">📦</div>
+              <div style="font-weight:700;font-size:13px;margin-bottom:3px">الشحنات</div>
+              <div style="font-size:11px;color:var(--text3)">قريباً — عند بناء Customs Module</div>
+            </div>
+            <div class="card" style="padding:14px;text-align:center;background:var(--bg);opacity:0.7">
+              <div style="font-size:32px;margin-bottom:6px">💰</div>
+              <div style="font-weight:700;font-size:13px;margin-bottom:3px">الفواتير</div>
+              <div style="font-size:11px;color:var(--text3)">قريباً — عند بناء Invoicing Module</div>
+            </div>
+          </div>
+          
+        </div>
+        <div class="mftr">
+          <button class="btn" onclick="closeM('client-profile-modal')">إغلاق</button>
+          ${(curUser.role==="admin"||curUser.role==="coordinator") ? '<button class="btn primary" onclick="closeM(\'client-profile-modal\');openEditClient('+id+')">✏️ تعديل</button>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  document.body.appendChild(div.firstElementChild);
+}
+
+// ════════════════════════════════════════════════════════════════
+// IMPORT CLIENTS FROM EXCEL
+// ════════════════════════════════════════════════════════════════
+function openImportClients(){
+  if(curUser.role !== "admin" && curUser.role !== "coordinator"){
+    showToast("⚠","غير مسموح"); return;
   }
-  function updateProgress(pct, status, step){
-    const bar = document.getElementById("diag-bar");
-    const st = document.getElementById("diag-status");
-    const sp = document.getElementById("diag-step");
-    if(bar) bar.style.width = pct + "%";
-    if(st) st.textContent = status;
-    if(sp) sp.textContent = step;
+  
+  const modalHtml = `
+    <div id="import-clients-modal" class="mov open" style="z-index:9999">
+      <div class="modal" style="max-width:600px">
+        <div class="mhdr">
+          <h2 style="display:flex;align-items:center;gap:8px;font-size:15px;margin:0">
+            📥 استيراد عملاء من Excel
+          </h2>
+          <button class="mx" onclick="closeM('import-clients-modal')">×</button>
+        </div>
+        <div class="mbody" style="padding:18px">
+          
+          <div style="background:rgba(37,99,235,.08);border:1px solid var(--blue);border-radius:8px;padding:12px;font-size:12px;margin-bottom:14px;line-height:1.7">
+            <strong>📋 الأعمدة المطلوبة:</strong><br>
+            <code style="background:var(--bg2);padding:2px 6px;border-radius:3px;font-family:Outfit;font-size:11px">name</code>,
+            <code style="background:var(--bg2);padding:2px 6px;border-radius:3px;font-family:Outfit;font-size:11px">phone</code>
+            (إلزامية)<br>
+            <strong style="margin-top:6px;display:inline-block">اختياري:</strong>
+            <code style="background:var(--bg2);padding:2px 6px;border-radius:3px;font-family:Outfit;font-size:10px">client_code</code>,
+            <code style="background:var(--bg2);padding:2px 6px;border-radius:3px;font-family:Outfit;font-size:10px">old_code</code>,
+            <code style="background:var(--bg2);padding:2px 6px;border-radius:3px;font-family:Outfit;font-size:10px">company</code>,
+            <code style="background:var(--bg2);padding:2px 6px;border-radius:3px;font-family:Outfit;font-size:10px">email</code>,
+            <code style="background:var(--bg2);padding:2px 6px;border-radius:3px;font-family:Outfit;font-size:10px">client_type</code>...<br>
+            <em style="margin-top:6px;display:inline-block;color:var(--text2);font-size:11px">💡 لو client_code فاضي → النظام يولّد C001, C002... تلقائياً</em>
+          </div>
+          
+          <div id="import-zone" style="border:2px dashed var(--border2);border-radius:10px;padding:24px;text-align:center;background:var(--bg3);cursor:pointer" onclick="document.getElementById('import-file-input').click()">
+            <div style="font-size:36px;margin-bottom:8px">📂</div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:4px">اضغط لاختيار ملف Excel</div>
+            <div style="font-size:11px;color:var(--text3)">XLSX / XLS / CSV</div>
+          </div>
+          <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile(this.files[0])">
+          
+          <div id="import-preview" style="margin-top:14px"></div>
+          
+        </div>
+        <div class="mftr">
+          <button class="btn" onclick="closeM('import-clients-modal')">إلغاء</button>
+          <button id="import-confirm-btn" class="btn primary" disabled style="opacity:0.5;cursor:not-allowed" onclick="confirmImportClients()">📥 استيراد</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const div = document.createElement('div');
+  div.innerHTML = modalHtml;
+  document.body.appendChild(div.firstElementChild);
+}
+
+let _importedClientsBuffer = [];
+
+async function handleImportFile(file){
+  if(!file) return;
+  if(typeof XLSX === 'undefined'){
+    showToast("✕","مكتبة XLSX غير محملة");
+    return;
   }
   
   try {
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 1: Connection & Session
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(5, "1/12 — الاتصال والمستخدم", "فحص الاتصال بـ Supabase");
-    const connSec = [];
-    connSec.push({label: "Supabase Connected", value: supa ? "✓ Yes" : "✗ No", status: supa ? "ok" : "fail"});
-    connSec.push({label: "Current User", value: curUser ? curUser.name + " ("+curUser.role+")" : "None", status: curUser ? "ok" : "fail"});
-    connSec.push({label: "User ID", value: curUser ? curUser.id : "—", status: "info"});
-    connSec.push({label: "User Email", value: curUser?.email || "—", status: "info"});
-    connSec.push({label: "Browser", value: (navigator.userAgent.split(") ")[0]||"").split("(")[1] || "Unknown", status: "info"});
-    connSec.push({label: "Online", value: navigator.onLine ? "✓ Yes" : "✗ Offline", status: navigator.onLine ? "ok" : "fail"});
-    connSec.push({label: "Page URL", value: location.href.substring(0,80), status: "info"});
-    if(location.protocol === "file:"){
-      addIssue("INFO", "Running from local file (not deployed to GitHub)", "ده طبيعي للاختبار المحلي");
-    }
-    addSection("🔌 Connection & Session", connSec);
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type: 'array'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {defval: ""});
     
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 2: Tables Discovery
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(12, "2/12 — اكتشاف الجداول", "فحص الجداول الموجودة");
-    
-    // Known + discoverable tables — adapts if you add new ones later
-    const knownTables = [
-      "profiles", "leads", "daily_contacted", "notifications", 
-      "rr_state", "sla_settings", "audit_log", "user_actions",
-      "clients", "shipments", "quotations", "invoices", "payments",
-      "vendors", "trading_services", "expenses"
-    ];
-    
-    const tableSec = [];
-    const tableInfo = {};
-    
-    for(const t of knownTables){
-      const r = await _probeCountSafe(t);
-      tableInfo[t] = r;
-      if(r.exists && !r.rlsProtected && r.count !== null){
-        tableSec.push({label: t, value: r.count + " rows", status: "ok"});
-      } else if(r.exists && r.rlsProtected){
-        tableSec.push({label: t, value: "🔐 RLS Protected (table exists)", status: "info"});
-      } else {
-        // Doesn't exist — only flag if it's a core table
-        const isCore = ["profiles","leads","daily_contacted","notifications","rr_state"].includes(t);
-        if(isCore){
-          tableSec.push({label: t, value: "✗ Not found", status: "fail"});
-          addIssue("HIGH", "Core table '"+t+"' does not exist", "هذا الجدول أساسي");
-        }
-        // Otherwise: skip silently (table not built yet)
-      }
-    }
-    addSection("📋 Tables Discovery", tableSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 3: Schema Discovery — learn column names dynamically
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(20, "3/12 — اكتشاف الأعمدة", "تعلّم بنية الجداول");
-    
-    const schemaSec = [];
-    for(const tbl of Object.keys(schema)){
-      if(!tableInfo[tbl] || !tableInfo[tbl].exists){
-        schemaSec.push({label: tbl, value: "—", status: "info"});
-        continue;
-      }
-      const r = await _probeSampleSafe(tbl, 1);
-      if(r.ok && r.data && r.data.length > 0){
-        schema[tbl].sample = r.data[0];
-        schema[tbl].columns = Object.keys(r.data[0]);
-        schemaSec.push({
-          label: tbl + " columns",
-          value: schema[tbl].columns.length + " cols: " + schema[tbl].columns.slice(0,8).join(", ") + (schema[tbl].columns.length > 8 ? "..." : ""),
-          status: "ok"
-        });
-      } else if(r.rlsProtected){
-        schemaSec.push({label: tbl + " columns", value: "🔐 RLS — cannot inspect", status: "info"});
-      } else if(r.ok && r.data && r.data.length === 0){
-        schemaSec.push({label: tbl + " columns", value: "Empty table — schema unknown", status: "info"});
-      } else {
-        schemaSec.push({label: tbl + " columns", value: "Error: " + (r.error||"").substring(0,40), status: "info"});
-      }
-    }
-    addSection("📑 Schema Discovery", schemaSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 4: Profiles Analysis
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(30, "4/12 — المستخدمين", "تحليل الـ profiles");
-    const profSec = [];
-    
-    if(tableInfo.profiles?.exists){
-      const r = await _probeSelectSafe("profiles", "*");
-      if(r.ok && r.data){
-        const list = r.data;
-        const admins = list.filter(p => p.role === "admin");
-        const coords = list.filter(p => p.role === "coordinator");
-        const sales = list.filter(p => p.role === "sales");
-        const salesInRot = sales.filter(p => p.in_rotation === true);
-        const salesOutRot = sales.filter(p => p.in_rotation === false);
-        const salesNullRot = sales.filter(p => p.in_rotation === null);
-        const noRole = list.filter(p => !p.role);
-        const noName = list.filter(p => !p.name);
-        const noEmail = list.filter(p => !p.email);
-        
-        profSec.push({label: "Total profiles", value: list.length, status: "info"});
-        profSec.push({label: "Admins", value: admins.length, status: admins.length > 0 ? "ok" : "warn"});
-        profSec.push({label: "Coordinators", value: coords.length, status: "info"});
-        profSec.push({label: "Sales (all)", value: sales.length, status: "info"});
-        profSec.push({label: "Sales in_rotation=true", value: salesInRot.length, status: salesInRot.length >= 2 ? "ok" : "warn"});
-        profSec.push({label: "Sales in_rotation=false", value: salesOutRot.length, status: "info"});
-        profSec.push({label: "Sales in_rotation=null", value: salesNullRot.length, status: salesNullRot.length > 0 ? "warn" : "ok"});
-        profSec.push({label: "Profiles without role", value: noRole.length, status: noRole.length > 0 ? "warn" : "ok"});
-        profSec.push({label: "Profiles without name", value: noName.length, status: noName.length > 0 ? "warn" : "ok"});
-        profSec.push({label: "Profiles without email", value: noEmail.length, status: noEmail.length > 0 ? "warn" : "ok"});
-        
-        if(admins.length === 0){
-          addIssue("CRITICAL", "No admin users found", "يجب أن يكون هناك أدمن واحد على الأقل");
-        }
-        if(salesInRot.length < 2){
-          addIssue("HIGH", "Only "+salesInRot.length+" sales in rotation", "Round Robin يحتاج 2+ سيلز");
-        }
-        if(salesNullRot.length > 0){
-          addIssue("MEDIUM", salesNullRot.length+" sales have in_rotation=NULL", "اضبطها true أو false");
-        }
-        if(noRole.length > 0){
-          addIssue("HIGH", noRole.length+" profiles have no role", "");
-        }
-        
-        const activeReps = salesInRot.map(s => s.name).join(", ") || "—";
-        profSec.push({label: "Active Sales Reps", value: activeReps, status: "info"});
-        
-      } else if(r.error){
-        profSec.push({label: "Error reading", value: r.error.substring(0,60), status: "fail"});
-      }
-    } else if(tableInfo.profiles?.rlsProtected){
-      profSec.push({label: "Status", value: "🔐 RLS Protected", status: "info"});
-    } else {
-      profSec.push({label: "Status", value: "Table not found", status: "fail"});
-    }
-    addSection("👥 Profiles Analysis", profSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 5: Leads Analysis (Schema-Aware)
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(40, "5/12 — Leads", "تحليل الـ leads بشكل ذكي");
-    const leadsSec = [];
-    
-    if(tableInfo.leads?.exists && schema.leads.columns.length > 0){
-      // Detect column names dynamically — adapts to schema changes
-      const cols = schema.leads.columns;
-      const colName = cols.includes("nm") ? "nm" : (cols.includes("name") ? "name" : null);
-      const colRep = cols.includes("rep_name") ? "rep_name" : (cols.includes("rep") ? "rep" : null);
-      const colRepId = cols.includes("rep_id") ? "rep_id" : null;
-      const colCoord = cols.includes("by_name") ? "by_name" : (cols.includes("by") ? "by" : null);
-      const colCoordId = cols.includes("by_id") ? "by_id" : null;
-      const colPhone = cols.includes("mob") ? "mob" : (cols.includes("phone") ? "phone" : null);
-      const colStatus = cols.includes("st") ? "st" : (cols.includes("status") ? "status" : null);
-      const colManual = cols.includes("rep_manual") ? "rep_manual" : null;
-      const colDate = cols.includes("dt") ? "dt" : (cols.includes("date") ? "date" : null);
-      const colCreated = cols.includes("created_at") ? "created_at" : null;
+    // Validate & map
+    const valid = [];
+    const errors = [];
+    rows.forEach((r, idx) => {
+      const rowNum = idx + 2; // Excel row (header is 1)
+      const name = String(r.name || r.Name || r["اسم العميل"] || "").trim();
+      const phone = String(r.phone || r.Phone || r["الموبايل"] || "").trim();
       
-      // Build column list dynamically
-      const selectCols = [colName, colRep, colRepId, colCoord, colCoordId, colPhone, colStatus, colManual, colDate, colCreated]
-        .filter(c => c).join(",");
+      if(!name){ errors.push("صف "+rowNum+": اسم مفقود"); return; }
+      if(!phone){ errors.push("صف "+rowNum+": موبايل مفقود"); return; }
       
-      const r = await _probeSelectSafe("leads", selectCols || "*");
-      if(r.ok && r.data){
-        const list = r.data;
-        leadsSec.push({label: "Total leads", value: list.length, status: "info"});
-        leadsSec.push({label: "Detected columns", value: cols.length + " total", status: "info"});
-        
-        // Status distribution
-        if(colStatus){
-          const statusCount = {};
-          list.forEach(l => {
-            const s = l[colStatus] || "(empty)";
-            statusCount[s] = (statusCount[s]||0) + 1;
-          });
-          Object.keys(statusCount).sort((a,b) => statusCount[b]-statusCount[a]).forEach(s => {
-            leadsSec.push({label: "Status: "+s, value: statusCount[s], status: "info"});
-          });
-        }
-        
-        // Data integrity
-        if(colRep || colRepId){
-          const noRep = list.filter(l => !l[colRep] && (!colRepId || !l[colRepId]));
-          leadsSec.push({label: "Leads without sales rep", value: noRep.length, status: noRep.length > 0 ? "warn" : "ok"});
-        }
-        if(colCoord || colCoordId){
-          const noCoord = list.filter(l => !l[colCoord] && (!colCoordId || !l[colCoordId]));
-          leadsSec.push({label: "Leads without coordinator", value: noCoord.length, status: noCoord.length > 0 ? "warn" : "ok"});
-        }
-        if(colPhone){
-          const noPhone = list.filter(l => !l[colPhone]);
-          leadsSec.push({label: "Leads without phone", value: noPhone.length, status: noPhone.length > 0 ? "warn" : "ok"});
-          
-          // Duplicates
-          const phoneMap = {};
-          list.forEach(l => {
-            if(l[colPhone]){
-              const p = String(l[colPhone]).replace(/\D/g,"");
-              if(p) phoneMap[p] = (phoneMap[p]||0) + 1;
-            }
-          });
-          const dupPhones = Object.keys(phoneMap).filter(p => phoneMap[p] > 1);
-          leadsSec.push({label: "Duplicate phone numbers", value: dupPhones.length, status: dupPhones.length > 0 ? "warn" : "ok"});
-        }
-        if(colName){
-          const noName = list.filter(l => !l[colName]);
-          leadsSec.push({label: "Leads without name", value: noName.length, status: noName.length > 0 ? "warn" : "ok"});
-        }
-        
-        // RR distribution
-        if(colRep && colManual){
-          const recent = list
-            .filter(l => l[colRep] && l[colManual] !== true)
-            .sort((a,b) => (b[colCreated]||"").localeCompare(a[colCreated]||""))
-            .slice(0, 30);
-          const repDist = {};
-          recent.forEach(l => {
-            repDist[l[colRep]] = (repDist[l[colRep]]||0) + 1;
-          });
-          const repDistText = Object.keys(repDist).sort((a,b) => repDist[b]-repDist[a])
-            .map(r => r+":"+repDist[r]).join(", ");
-          leadsSec.push({label: "RR distribution (last 30 auto)", value: repDistText || "—", status: "info"});
-          
-          // Check if distribution is balanced
-          const counts = Object.values(repDist);
-          if(counts.length >= 2){
-            const max = Math.max(...counts);
-            const min = Math.min(...counts);
-            const imbalance = max - min;
-            if(imbalance > 5){
-              addIssue("MEDIUM", "RR distribution imbalanced (diff: "+imbalance+")", "ممكن بسبب manual overrides");
-            }
-          }
-          
-          const manual = list.filter(l => l[colManual] === true).length;
-          leadsSec.push({label: "Manual rep override count", value: manual, status: "info"});
-        }
-        
-      } else if(r.error){
-        leadsSec.push({label: "Error", value: r.error.substring(0,60), status: "fail"});
-      }
-    } else if(tableInfo.leads?.rlsProtected){
-      leadsSec.push({label: "Status", value: "🔐 RLS Protected", status: "info"});
-    }
-    addSection("📞 Leads Analysis", leadsSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 6: Round Robin Health (Schema-Aware)
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(50, "6/12 — Round Robin", "فحص حالة الـ Round Robin");
-    const rrSec = [];
-    
-    if(tableInfo.rr_state?.exists){
-      if(tableInfo.rr_state.rlsProtected){
-        rrSec.push({label: "rr_state access", value: "🔐 RLS Protected (normal for atomic RR)", status: "ok"});
-        rrSec.push({label: "Note", value: "الجدول محمي — الـ DB function تشغّله بصلاحيات أعلى", status: "info"});
-      } else {
-        const r = await _probeSampleSafe("rr_state", 5);
-        if(r.ok && r.data){
-          if(r.data.length === 0){
-            rrSec.push({label: "rr_state rows", value: "0 (will initialize on first use)", status: "warn"});
-            addIssue("MEDIUM", "rr_state empty", "Run: INSERT INTO rr_state (id) VALUES (1) ON CONFLICT (id) DO NOTHING;");
-          } else {
-            const row = r.data[0];
-            rrSec.push({label: "rr_state rows", value: r.data.length, status: r.data.length === 1 ? "ok" : "warn"});
-            
-            // Find last_rep_id field (might be different names)
-            const lastIdField = _firstAvailable(row, ["last_rep_id", "last_rep", "last_assigned_id"]);
-            const lastTsField = _firstAvailable(row, ["last_assigned_at", "updated_at", "last_at"]);
-            
-            if(lastIdField){
-              rrSec.push({label: "Last rep ID", value: row[lastIdField] || "(null - never used)", status: "info"});
-            }
-            if(lastTsField){
-              rrSec.push({label: "Last assigned at", value: row[lastTsField] || "—", status: "info"});
-            }
-            
-            // Try to verify the last_rep_id in profiles
-            if(row[lastIdField] && tableInfo.profiles?.exists && !tableInfo.profiles.rlsProtected){
-              const verify = await _probeSelectSafe("profiles", "id,name,role,in_rotation", {eq: {col: "id", val: row[lastIdField]}});
-              if(verify.ok && verify.data && verify.data.length > 0){
-                const u = verify.data[0];
-                rrSec.push({label: "Last rep name", value: u.name + " ("+u.role+")", status: "ok"});
-                rrSec.push({
-                  label: "Last rep in_rotation", 
-                  value: u.in_rotation === true ? "✓ true" : (u.in_rotation === false ? "✗ false" : "(null)"),
-                  status: u.in_rotation === true ? "ok" : "warn"
-                });
-                if(u.in_rotation !== true){
-                  addIssue("HIGH", "Last assigned rep '"+u.name+"' is not in rotation", "");
-                }
-              }
-            }
-          }
-        }
-      }
-    } else {
-      rrSec.push({label: "rr_state", value: "✗ Does not exist", status: "fail"});
-      addIssue("CRITICAL", "rr_state table missing", "Round Robin atomic reservation won't work");
-    }
-    addSection("🔄 Round Robin Health", rrSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 7: Live Round Robin Test (calls the DB function once)
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(58, "7/12 — اختبار حي للـ RR", "استدعاء get_next_sales_rep");
-    const liveSec = [];
-    
-    try {
-      const r = await supa.rpc("get_next_sales_rep");
-      if(r.error){
-        const msg = String(r.error.message||"").toLowerCase();
-        if(msg.includes("does not exist") || msg.includes("function") && msg.includes("does not exist")){
-          liveSec.push({label: "get_next_sales_rep()", value: "✗ Function not found", status: "fail"});
-          addIssue("CRITICAL", "DB function 'get_next_sales_rep' missing", "Round Robin atomic mode unavailable");
-        } else {
-          liveSec.push({label: "get_next_sales_rep()", value: "Error: " + r.error.message.substring(0,50), status: "warn"});
-        }
-      } else if(r.data){
-        const result = Array.isArray(r.data) ? r.data[0] : r.data;
-        if(result && (result.rep_name || result.name)){
-          liveSec.push({label: "Function callable", value: "✓ Yes", status: "ok"});
-          liveSec.push({label: "Returned rep", value: (result.rep_name || result.name) + (result.rep_id ? " (id: "+String(result.rep_id).substring(0,8)+"...)" : ""), status: "ok"});
-          liveSec.push({label: "Note", value: "Side effect: rr_state advanced by 1 (normal)", status: "info"});
-        } else {
-          liveSec.push({label: "Function returned", value: "Empty/null - no active sales", status: "warn"});
-          addIssue("HIGH", "RR function returned no sales rep", "تأكد إن في 2+ sales بـ in_rotation=true");
-        }
-      }
-    } catch(e){
-      liveSec.push({label: "Test error", value: e.message.substring(0,60), status: "warn"});
-    }
-    addSection("⚡ Live RR Function Test", liveSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 8: Daily Contacted Analysis
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(66, "8/12 — Daily Contacted", "فحص جدول التواصلات");
-    const dcSec = [];
-    
-    if(tableInfo.daily_contacted?.exists){
-      if(tableInfo.daily_contacted.rlsProtected){
-        dcSec.push({label: "Status", value: "🔐 RLS Protected", status: "info"});
-      } else {
-        const r = await _probeSelectSafe("daily_contacted", "*", {order: "date", ascending: false, limit: 20});
-        if(r.ok && r.data){
-          dcSec.push({label: "Recent rows fetched", value: r.data.length, status: "info"});
-          
-          if(r.data.length > 0){
-            const sample = r.data[0];
-            const cols = Object.keys(sample);
-            dcSec.push({label: "Columns present", value: cols.join(", "), status: "info"});
-            
-            // Detect channel column (or alternatives)
-            const channelCol = _firstAvailable(sample, ["channel", "ch", "source", "type"]);
-            if(channelCol){
-              dcSec.push({label: "Has channel-like column", value: "✓ '"+channelCol+"'", status: "ok"});
-              
-              const chMap = {};
-              r.data.forEach(d => {
-                const c = d[channelCol] || "(null)";
-                chMap[c] = (chMap[c]||0) + 1;
-              });
-              dcSec.push({label: "Channels (recent 20)", value: Object.keys(chMap).map(c => c+":"+chMap[c]).join(", "), status: "info"});
-            } else {
-              dcSec.push({label: "Has channel column", value: "✗ No (Phone/Google/IG features won't work)", status: "fail"});
-              addIssue("HIGH", "daily_contacted missing 'channel' column", "ALTER TABLE daily_contacted ADD COLUMN channel TEXT DEFAULT '_total';");
-            }
-            
-            const dateCol = _firstAvailable(sample, ["date", "dt", "day"]);
-            if(dateCol) dcSec.push({label: "Most recent date", value: sample[dateCol] || "—", status: "info"});
-            
-            const coordCol = _firstAvailable(sample, ["coord_name", "coord", "user_name"]);
-            if(coordCol) dcSec.push({label: "Most recent coord", value: sample[coordCol] || "—", status: "info"});
-          } else {
-            dcSec.push({label: "Status", value: "Table is empty (no contacts logged yet)", status: "info"});
-          }
-        }
-      }
-    }
-    addSection("📊 Daily Contacted", dcSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 9: Notifications
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(74, "9/12 — Notifications", "فحص الإشعارات");
-    const notSec = [];
-    
-    if(tableInfo.notifications?.exists && !tableInfo.notifications.rlsProtected){
-      notSec.push({label: "Total notifications", value: tableInfo.notifications.count, status: "info"});
-      
-      const r2 = await _probeCountSafe("notifications");  // re-probe for unread count
-      try {
-        const unread = await supa.from("notifications").select("*", {count: "exact", head: true}).eq("read", false);
-        if(!unread.error){
-          notSec.push({label: "Unread notifications", value: unread.count, status: "info"});
-        }
-      } catch(e){}
-      
-      const r3 = await _probeSelectSafe("notifications", "*", {order: "created_at", ascending: false, limit: 1});
-      if(r3.ok && r3.data && r3.data.length > 0){
-        const ts = r3.data[0].created_at || r3.data[0].updated_at || null;
-        if(ts) notSec.push({label: "Latest notification at", value: ts, status: "info"});
-      }
-    } else if(tableInfo.notifications?.rlsProtected){
-      notSec.push({label: "Status", value: "🔐 RLS Protected", status: "info"});
-    }
-    addSection("🔔 Notifications", notSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 10: Recent Activity (Schema-Aware)
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(82, "10/12 — النشاط الأخير", "آخر العمليات");
-    const actSec = [];
-    
-    if(tableInfo.leads?.exists && schema.leads.columns.length > 0){
-      const cols = schema.leads.columns;
-      const colName = cols.includes("nm") ? "nm" : (cols.includes("name") ? "name" : "id");
-      const colRep = cols.includes("rep_name") ? "rep_name" : (cols.includes("rep") ? "rep" : null);
-      const colStatus = cols.includes("st") ? "st" : (cols.includes("status") ? "status" : null);
-      const colCreated = cols.includes("created_at") ? "created_at" : null;
-      
-      const selectStr = ["id", colName, colRep, colStatus, colCreated].filter(c => c).join(",");
-      const r = await _probeSelectSafe("leads", selectStr, {order: colCreated || "id", ascending: false, limit: 5});
-      if(r.ok && r.data){
-        r.data.forEach((l, i) => {
-          actSec.push({
-            label: "Lead #"+(i+1),
-            value: (l[colName] || "?")+" — "+(colRep ? (l[colRep] || "no rep") : "")+(colStatus ? " — "+(l[colStatus] || "no status") : ""),
-            status: "info"
-          });
-        });
-        if(r.data.length === 0){
-          actSec.push({label: "Status", value: "No leads found", status: "info"});
-        }
-      }
-    }
-    addSection("📅 Recent Activity (Last 5 Leads)", actSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 11: Local State (JS Memory)
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(90, "11/12 — الذاكرة المحلية", "فحص الـ JS state");
-    const memSec = [];
-    
-    memSec.push({label: "LEADS array length", value: typeof LEADS !== "undefined" ? LEADS.length : "undefined", status: "info"});
-    memSec.push({label: "USERS array length", value: typeof USERS !== "undefined" ? USERS.length : "undefined", status: "info"});
-    memSec.push({label: "SALES_USERS length", value: typeof SALES_USERS !== "undefined" ? SALES_USERS.length : "undefined", status: "info"});
-    memSec.push({label: "COORD_USERS length", value: typeof COORD_USERS !== "undefined" ? COORD_USERS.length : "undefined", status: "info"});
-    memSec.push({label: "NOTIFS length", value: typeof NOTIFS !== "undefined" ? NOTIFS.length : "undefined", status: "info"});
-    memSec.push({label: "RESERVED_REP", value: typeof RESERVED_REP !== "undefined" ? (RESERVED_REP ? RESERVED_REP.name : "null") : "undefined", status: "info"});
-    
-    // DB vs memory comparison
-    if(tableInfo.leads?.exists && tableInfo.leads.count !== null && typeof LEADS !== "undefined"){
-      const dbCount = tableInfo.leads.count;
-      const memCount = LEADS.length;
-      memSec.push({
-        label: "DB vs Memory match", 
-        value: dbCount === memCount ? "✓ Match ("+dbCount+")" : "Diff: DB="+dbCount+" Memory="+memCount,
-        status: dbCount === memCount ? "ok" : "warn"
-      });
-    }
-    addSection("💾 Local State (JS Memory)", memSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // SECTION 12: Browser & Environment
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(96, "12/12 — المتصفح", "آخر الفحوصات");
-    const brSec = [];
-    
-    brSec.push({label: "Platform", value: navigator.platform || "Unknown", status: "info"});
-    brSec.push({label: "Language", value: navigator.language, status: "info"});
-    brSec.push({label: "Cookies enabled", value: navigator.cookieEnabled ? "✓ Yes" : "✗ No", status: navigator.cookieEnabled ? "ok" : "warn"});
-    brSec.push({label: "localStorage available", value: (function(){try{localStorage.getItem("_t");return "✓ Yes";}catch(e){return "✗ No";}})(), status: "info"});
-    brSec.push({label: "Screen size", value: window.screen.width + "x" + window.screen.height, status: "info"});
-    brSec.push({label: "Window size", value: window.innerWidth + "x" + window.innerHeight, status: "info"});
-    
-    try {
-      const crmKeys = [];
-      for(let i = 0; i < localStorage.length; i++){
-        const k = localStorage.key(i);
-        if(k && k.startsWith("sll-crm")) crmKeys.push(k);
-      }
-      brSec.push({label: "CRM localStorage keys", value: crmKeys.length + " keys", status: "info"});
-    } catch(e){}
-    
-    addSection("🌐 Browser & Environment", brSec);
-    
-    // ═══════════════════════════════════════════════════════════
-    // FINALIZE
-    // ═══════════════════════════════════════════════════════════
-    updateProgress(100, "اكتمل الفحص!", "جاري إعداد التقرير");
-    
-    report.sections.forEach(s => {
-      s.items.forEach(it => {
-        report.summary.total++;
-        if(it.status === "ok") report.summary.passed++;
-        else if(it.status === "warn") report.summary.warnings++;
-        else if(it.status === "fail") report.summary.failed++;
-        else report.summary.infos++;
+      valid.push({
+        client_code: String(r.client_code || "").trim() || null,
+        old_code: String(r.old_code || "").trim() || null,
+        name,
+        company: String(r.company || "").trim() || null,
+        phone,
+        phone_alt: String(r.phone_alt || "").trim() || null,
+        email: String(r.email || "").trim() || null,
+        address: String(r.address || "").trim() || null,
+        city: String(r.city || "").trim() || null,
+        client_type: ["عادي","VIP","استراتيجي"].includes(String(r.client_type||"").trim()) ? String(r.client_type).trim() : "عادي",
+        rating: parseInt(r.rating) || 3,
+        tax_number: String(r.tax_number || "").trim() || null,
+        commercial_register: String(r.commercial_register || "").trim() || null,
+        industry: String(r.industry || "").trim() || null,
+        primary_sales_rep_name: String(r.primary_sales_rep_name || "").trim() || null,
+        source: String(r.source || "").trim() || null,
+        notes: String(r.notes || "").trim() || null,
+        first_deal_date: String(r.first_deal_date || "").trim() || null,
+        status: ["نشط","غير نشط","محظور"].includes(String(r.status||"").trim()) ? String(r.status).trim() : "نشط",
+        created_by: curUser.id
       });
     });
     
-    await new Promise(r => setTimeout(r, 400));
-    displayDiagnosticsReport(report);
+    _importedClientsBuffer = valid;
     
-  } catch(e){
-    console.error("[Diagnostics] Fatal error:", e);
-    const progressEl = document.getElementById("diag-progress");
-    if(progressEl){
-      progressEl.innerHTML = 
-        '<div style="color:var(--red);text-align:center;padding:30px"><div style="font-size:36px">❌</div><div style="font-weight:700;margin-top:10px">حدث خطأ في الفحص</div><div style="font-size:12px;color:var(--text2);margin-top:6px">'+e.message+'</div></div>';
+    let preview = '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px">';
+    preview += '<div style="display:flex;justify-content:space-between;margin-bottom:8px">';
+    preview += '<strong>✓ تم قراءة الملف</strong>';
+    preview += '<span style="color:var(--green);font-weight:700">' + valid.length + ' عميل جاهز</span>';
+    preview += '</div>';
+    if(errors.length){
+      preview += '<details style="margin-top:8px"><summary style="color:var(--orange);cursor:pointer;font-weight:700">⚠ ' + errors.length + ' خطأ (لن يتم استيرادها)</summary>';
+      preview += '<div style="margin-top:6px;padding-right:12px;font-size:11px;color:var(--text2);max-height:120px;overflow-y:auto">';
+      preview += errors.slice(0,20).map(e=>'• '+e).join('<br>');
+      if(errors.length > 20) preview += '<br>... و ' + (errors.length-20) + ' آخر';
+      preview += '</div></details>';
     }
+    preview += '</div>';
+    $("import-preview").innerHTML = preview;
+    
+    const btn = $("import-confirm-btn");
+    if(btn && valid.length > 0){
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.style.cursor = "pointer";
+      btn.textContent = "📥 استيراد " + valid.length + " عميل";
+    }
+  } catch(err){
+    console.error("[import]", err);
+    showToast("✕","خطأ في قراءة الملف: " + err.message);
   }
 }
 
-function displayDiagnosticsReport(report){
-  const progressEl = document.getElementById("diag-progress");
-  const resultEl = document.getElementById("diag-result");
-  if(progressEl) progressEl.style.display = "none";
-  if(!resultEl) return;
-  resultEl.style.display = "block";
+async function confirmImportClients(){
+  if(!_importedClientsBuffer.length){ showToast("⚠","لا توجد بيانات"); return; }
   
-  const s = report.summary;
-  let html = '';
+  const btn = $("import-confirm-btn");
+  if(btn){ btn.disabled = true; btn.textContent = "⏳ جاري الاستيراد..."; }
   
-  // Summary banner — only FAIL counts as real problem (warnings are just notes)
-  const hasRealProblem = s.failed > 0;
-  const bannerColor = hasRealProblem ? "var(--red)" : (s.warnings > 0 ? "var(--orange)" : "var(--green2)");
-  const bannerBg = hasRealProblem ? "rgba(245,82,82,.08)" : (s.warnings > 0 ? "rgba(245,146,74,.08)" : "rgba(34,197,94,.08)");
+  let inserted = 0, failed = 0;
   
-  html += '<div style="background:'+bannerBg+';border:1px solid '+bannerColor+';border-radius:10px;padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
-  html += '<div style="font-size:32px">'+(hasRealProblem ? "🚨" : (s.warnings > 0 ? "⚠️" : "✅"))+'</div>';
-  html += '<div style="flex:1">';
-  html += '<div style="font-weight:800;font-size:15px;color:'+bannerColor+'">';
-  html += hasRealProblem ? "تم اكتشاف مشاكل تحتاج إصلاح" : (s.warnings > 0 ? "النظام يعمل — لكن في تنبيهات بسيطة" : "النظام يعمل بشكل ممتاز");
-  html += '</div>';
-  html += '<div style="font-size:12px;color:var(--text2);margin-top:3px">';
-  html += '✓ '+s.passed+' OK · ⓘ '+s.infos+' Info · ⚠ '+s.warnings+' Warnings · ✗ '+s.failed+' Failed · المجموع: '+s.total;
-  html += '</div></div></div>';
-  
-  // Issues
-  if(report.issues.length > 0){
-    html += '<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;margin-bottom:14px">';
-    html += '<div style="font-weight:800;margin-bottom:10px;font-size:13px">🚨 المشاكل المكتشفة ('+report.issues.length+')</div>';
-    report.issues.forEach(iss => {
-      const c = iss.severity === "CRITICAL" ? "var(--red)" : (iss.severity === "HIGH" ? "var(--orange)" : (iss.severity === "MEDIUM" ? "var(--blue)" : "var(--text2)"));
-      html += '<div style="padding:8px 0;border-top:1px dashed var(--border)">';
-      html += '<span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;background:'+c+';color:#fff;margin-left:6px">'+iss.severity+'</span>';
-      html += '<span style="font-size:12px">'+iss.message+'</span>';
-      if(iss.hint) html += '<div style="font-size:11px;color:var(--text2);margin-top:3px;padding-right:8px">💡 '+iss.hint+'</div>';
-      html += '</div>';
-    });
-    html += '</div>';
+  try {
+    // Batch insert in chunks of 50
+    const chunkSize = 50;
+    for(let i = 0; i < _importedClientsBuffer.length; i += chunkSize){
+      const chunk = _importedClientsBuffer.slice(i, i + chunkSize);
+      const {data, error} = await supa.from("clients").insert(chunk).select();
+      if(error){
+        console.error("[import chunk error]", error);
+        failed += chunk.length;
+      } else {
+        inserted += (data||[]).length;
+      }
+    }
+    
+    showToast("✓", "تم استيراد " + inserted + " عميل" + (failed ? " (فشل " + failed + ")" : ""));
+    _importedClientsBuffer = [];
+    closeM('import-clients-modal');
+    await loadAllData();
+    renderClientsPage();
+  } catch(err){
+    showToast("✕","خطأ: " + err.message);
+    if(btn){ btn.disabled = false; btn.textContent = "📥 استيراد"; }
   }
-  
-  // Actions
-  html += '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">';
-  html += '<button class="btn primary" onclick="copyDiagnosticsReport()">📋 Copy Report</button>';
-  html += '<button class="btn" onclick="downloadDiagnosticsReport()">💾 Download .txt</button>';
-  html += '<button class="btn" onclick="document.getElementById(\'diag-modal\').remove()" style="margin-right:auto">إغلاق</button>';
-  html += '</div>';
-  
-  // Sections
-  report.sections.forEach(sec => {
-    if(sec.items.length === 0) return; // Skip empty sections
-    html += '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">';
-    html += '<div style="font-weight:800;font-size:13px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">'+sec.title+'</div>';
-    sec.items.forEach(it => {
-      const c = it.status === "ok" ? "var(--green2)" : (it.status === "warn" ? "var(--orange)" : (it.status === "fail" ? "var(--red)" : "var(--text2)"));
-      const icon = it.status === "ok" ? "✓" : (it.status === "warn" ? "⚠" : (it.status === "fail" ? "✗" : "·"));
-      html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;gap:8px">';
-      html += '<span style="color:var(--text2)"><span style="color:'+c+';font-weight:700;margin-left:6px">'+icon+'</span>'+it.label+'</span>';
-      html += '<span style="color:'+c+';font-weight:600;text-align:left;direction:ltr;font-family:Outfit;word-break:break-all">'+it.value+'</span>';
-      html += '</div>';
-    });
-    html += '</div>';
-  });
-  
-  resultEl.innerHTML = html;
-  window._lastDiagReport = generateDiagnosticsText(report);
 }
-
-function generateDiagnosticsText(report){
-  let txt = "═══════════════════════════════════════════════\n";
-  txt += "  SLL CRM — SYSTEM DIAGNOSTICS REPORT v2\n";
-  txt += "═══════════════════════════════════════════════\n";
-  txt += "Generated: " + report.timestampLocal + "\n";
-  txt += "ISO Time:  " + report.timestamp + "\n";
-  txt += "═══════════════════════════════════════════════\n\n";
-  
-  txt += "SUMMARY\n───────\n";
-  txt += "Total checks:  " + report.summary.total + "\n";
-  txt += "✓ Passed:      " + report.summary.passed + "\n";
-  txt += "ⓘ Info:        " + report.summary.infos + "\n";
-  txt += "⚠ Warnings:    " + report.summary.warnings + "\n";
-  txt += "✗ Failed:      " + report.summary.failed + "\n\n";
-  
-  if(report.issues.length > 0){
-    txt += "ISSUES FOUND (" + report.issues.length + ")\n─────────────\n";
-    report.issues.forEach((iss, i) => {
-      txt += (i+1) + ". [" + iss.severity + "] " + iss.message + "\n";
-      if(iss.hint) txt += "   Hint: " + iss.hint + "\n";
-    });
-    txt += "\n";
-  }
-  
-  report.sections.forEach(sec => {
-    if(sec.items.length === 0) return;
-    txt += "\n" + sec.title + "\n";
-    txt += "─".repeat(60) + "\n";
-    sec.items.forEach(it => {
-      const icon = it.status === "ok" ? "[OK]  " : (it.status === "warn" ? "[WARN]" : (it.status === "fail" ? "[FAIL]" : "[INFO]"));
-      txt += icon + " " + (it.label + ":").padEnd(40) + " " + it.value + "\n";
-    });
-  });
-  
-  txt += "\n═══════════════════════════════════════════════\n";
-  txt += "  End of Report\n";
-  txt += "═══════════════════════════════════════════════\n";
-  return txt;
-}
-
-function copyDiagnosticsReport(){
-  if(!window._lastDiagReport){ showToast("⚠","لا يوجد تقرير"); return; }
-  navigator.clipboard.writeText(window._lastDiagReport).then(() => {
-    showToast("✓","تم نسخ التقرير");
-  }).catch(() => {
-    const ta = document.createElement("textarea");
-    ta.value = window._lastDiagReport;
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand("copy"); showToast("✓","تم نسخ التقرير"); }
-    catch(e){ showToast("✗","فشل النسخ"); }
-    document.body.removeChild(ta);
-  });
-}
-
-function downloadDiagnosticsReport(){
-  if(!window._lastDiagReport){ showToast("⚠","لا يوجد تقرير"); return; }
-  const blob = new Blob([window._lastDiagReport], {type: "text/plain;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "sll-crm-diagnostics-" + new Date().toISOString().slice(0,19).replace(/[:T]/g,"-") + ".txt";
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
-  showToast("✓","جاري التنزيل");
-}
-
 
 window.addEventListener("DOMContentLoaded", () => {
   console.log("[Auth] DOMContentLoaded fired");
