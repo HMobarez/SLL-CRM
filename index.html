@@ -4335,13 +4335,15 @@ function renderReports(){
     <button class="vtab ${adminRptTab==='coords'?'on':''}" onclick="showRT('coords',this)">👥 Coordinators</button>
     <button class="vtab ${adminRptTab==='clients'?'on':''}" onclick="showRT('clients',this)">🎯 Clients Analysis</button>
     <button class="vtab ${adminRptTab==='active'?'on':''}" onclick="showRT('active',this)">✅ Active Clients</button>
+    <button class="vtab ${adminRptTab==='violations'?'on':''}" onclick="showRT('violations',this)">⚠️ Violations</button>
   </div>
   <div id="rpt-overview" ${adminRptTab!=='overview'?'style="display:none"':''}></div>
   <div id="rpt-marketing" ${adminRptTab!=='marketing'?'style="display:none"':''}></div>
   <div id="rpt-salesperf" ${adminRptTab!=='salesperf'?'style="display:none"':''}></div>
   <div id="rpt-coords" ${adminRptTab!=='coords'?'style="display:none"':''}></div>
   <div id="rpt-clients" ${adminRptTab!=='clients'?'style="display:none"':''}></div>
-  <div id="rpt-active" ${adminRptTab!=='active'?'style="display:none"':''}></div>`;
+  <div id="rpt-active" ${adminRptTab!=='active'?'style="display:none"':''}></div>
+  <div id="rpt-violations" ${adminRptTab!=='violations'?'style="display:none"':''}></div>`;
   renderRT(adminRptTab);
 }
 function setAdminRptPeriod(p){
@@ -4352,7 +4354,7 @@ function showRT(id,btn){
   adminRptTab=id;
   document.querySelectorAll("#pg-reports .vtab").forEach(b=>b.classList.remove("on"));
   if(btn)btn.classList.add("on");
-  ["overview","marketing","salesperf","coords","clients","active"].forEach(t=>{$("rpt-"+t).style.display=t===id?"block":"none";});
+  ["overview","marketing","salesperf","coords","clients","active","violations"].forEach(t=>{$("rpt-"+t).style.display=t===id?"block":"none";});
   renderRT(id);
 }
 function rpL(){
@@ -4871,6 +4873,9 @@ function renderRT(tab){
   if(tab==="active"){
     renderActiveClientsTab();
   }
+  if(tab==="violations"){
+    renderViolationsTab();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -4893,6 +4898,7 @@ function openPrintMenu(){
   html += '4. 🏆 Sales Performance<br>';
   html += '5. 👥 Coordinators<br>';
   html += '6. 🎯 Clients Analysis<br>';
+  html += '7. ⚠️ Violations<br>';
   html += '<div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:6px;font-size:11px">📅 الفترة: <strong>'+periodLabel(adminRptPeriod)+'</strong></div>';
   html += '</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
@@ -5016,10 +5022,16 @@ async function buildPrintContent(){
   html += '<div id="rpt-clients"></div>';
   html += '</div>';
   
+  // 7. Violations
+  html += '<div class="print-page-break print-section">';
+  html += printHeader('Violations Tracker — سجل المخالفات', '⚠️');
+  html += '<div id="rpt-violations"></div>';
+  html += '</div>';
+  
   reportsPage.innerHTML = html;
   
   // Render each tab content (one by one to avoid chart conflicts)
-  const tabs = ["active", "overview", "marketing", "salesperf", "coords", "clients"];
+  const tabs = ["active", "overview", "marketing", "salesperf", "coords", "clients", "violations"];
   for(const t of tabs){
     adminRptTab = t;
     try {
@@ -5335,6 +5347,437 @@ function renderActiveClientsTab(){
       });
     }
   }, 50);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VIOLATIONS TRACKER — SLA1 & SLA2 violations per Sales
+// ═══════════════════════════════════════════════════════════════════
+// Filter state
+window._violationsState = {
+  filterSales: "all",   // sales user id or "all"
+  filterType: "all",    // "all" | "sla1" | "sla2"
+};
+
+function renderViolationsTab(){
+  const allLeads = rpL();
+  
+  // ─── Compute violations ───
+  // Each Lead that has an active SLA1/SLA2 breach = 1 violation
+  // We attribute each violation to the assigned sales rep
+  const violations = [];
+  
+  allLeads.forEach(l => {
+    if(!l.repId) return;
+    // SLA1: breached (not warn) — Lead بدون status ومر 24h+
+    if(sla1St(l) === "breach"){
+      violations.push({
+        type: "sla1",
+        leadId: l.id,
+        leadName: l.nm,
+        salesId: l.repId,
+        salesName: l.rep || "غير محدد",
+        delay: sla1Hrs(l),
+        unit: "ساعة",
+        date: l.dt,
+        leadObj: l
+      });
+    }
+    // SLA2: late — تاريخ المتابعة فات
+    if(sla2St(l) === "late"){
+      const days = Math.round((new Date() - new Date(l.fuDate+"T00:00"))/86400000);
+      violations.push({
+        type: "sla2",
+        leadId: l.id,
+        leadName: l.nm,
+        salesId: l.repId,
+        salesName: l.rep || "غير محدد",
+        delay: days,
+        unit: "يوم",
+        date: l.fuDate,
+        leadObj: l
+      });
+    }
+  });
+  
+  // ─── Apply filters ───
+  const state = window._violationsState;
+  const filtered = violations.filter(v => {
+    if(state.filterSales !== "all" && String(v.salesId) !== String(state.filterSales)) return false;
+    if(state.filterType !== "all" && v.type !== state.filterType) return false;
+    return true;
+  });
+  
+  // ─── Aggregate per sales ───
+  const perSales = {};
+  SALES_USERS.forEach(s => {
+    perSales[s.id] = {id: s.id, name: s.name, sla1:0, sla2:0, total:0, leads:[]};
+  });
+  
+  filtered.forEach(v => {
+    if(!perSales[v.salesId]){
+      perSales[v.salesId] = {id: v.salesId, name: v.salesName, sla1:0, sla2:0, total:0, leads:[]};
+    }
+    perSales[v.salesId][v.type]++;
+    perSales[v.salesId].total++;
+    perSales[v.salesId].leads.push(v);
+  });
+  
+  const salesArr = Object.values(perSales).sort((a,b) => b.total - a.total);
+  const activeSales = salesArr.filter(s => s.total > 0);
+  
+  // ─── KPIs ───
+  const totalViolations = filtered.length;
+  const totalSla1 = filtered.filter(v => v.type === "sla1").length;
+  const totalSla2 = filtered.filter(v => v.type === "sla2").length;
+  const salesWithViolations = activeSales.length;
+  const worstSales = salesArr[0]?.total > 0 ? salesArr[0] : null;
+  
+  // ─── Build HTML ───
+  let html = '';
+  
+  // Header banner
+  html += '<div style="background:linear-gradient(135deg,rgba(245,82,82,.08),rgba(245,146,74,.04));border:1px solid rgba(245,82,82,.2);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+  html += '<div style="font-size:32px">⚠️</div>';
+  html += '<div style="flex:1;min-width:200px">';
+  html += '<div style="font-size:14px;font-weight:700;color:var(--red)">سجل المخالفات (Violations Tracker)</div>';
+  html += '<div style="font-size:11px;color:var(--text2);margin-top:3px">';
+  html += 'كل Lead متأخر = مخالفة 1 نقطة · يتم احتسابها لحظياً من بيانات الـ leads الحالية';
+  html += '</div></div>';
+  html += '<button class="btn" onclick="exportViolationsExcel()" style="background:var(--green-bg);color:var(--green);border:1px solid rgba(34,201,151,.3)">📥 تصدير Excel</button>';
+  html += '</div>';
+  
+  // ─── KPIs ───
+  html += '<div class="kpi-row c4" style="margin-bottom:14px">';
+  html += kc("⚠️ إجمالي المخالفات", totalViolations, "var(--red)", "ضمن الفترة", totalViolations > 0 ? "warn" : "");
+  html += kc("🚨 SLA 1 (توقيت التواصل)", totalSla1, "var(--red)", "+24h بدون حالة", totalSla1 > 0 ? "warn" : "");
+  html += kc("⏰ SLA 2 (تاريخ المتابعة)", totalSla2, "var(--orange)", "متأخر عن المتابعة", totalSla2 > 0 ? "warn" : "");
+  html += kc("👥 سيلز عليهم مخالفات", salesWithViolations + "/" + SALES_USERS.length, "var(--purple)", "من إجمالي السيلز", "");
+  html += '</div>';
+  
+  // ─── Filters ───
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center">';
+  html += '<div style="font-size:11px;color:var(--text3);font-weight:600">🔍 فلتر:</div>';
+  
+  // Sales filter
+  html += '<select onchange="onViolationsSalesChange(this.value)" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:0 10px;height:32px;color:var(--text);font-size:12px;min-width:140px">';
+  html += '<option value="all"'+(state.filterSales==="all"?" selected":"")+'>كل السيلز</option>';
+  SALES_USERS.forEach(s => {
+    html += '<option value="'+s.id+'"'+(String(state.filterSales)===String(s.id)?" selected":"")+'>'+s.name+'</option>';
+  });
+  html += '</select>';
+  
+  // Type filter
+  html += '<select onchange="onViolationsTypeChange(this.value)" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:0 10px;height:32px;color:var(--text);font-size:12px;min-width:140px">';
+  html += '<option value="all"'+(state.filterType==="all"?" selected":"")+'>كل الأنواع</option>';
+  html += '<option value="sla1"'+(state.filterType==="sla1"?" selected":"")+'>🚨 SLA 1 فقط</option>';
+  html += '<option value="sla2"'+(state.filterType==="sla2"?" selected":"")+'>⏰ SLA 2 فقط</option>';
+  html += '</select>';
+  
+  if(state.filterSales !== "all" || state.filterType !== "all"){
+    html += '<button class="btn sm" onclick="clearViolationsFilters()" style="font-size:11px">✕ مسح الفلاتر</button>';
+  }
+  html += '</div>';
+  
+  // ─── Empty state ───
+  if(totalViolations === 0){
+    html += '<div class="empty-st" style="background:rgba(34,201,151,.05);border:1px solid rgba(34,201,151,.2);padding:30px;text-align:center;border-radius:12px">';
+    html += '<div style="font-size:48px;margin-bottom:10px">🎉</div>';
+    html += '<div style="font-size:14px;font-weight:700;color:var(--green)">لا توجد مخالفات!</div>';
+    html += '<div style="font-size:11px;color:var(--text2);margin-top:5px">كل السيلز ملتزمين بمواعيد التواصل والمتابعة</div>';
+    html += '</div>';
+    $("rpt-violations").innerHTML = html;
+    return;
+  }
+  
+  // ─── Main table: Sales × Violations ───
+  html += '<div class="card" style="margin-bottom:14px">';
+  html += '<div class="card-title">📊 جدول المخالفات حسب السيلز</div>';
+  html += '<div class="card-sub">اضغط على رقم لعرض التفاصيل · ترتيب من الأعلى للأقل</div>';
+  
+  html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px">';
+  html += '<thead><tr style="background:var(--bg2);border-bottom:2px solid var(--border)">';
+  html += '<th style="padding:9px 12px;text-align:right;font-weight:700;color:var(--text2);font-size:11px">#</th>';
+  html += '<th style="padding:9px 12px;text-align:right;font-weight:700;color:var(--text2);font-size:11px">السيلز</th>';
+  html += '<th style="padding:9px 12px;text-align:center;font-weight:700;color:var(--red);font-size:11px;min-width:90px">🚨 SLA 1</th>';
+  html += '<th style="padding:9px 12px;text-align:center;font-weight:700;color:var(--orange);font-size:11px;min-width:90px">⏰ SLA 2</th>';
+  html += '<th style="padding:9px 12px;text-align:center;font-weight:700;color:var(--red);font-size:11px;min-width:80px">⚠ Total</th>';
+  html += '<th style="padding:9px 12px;text-align:center;font-weight:700;color:var(--text2);font-size:11px;min-width:100px">Score</th>';
+  html += '</tr></thead><tbody>';
+  
+  salesArr.forEach((s, idx) => {
+    if(s.total === 0) return; // skip clean sales
+    const scoreColor = s.total >= 10 ? "var(--red)" : s.total >= 5 ? "var(--orange)" : "var(--green)";
+    const scoreLabel = s.total >= 10 ? "🔴 High" : s.total >= 5 ? "🟡 Medium" : "🟢 Low";
+    const medal = idx===0 ? "🥇" : idx===1 ? "🥈" : idx===2 ? "🥉" : "";
+    html += '<tr style="border-bottom:1px solid var(--border)">';
+    html += '<td style="padding:9px 12px;color:var(--text3);font-weight:600">'+(idx+1)+' '+medal+'</td>';
+    html += '<td style="padding:9px 12px;font-weight:700">'+s.name+'</td>';
+    
+    // SLA1 cell
+    if(s.sla1 > 0){
+      html += '<td style="padding:9px 12px;text-align:center"><span onclick="showViolationsDetail(\''+s.id+'\',\'sla1\')" style="background:rgba(245,82,82,.12);color:var(--red);padding:5px 12px;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer;display:inline-block" title="عرض التفاصيل">'+s.sla1+'</span></td>';
+    } else {
+      html += '<td style="padding:9px 12px;text-align:center;color:var(--text4)">—</td>';
+    }
+    
+    // SLA2 cell
+    if(s.sla2 > 0){
+      html += '<td style="padding:9px 12px;text-align:center"><span onclick="showViolationsDetail(\''+s.id+'\',\'sla2\')" style="background:rgba(245,146,74,.12);color:var(--orange);padding:5px 12px;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer;display:inline-block" title="عرض التفاصيل">'+s.sla2+'</span></td>';
+    } else {
+      html += '<td style="padding:9px 12px;text-align:center;color:var(--text4)">—</td>';
+    }
+    
+    // Total cell
+    html += '<td style="padding:9px 12px;text-align:center"><span onclick="showViolationsDetail(\''+s.id+'\',\'all\')" style="background:rgba(245,82,82,.18);color:var(--red);padding:5px 14px;border-radius:6px;font-weight:800;font-size:14px;cursor:pointer;display:inline-block">'+s.total+'</span></td>';
+    
+    // Score
+    html += '<td style="padding:9px 12px;text-align:center"><span style="background:'+scoreColor+';opacity:.15;color:'+scoreColor+';padding:4px 10px;border-radius:5px;font-weight:700;font-size:11px;background:rgba(245,82,82,.1)">'+scoreLabel+'</span></td>';
+    
+    html += '</tr>';
+  });
+  
+  // Totals row
+  html += '<tr style="background:var(--bg3);border-top:2px solid var(--border);font-weight:800">';
+  html += '<td style="padding:10px 12px" colspan="2">الإجمالي</td>';
+  html += '<td style="padding:10px 12px;text-align:center;color:var(--red);font-size:14px">'+totalSla1+'</td>';
+  html += '<td style="padding:10px 12px;text-align:center;color:var(--orange);font-size:14px">'+totalSla2+'</td>';
+  html += '<td style="padding:10px 12px;text-align:center;color:var(--red);font-size:15px">'+totalViolations+'</td>';
+  html += '<td style="padding:10px 12px"></td>';
+  html += '</tr>';
+  
+  html += '</tbody></table></div></div>';
+  
+  // ─── Two-column charts ───
+  html += '<div class="g2" style="margin-bottom:14px">';
+  
+  // Chart 1: Bar chart per sales
+  html += '<div class="card"><div class="card-title">📊 المخالفات لكل سيلز</div>';
+  html += '<div class="card-sub">SLA1 vs SLA2</div>';
+  html += '<canvas id="viol-bar" height="220"></canvas>';
+  html += '</div>';
+  
+  // Chart 2: Donut by violation type
+  html += '<div class="card"><div class="card-title">🍩 توزيع أنواع المخالفات</div>';
+  html += '<div class="card-sub">نسبة SLA1 إلى SLA2</div>';
+  html += '<canvas id="viol-donut" height="220"></canvas>';
+  html += '</div>';
+  
+  html += '</div>';
+  
+  // ─── Worst offender card ───
+  if(worstSales && worstSales.total > 0){
+    html += '<div class="card" style="background:linear-gradient(135deg,rgba(245,82,82,.05),rgba(245,146,74,.03));border:1px solid rgba(245,82,82,.2);margin-bottom:14px">';
+    html += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">';
+    html += '<div style="font-size:42px">🎯</div>';
+    html += '<div style="flex:1;min-width:200px">';
+    html += '<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">أكثر سيلز مخالفات</div>';
+    html += '<div style="font-size:18px;font-weight:800;color:var(--red);margin-bottom:3px">'+worstSales.name+'</div>';
+    html += '<div style="font-size:12px;color:var(--text2)">';
+    html += '⚠ <strong>'+worstSales.total+'</strong> مخالفة · ';
+    html += '🚨 SLA1: <strong>'+worstSales.sla1+'</strong> · ';
+    html += '⏰ SLA2: <strong>'+worstSales.sla2+'</strong>';
+    html += '</div></div>';
+    html += '<button class="btn primary" onclick="showViolationsDetail(\''+worstSales.id+'\',\'all\')">👁 عرض كل مخالفاته</button>';
+    html += '</div></div>';
+  }
+  
+  $("rpt-violations").innerHTML = html;
+  
+  // ─── Render Charts ───
+  setTimeout(() => {
+    // Bar chart: Sales × violations
+    const barCtx = document.getElementById('viol-bar');
+    if(barCtx && activeSales.length > 0){
+      if(charts['viol-bar']) charts['viol-bar'].destroy();
+      charts['viol-bar'] = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: activeSales.slice(0,8).map(s => s.name),
+          datasets: [
+            {label: 'SLA 1', data: activeSales.slice(0,8).map(s => s.sla1), backgroundColor: '#F55252'},
+            {label: 'SLA 2', data: activeSales.slice(0,8).map(s => s.sla2), backgroundColor: '#F5924A'}
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {legend: {labels: {color: '#6B72A0', font: {size: 10}}}},
+          scales: {
+            x: {stacked: true, ticks: {color: '#6B72A0', font: {size: 9}}, grid: {color: 'rgba(255,255,255,0.05)'}},
+            y: {stacked: true, ticks: {color: '#6B72A0', font: {size: 9}, precision: 0}, grid: {color: 'rgba(255,255,255,0.05)'}, beginAtZero: true}
+          }
+        }
+      });
+    }
+    
+    // Donut chart: Violation types
+    const donutCtx = document.getElementById('viol-donut');
+    if(donutCtx && (totalSla1 > 0 || totalSla2 > 0)){
+      if(charts['viol-donut']) charts['viol-donut'].destroy();
+      charts['viol-donut'] = new Chart(donutCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['SLA 1 (توقيت التواصل)', 'SLA 2 (تاريخ المتابعة)'],
+          datasets: [{
+            data: [totalSla1, totalSla2],
+            backgroundColor: ['#F55252', '#F5924A'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {legend: {labels: {color: '#6B72A0', font: {size: 10}}, position: 'bottom'}},
+          cutout: '55%'
+        }
+      });
+    }
+  }, 50);
+}
+
+function onViolationsSalesChange(v){
+  window._violationsState.filterSales = v;
+  renderViolationsTab();
+}
+function onViolationsTypeChange(v){
+  window._violationsState.filterType = v;
+  renderViolationsTab();
+}
+function clearViolationsFilters(){
+  window._violationsState.filterSales = "all";
+  window._violationsState.filterType = "all";
+  renderViolationsTab();
+}
+
+// Drill-down modal: show all violations for a specific sales + type
+function showViolationsDetail(salesId, type){
+  const allLeads = rpL();
+  const violations = [];
+  
+  allLeads.forEach(l => {
+    if(String(l.repId) !== String(salesId)) return;
+    if(sla1St(l) === "breach" && (type === "all" || type === "sla1")){
+      violations.push({
+        type: "sla1",
+        leadObj: l,
+        delay: sla1Hrs(l),
+        unit: "ساعة",
+        date: l.dt + " " + (l.tm||"")
+      });
+    }
+    if(sla2St(l) === "late" && (type === "all" || type === "sla2")){
+      const days = Math.round((new Date() - new Date(l.fuDate+"T00:00"))/86400000);
+      violations.push({
+        type: "sla2",
+        leadObj: l,
+        delay: days,
+        unit: "يوم",
+        date: l.fuDate
+      });
+    }
+  });
+  
+  const sales = SALES_USERS.find(s => String(s.id) === String(salesId));
+  const salesName = sales?.name || "غير معروف";
+  const typeLabel = type === "all" ? "كل المخالفات" : type === "sla1" ? "SLA 1 فقط" : "SLA 2 فقط";
+  
+  // Build modal
+  let html = '<div class="mov open" id="viol-detail-modal" onclick="if(event.target===this)closeM(\'viol-detail-modal\')">';
+  html += '<div class="modal" style="max-width:680px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">';
+  html += '<div class="mhdr"><h2>⚠️ مخالفات '+salesName+' — '+typeLabel+'</h2><button class="mx" onclick="closeM(\'viol-detail-modal\')">×</button></div>';
+  html += '<div class="mbody" style="overflow-y:auto;flex:1">';
+  
+  // Summary
+  html += '<div style="background:var(--bg3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--text2)">';
+  html += '<strong style="color:var(--red);font-size:14px">'+violations.length+'</strong> مخالفة · ';
+  html += 'الفترة: <strong>'+periodLabel(adminRptPeriod)+'</strong>';
+  html += '</div>';
+  
+  if(violations.length === 0){
+    html += '<div class="empty-st"><div class="empty-icon">✓</div><div class="empty-ttl">لا توجد مخالفات</div></div>';
+  } else {
+    // List of violations
+    violations.sort((a,b) => b.delay - a.delay).forEach(v => {
+      const l = v.leadObj;
+      const isHighDelay = (v.type==="sla1" && v.delay > 48) || (v.type==="sla2" && v.delay > 7);
+      const bgColor = v.type === "sla1" ? "rgba(245,82,82,.08)" : "rgba(245,146,74,.08)";
+      const borderColor = v.type === "sla1" ? "rgba(245,82,82,.3)" : "rgba(245,146,74,.3)";
+      const typeLabelV = v.type === "sla1" ? "🚨 SLA 1" : "⏰ SLA 2";
+      const typeColor = v.type === "sla1" ? "var(--red)" : "var(--orange)";
+      
+      html += '<div style="background:'+bgColor+';border:1px solid '+borderColor+';border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">';
+      html += '<div style="flex:1;min-width:200px">';
+      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">';
+      html += '<span style="background:'+typeColor+';opacity:.15;background:rgba(245,82,82,.12);color:'+typeColor+';padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">'+typeLabelV+'</span>';
+      if(isHighDelay) html += '<span style="background:rgba(245,82,82,.15);color:var(--red);padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700">🔥 شديد</span>';
+      html += '</div>';
+      html += '<div style="font-size:13px;font-weight:700;margin-bottom:2px">'+l.nm+'</div>';
+      html += '<div style="font-size:11px;color:var(--text2)">';
+      html += '📅 '+v.date+' · ⏱ متأخر <strong style="color:'+typeColor+'">'+v.delay+' '+v.unit+'</strong>';
+      if(l.mob) html += ' · 📱 '+l.mob;
+      html += '</div>';
+      html += '</div>';
+      html += '<button class="btn sm" onclick="closeM(\'viol-detail-modal\');viewLead('+l.id+')" style="background:var(--blue-bg);color:var(--blue2);border:1px solid rgba(75,124,245,.3);font-size:11px">👁 عرض الـ Lead</button>';
+      html += '</div>';
+    });
+  }
+  
+  html += '</div>';
+  html += '<div class="mftr"><button class="btn" onclick="closeM(\'viol-detail-modal\')">إغلاق</button></div>';
+  html += '</div></div>';
+  
+  const wrap = document.createElement("div"); wrap.innerHTML = html;
+  document.body.appendChild(wrap.firstChild);
+}
+
+// Export violations to Excel
+function exportViolationsExcel(){
+  const allLeads = rpL();
+  const rows = [];
+  
+  allLeads.forEach(l => {
+    if(!l.repId) return;
+    if(sla1St(l) === "breach"){
+      rows.push({
+        "السيلز": l.rep || "غير محدد",
+        "نوع المخالفة": "SLA 1 - توقيت التواصل",
+        "اسم العميل": l.nm || "",
+        "الموبايل": l.mob || "",
+        "تاريخ الـ Lead": l.dt + " " + (l.tm||""),
+        "مدة التأخير": sla1Hrs(l) + " ساعة",
+        "الحالة": l.st || "بدون حالة",
+        "الكوردينتور": l.by || ""
+      });
+    }
+    if(sla2St(l) === "late"){
+      const days = Math.round((new Date() - new Date(l.fuDate+"T00:00"))/86400000);
+      rows.push({
+        "السيلز": l.rep || "غير محدد",
+        "نوع المخالفة": "SLA 2 - تاريخ المتابعة",
+        "اسم العميل": l.nm || "",
+        "الموبايل": l.mob || "",
+        "تاريخ المتابعة المتأخرة": l.fuDate,
+        "مدة التأخير": days + " يوم",
+        "الحالة": l.st || "",
+        "الكوردينتور": l.by || ""
+      });
+    }
+  });
+  
+  if(rows.length === 0){
+    showToast("ℹ","لا توجد مخالفات للتصدير");
+    return;
+  }
+  
+  try {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:18},{wch:22},{wch:25},{wch:14},{wch:18},{wch:14},{wch:14},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws, "Violations");
+    const fname = "SLL_Violations_"+new Date().toISOString().slice(0,10)+".xlsx";
+    XLSX.writeFile(wb, fname);
+    showToast("✓","تم تصدير "+rows.length+" مخالفة");
+  } catch(e){
+    showToast("❌","فشل التصدير: "+e.message);
+  }
 }
 
 // ═══ SETTINGS ═══
