@@ -829,7 +829,10 @@ function myLeads(){
   if(u.role==="coordinator")return LEADS.filter(l=>l.byId===u.id);
   return LEADS.filter(l=>l.repId===u.id);
 }
-function todayFU(){return myLeads().filter(l=>sla2St(l)==="today");}
+function todayFU(){return myLeads().filter(l=>{
+  const st=sla2St(l);
+  return st==="today"||st==="late";
+});}
 function lateFU(){return myLeads().filter(l=>sla2St(l)==="late");}
 function newLeads(){return myLeads().filter(l=>isNew(l));}
 function priorityLeads(){return myLeads().filter(l=>needsAction(l));}
@@ -1844,7 +1847,7 @@ function dashSales(){
   const sla2b=myLeads().filter(x=>sla2St(x)==="late");
   let html='<div class="kpi-row c4">';
   html+=kc("🆕 عملاء جدد اليوم",newToday.length,"var(--cyan)","تم استلامهم اليوم",newToday.length>0?"warn":"");
-  html+=kc("📅 متابعات اليوم",tf.length,"var(--orange)",tf.length>0?"يحتاجون اتصال اليوم":"لا يوجد",tf.length>0?"warn":"");
+  html+=kc("📅 متابعات اليوم",tf.length,"var(--orange)",tf.length>0?"اليوم أو فات الميعاد":"لا يوجد",tf.length>0?"warn":"");
   html+=kcClick("⚠ SLA 1 — توقيت التواصل",sla1b.length,"var(--red)","+24h بدون حالة","","applySlaFilter('sla1')","الالتزام بتوقيت التواصل خلال 24 ساعة عمل — اضغط للفلتر");
   html+=kcClick("⏰ SLA 2 — تاريخ المتابعة",sla2b.length,"var(--red)","فات تاريخ المتابعة","","applySlaFilter('sla2')","عملاء فات تاريخ متابعتهم ولم يتم التواصل — اضغط للفلتر");
   html+='</div>';
@@ -2143,21 +2146,18 @@ function filteredL(){
   if(dtTo)l=l.filter(x=>x.dt&&x.dt<=dtTo);
   if(fuFrom)l=l.filter(x=>(x.fuDate||"")>=fuFrom);
   if(fuTo)l=l.filter(x=>(x.fuDate||"")<=fuTo);
-  // ★ "اليوم" combined filter — 4 categories:
-  //   1) Registered today  (dt === today)
-  //   2) Follow-up today   (fuDate === today)
-  //   3) New + no answer   (status empty OR "لم يتم الرد")
-  //   4) Overdue follow-ups (fuDate < today AND not 'عميل فعلي' AND not 'لاغي')
+  // ★ "اليوم" filter — يعرض للسيلز ما يحتاج تواصل اليوم:
+  //   A) Leads جديدة (status فاضي) من اليوم أو قبله — لسه ما اتعملوش
+  //   B) Leads ميعاد متابعتها اليوم أو فات (لازم نكلمه)
+  //      مع استثناء: عميل فعلي / لاغي / لم يتم الرد
   if(_todayFilterActive){
     const t=_todayFilterActive;
     l=l.filter(x=>{
-      const regToday=x.dt===t;
-      const fuToday=x.fuDate===t;
-      // ★ "لم يتم الرد" مش في "جديد بدون رد" — هي حالة خاصة لوحدها
-      const newNoAnswer=(!x.st||x.st==="");
-      // ★ "لم يتم الرد" + "لاغي" مستثناة من الـ overdue
-      const overdueFU=x.fuDate && x.fuDate<t && !["عميل فعلي","لاغي","لم يتم الرد"].includes(x.st);
-      return regToday||fuToday||newNoAnswer||overdueFU;
+      // A) جديد بدون status (اليوم أو قبله)
+      const newAwaiting = (!x.st || x.st==="") && (x.dt && x.dt<=t);
+      // B) متابعة لازم تتعمل (اليوم أو فات الميعاد)
+      const followupDue = x.fuDate && x.fuDate<=t && !["عميل فعلي","لاغي","لم يتم الرد"].includes(x.st);
+      return newAwaiting || followupDue;
     });
   }
   // ★ SLA Filter — لما اليوزر يضغط على كرت SLA في الـ Dashboard
