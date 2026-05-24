@@ -7680,6 +7680,127 @@ async function loadChannels(){
   }
 }
 
+// ═══ Per-user visible channels (localStorage) ═══
+function _contactsVisibleKey(){
+  return "sll-contacts-visible-"+(curUser?.id||"anon");
+}
+function getVisibleChannels(){
+  // Returns array of channel names that should be visible
+  // Default: first 5 channels visible (user can enable more)
+  try {
+    const saved = localStorage.getItem(_contactsVisibleKey());
+    if(saved){
+      const arr = JSON.parse(saved);
+      if(Array.isArray(arr)) return arr;
+    }
+  } catch(e){}
+  // Default: first 5 channels (or all if fewer than 5)
+  return CHANNELS.slice(0, 5).map(c => c.name);
+}
+function setVisibleChannels(names){
+  try {
+    localStorage.setItem(_contactsVisibleKey(), JSON.stringify(names));
+  } catch(e){}
+}
+function visibleChannelObjects(){
+  // Returns CHANNELS filtered to only visible ones, preserving order from CHANNELS
+  const vis = new Set(getVisibleChannels());
+  return CHANNELS.filter(c => vis.has(c.name));
+}
+
+// ═══ Channels Picker Modal (per-user) ═══
+function openChannelsPicker(){
+  if(CHANNELS.length === 0){
+    showToast("⚠","لا توجد قنوات");
+    return;
+  }
+  const currentVisible = new Set(getVisibleChannels());
+  
+  let html = '<div class="mov open" id="ch-picker-modal" onclick="if(event.target===this)closeM(\'ch-picker-modal\')">';
+  html += '<div class="modal" style="max-width:480px;max-height:85vh;display:flex;flex-direction:column">';
+  html += '<div class="mhdr"><h2>📋 اختيار القنوات الظاهرة</h2><button class="mx" onclick="closeM(\'ch-picker-modal\')">×</button></div>';
+  html += '<div class="mbody" style="overflow-y:auto;flex:1">';
+  
+  // Description
+  html += '<div style="background:var(--bg3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:var(--text2);line-height:1.7">';
+  html += '✓ اختر القنوات اللي تحب تظهر في الجدول<br>';
+  html += '⚙️ الاختيار يحفظ تلقائياً عند الضغط على "حفظ"<br>';
+  html += '💡 البيانات في القنوات المخفية تفضل محفوظة';
+  html += '</div>';
+  
+  // Quick actions
+  html += '<div style="display:flex;gap:6px;margin-bottom:10px">';
+  html += '<button class="btn sm" onclick="picker_selectAll()" style="font-size:11px;flex:1">✓ اختر الكل</button>';
+  html += '<button class="btn sm" onclick="picker_deselectAll()" style="font-size:11px;flex:1">○ إلغاء الكل</button>';
+  html += '</div>';
+  
+  // Channel list (checkboxes)
+  html += '<div style="background:var(--bg3);border-radius:8px;padding:8px;max-height:340px;overflow-y:auto">';
+  CHANNELS.forEach(c => {
+    const isChecked = currentVisible.has(c.name);
+    html += '<label class="ch-pick-row" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:6px;cursor:pointer;background:var(--surface);border:1px solid '+(isChecked?'rgba(34,201,151,.3)':'var(--border)')+';margin-bottom:5px;transition:all .15s" onmouseover="this.style.borderColor=\'var(--blue2)\'" onmouseout="this.style.borderColor=\''+(isChecked?'rgba(34,201,151,.3)':'var(--border)')+'\'">';
+    html += '<input type="checkbox" class="ch-pick-cb" data-name="'+c.name.replace(/"/g,'&quot;')+'" '+(isChecked?'checked':'')+' style="width:18px;height:18px;cursor:pointer;accent-color:var(--green)">';
+    html += '<div style="flex:1;font-size:12px;font-weight:600;color:var(--text)">'+c.name+'</div>';
+    if(isChecked) html += '<span style="font-size:10px;color:var(--green);font-weight:700">ظاهر</span>';
+    else html += '<span style="font-size:10px;color:var(--text3)">مخفي</span>';
+    html += '</label>';
+  });
+  html += '</div>';
+  
+  // Counter
+  html += '<div id="ch-pick-counter" style="margin-top:10px;text-align:center;font-size:11px;color:var(--text2);font-weight:600"></div>';
+  
+  html += '</div>';
+  // Footer
+  html += '<div class="mftr">';
+  html += '<button class="btn" onclick="closeM(\'ch-picker-modal\')">إلغاء</button>';
+  html += '<button class="btn primary" onclick="picker_save()">💾 حفظ</button>';
+  html += '</div>';
+  html += '</div></div>';
+  
+  const wrap = document.createElement("div"); wrap.innerHTML = html;
+  document.body.appendChild(wrap.firstChild);
+  
+  // Wire up checkbox change events to update counter
+  setTimeout(() => {
+    document.querySelectorAll(".ch-pick-cb").forEach(cb => {
+      cb.addEventListener("change", _updatePickerCounter);
+    });
+    _updatePickerCounter();
+  }, 50);
+}
+
+function _updatePickerCounter(){
+  const total = document.querySelectorAll(".ch-pick-cb").length;
+  const checked = document.querySelectorAll(".ch-pick-cb:checked").length;
+  const counter = document.getElementById("ch-pick-counter");
+  if(counter){
+    counter.innerHTML = '<span style="color:var(--green)">'+checked+'</span> / '+total+' قناة مختارة';
+  }
+}
+
+function picker_selectAll(){
+  document.querySelectorAll(".ch-pick-cb").forEach(cb => { cb.checked = true; });
+  _updatePickerCounter();
+}
+function picker_deselectAll(){
+  document.querySelectorAll(".ch-pick-cb").forEach(cb => { cb.checked = false; });
+  _updatePickerCounter();
+}
+function picker_save(){
+  const selected = [];
+  document.querySelectorAll(".ch-pick-cb:checked").forEach(cb => {
+    selected.push(cb.dataset.name);
+  });
+  if(selected.length === 0){
+    if(!confirm("لم تختر أي قناة — هل تريد إخفاء كل القنوات؟")) return;
+  }
+  setVisibleChannels(selected);
+  closeM("ch-picker-modal");
+  showToast("✓","تم حفظ الاختيار");
+  renderContacts();
+}
+
 function _curMonthStr(){
   const d=new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
@@ -7766,6 +7887,8 @@ function renderContactsUI(data){
   const coordId = _contactsViewState.coordId;
   const daysCnt = _daysInMonth(month);
   const isAdmin = curUser.role === "admin";
+  // ★ Use user's visible channels selection
+  const visChannels = visibleChannelObjects();
   
   let html = '';
   
@@ -7796,6 +7919,10 @@ function renderContactsUI(data){
   
   // Action buttons
   html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  // ★ NEW: Channels picker (per-user)
+  const hiddenCount = CHANNELS.length - visChannels.length;
+  const channelBtnLabel = hiddenCount > 0 ? '📋 Channels ('+visChannels.length+'/'+CHANNELS.length+')' : '📋 Channels';
+  html += '<button class="btn" onclick="openChannelsPicker()" style="font-size:11px;background:var(--purple-bg);color:var(--purple2);border:1px solid rgba(168,85,247,.3)">'+channelBtnLabel+'</button>';
   if(isAdmin){
     html += '<button class="btn" onclick="openManageChannels()" style="font-size:11px">⚙ إدارة القنوات</button>';
   }
@@ -7806,7 +7933,7 @@ function renderContactsUI(data){
   
   html += '</div>';
   
-  // Summary card
+  // Summary card — show all channel totals (computed from ALL data) but display only visible
   let monthTotal = 0;
   const channelTotals = {};
   CHANNELS.forEach(c=>{channelTotals[c.name]=0;});
@@ -7819,8 +7946,9 @@ function renderContactsUI(data){
   });
   
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">';
-  html += '<div class="kc"><div class="kc-acc" style="background:var(--blue)"></div><div class="kc-lbl">إجمالي الشهر</div><div class="kc-val" style="color:var(--blue)">'+monthTotal+'</div><div class="kc-sub">'+_monthLabel(month)+'</div></div>';
-  CHANNELS.slice(0,4).forEach(c=>{
+  html += '<div class="kc"><div class="kc-acc" style="background:var(--blue)"></div><div class="kc-lbl">إجمالي الشهر</div><div class="kc-val" style="color:var(--blue)">'+monthTotal+'</div><div class="kc-sub">'+_monthLabel(month)+' · كل القنوات</div></div>';
+  // ★ Show top 4 from VISIBLE channels (not all)
+  visChannels.slice(0,4).forEach(c=>{
     html += '<div class="kc"><div class="kc-acc" style="background:var(--orange)"></div><div class="kc-lbl">'+c.name+'</div><div class="kc-val" style="color:var(--orange)">'+channelTotals[c.name]+'</div><div class="kc-sub">contacts</div></div>';
   });
   html += '</div>';
@@ -7829,20 +7957,24 @@ function renderContactsUI(data){
   html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">';
   html += '<div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;align-items:center;justify-content:space-between">';
   html += '<div style="font-weight:700;font-size:13px">📊 '+_monthLabel(month)+'</div>';
-  html += '<div style="font-size:10px;color:var(--text3)">انقر أي خانة للتعديل</div>';
+  if(hiddenCount > 0){
+    html += '<div style="font-size:10px;color:var(--purple2);font-weight:600">'+hiddenCount+' قناة مخفية · <span onclick="openChannelsPicker()" style="text-decoration:underline;cursor:pointer">إظهار</span></div>';
+  } else {
+    html += '<div style="font-size:10px;color:var(--text3)">انقر أي خانة للتعديل</div>';
+  }
   html += '</div>';
   
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;direction:rtl">';
-  // Header
+  // Header — use visible channels only
   html += '<thead><tr style="background:var(--bg2);border-bottom:2px solid var(--border)">';
   html += '<th style="text-align:center;padding:8px 10px;font-weight:700;color:var(--text2);font-size:10px;width:60px;border-left:1px solid var(--border)">اليوم</th>';
-  CHANNELS.forEach(c=>{
+  visChannels.forEach(c=>{
     html += '<th style="text-align:center;padding:8px 10px;font-weight:700;color:var(--text2);font-size:10px;min-width:90px;border-left:1px solid var(--border)">'+c.name+'</th>';
   });
   html += '<th style="text-align:center;padding:8px 10px;font-weight:700;color:var(--blue2);font-size:10px;min-width:80px;background:rgba(75,124,245,.04)">إجمالي اليوم</th>';
   html += '</tr></thead><tbody>';
   
-  // Days rows
+  // Days rows — use visible channels for inputs; day total counts ALL channels (visible+hidden)
   const today = new Date().toISOString().slice(0,10);
   for(let day=1; day<=daysCnt; day++){
     const dateStr = month + "-" + String(day).padStart(2,"0");
@@ -7853,7 +7985,7 @@ function renderContactsUI(data){
     
     html += '<tr style="border-bottom:1px solid var(--border);'+(isToday?'background:rgba(75,124,245,.05)':'')+'">';
     html += '<td style="padding:6px 10px;text-align:center;font-weight:700;color:'+(isToday?'var(--blue2)':'var(--text2)')+';font-size:11px;border-left:1px solid var(--border)">'+day+(isToday?' 🔵':'')+'</td>';
-    CHANNELS.forEach(c=>{
+    visChannels.forEach(c=>{
       const val = dayData[c.name] || 0;
       html += '<td style="padding:2px 4px;text-align:center;border-left:1px solid var(--border)">';
       html += '<input type="number" min="0" value="'+(val||"")+'" placeholder="0" data-date="'+dateStr+'" data-channel="'+c.name+'" onblur="saveContactCell(this)" style="width:60px;height:28px;text-align:center;background:'+(val>0?'rgba(34,201,151,.06)':'transparent')+';border:1px solid '+(val>0?'rgba(34,201,151,.3)':'transparent')+';border-radius:5px;color:var(--text);font-size:11px;font-weight:'+(val>0?'700':'400')+'">';
@@ -7863,10 +7995,10 @@ function renderContactsUI(data){
     html += '</tr>';
   }
   
-  // Footer (totals)
+  // Footer (totals) — visible channels totals + monthTotal for all
   html += '<tr style="background:var(--bg2);border-top:2px solid var(--border);font-weight:700">';
   html += '<td style="padding:8px 10px;text-align:center;color:var(--text);font-size:11px;border-left:1px solid var(--border)">الإجمالي</td>';
-  CHANNELS.forEach(c=>{
+  visChannels.forEach(c=>{
     html += '<td style="padding:8px 10px;text-align:center;color:var(--orange);font-size:13px;border-left:1px solid var(--border)">'+channelTotals[c.name]+'</td>';
   });
   html += '<td style="padding:8px 10px;text-align:center;color:var(--blue);font-size:14px;background:rgba(75,124,245,.08)">'+monthTotal+'</td>';
