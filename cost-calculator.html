@@ -2554,93 +2554,62 @@ function renderCoverPage(ctx){
   const oppAlign = isEn ? 'right' : 'left';
 
   return `
-    <div class="pdf-page" style="background:#FFC107;padding:0;margin:0;position:relative;overflow:hidden;direction:${dirAttr};width:210mm;height:297mm;">
+    <div class="pdf-page" style="background:#FAF7F2;padding:0;margin:0;position:relative;overflow:hidden;direction:${dirAttr};width:210mm;height:297mm;">
       
       <!-- ═══════════════════════════════════════════════
-           STYLE E — GLOBAL NETWORK (Premium Refined)
-           Clean wireframe globe + animated-look port nodes
+           STYLE E — GLOBAL NETWORK (Refined & Elegant)
+           Clean wireframe globe + 3 clear nodes
            ═══════════════════════════════════════════════ -->
       
-      <!-- Subtle warm gradient overlay -->
-      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 35%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0) 55%);z-index:1;"></div>
-      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 20% 80%, rgba(58,57,58,0.06) 0%, rgba(58,57,58,0) 50%);z-index:1;"></div>
+      <!-- Soft warm gradient atmosphere -->
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%, rgba(255,193,7,0.06) 0%, rgba(255,193,7,0) 60%);z-index:1;"></div>
       
-      <!-- Premium Wireframe Globe (positioned above info cards) -->
-      <svg style="position:absolute;top:108mm;left:50%;transform:translateX(-50%);width:165mm;height:165mm;opacity:0.13;z-index:2;pointer-events:none;" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+      <!-- Premium Wireframe Globe — refined positioning -->
+      <svg style="position:absolute;top:115mm;left:50%;transform:translateX(-50%);width:155mm;height:155mm;opacity:0.14;z-index:2;pointer-events:none;" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
         <g transform="translate(200,200)" fill="none" stroke="#3A393A" stroke-width="1.1" stroke-linecap="round">
           <!-- Main equatorial circle -->
-          <circle r="180" stroke-width="1.4"/>
+          <circle r="180" stroke-width="1.5"/>
           <!-- Horizontal meridians -->
-          <ellipse rx="180" ry="55" opacity="0.85"/>
-          <ellipse rx="180" ry="110" opacity="0.7"/>
-          <ellipse rx="180" ry="160" opacity="0.55"/>
+          <ellipse rx="180" ry="50" opacity="0.85"/>
+          <ellipse rx="180" ry="105" opacity="0.65"/>
+          <ellipse rx="180" ry="155" opacity="0.45"/>
           <!-- Vertical meridians -->
-          <ellipse rx="55" ry="180" opacity="0.85"/>
-          <ellipse rx="110" ry="180" opacity="0.7"/>
-          <ellipse rx="160" ry="180" opacity="0.55"/>
+          <ellipse rx="50" ry="180" opacity="0.85"/>
+          <ellipse rx="105" ry="180" opacity="0.65"/>
+          <ellipse rx="155" ry="180" opacity="0.45"/>
           <!-- Pole indicator dots -->
-          <circle cx="0" cy="-180" r="2.5" fill="#3A393A" stroke="none"/>
-          <circle cx="0" cy="180" r="2.5" fill="#3A393A" stroke="none"/>
+          <circle cx="0" cy="-180" r="3" fill="#3A393A" stroke="none"/>
+          <circle cx="0" cy="180" r="3" fill="#3A393A" stroke="none"/>
         </g>
       </svg>
       
-      <!-- Elegant Network Routes (smooth curves, no dashed clutter) -->
-      <svg style="position:absolute;top:108mm;left:0;width:100%;height:165mm;z-index:3;pointer-events:none;" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <!-- Gradient for main route (origin → destination) -->
-          <linearGradient id="route-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#EC1C23" stop-opacity="0.95"/>
-            <stop offset="50%" stop-color="#EC1C23" stop-opacity="1"/>
-            <stop offset="100%" stop-color="#EC1C23" stop-opacity="0.95"/>
-          </linearGradient>
-          <!-- Pulse animation effect (visual only, static) -->
-          <radialGradient id="pulse-grad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#EC1C23" stop-opacity="0.4"/>
-            <stop offset="100%" stop-color="#EC1C23" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
+      <!-- Three connected port nodes (clean, no clutter) -->
+      <svg style="position:absolute;top:115mm;left:0;width:100%;height:155mm;z-index:3;pointer-events:none;" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
         
-        <!-- Main route: solid elegant curve with subtle shadow -->
-        <path d="M 155,200 Q 400,90 645,235" fill="none" stroke="#3A393A" stroke-width="3.5" stroke-linecap="round" opacity="0.10"/>
-        <path d="M 155,200 Q 400,90 645,235" fill="none" stroke="url(#route-grad)" stroke-width="2.2" stroke-linecap="round"/>
+        <!-- Connection lines: clean triangle network -->
+        <line x1="180" y1="220" x2="620" y2="180" stroke="#EC1C23" stroke-width="2" opacity="0.75" stroke-linecap="round"/>
+        <line x1="180" y1="220" x2="400" y2="440" stroke="#EC1C23" stroke-width="1.4" opacity="0.45" stroke-dasharray="5,4"/>
+        <line x1="620" y1="180" x2="400" y2="440" stroke="#EC1C23" stroke-width="1.4" opacity="0.45" stroke-dasharray="5,4"/>
         
-        <!-- Smooth secondary route arcs (no harsh dashes) -->
-        <path d="M 155,200 Q 280,330 400,430" fill="none" stroke="#EC1C23" stroke-width="1.3" opacity="0.35"/>
-        <path d="M 645,235 Q 540,335 400,430" fill="none" stroke="#EC1C23" stroke-width="1.3" opacity="0.35"/>
-        
-        <!-- Tiny tertiary connectors (very subtle) -->
-        <path d="M 155,200 Q 110,310 170,455" fill="none" stroke="#3A393A" stroke-width="0.9" opacity="0.18"/>
-        <path d="M 645,235 Q 700,310 630,455" fill="none" stroke="#3A393A" stroke-width="0.9" opacity="0.18"/>
-        
-        <!-- Origin port (left) — Layered pulse rings -->
-        <g transform="translate(155,200)">
-          <circle r="30" fill="url(#pulse-grad)"/>
-          <circle r="20" fill="none" stroke="#EC1C23" stroke-width="0.8" opacity="0.30"/>
-          <circle r="13" fill="none" stroke="#EC1C23" stroke-width="1.2" opacity="0.55"/>
-          <circle r="8" fill="#FFFFFF" stroke="#EC1C23" stroke-width="2"/>
-          <circle r="3.5" fill="#EC1C23"/>
+        <!-- Origin port (left) — Premium dot -->
+        <g transform="translate(180,220)">
+          <circle r="14" fill="none" stroke="#EC1C23" stroke-width="1" opacity="0.35"/>
+          <circle r="9" fill="#EC1C23"/>
+          <circle r="3.5" fill="#FFFFFF"/>
         </g>
         
-        <!-- Destination port (right) — Same layered design -->
-        <g transform="translate(645,235)">
-          <circle r="30" fill="url(#pulse-grad)"/>
-          <circle r="20" fill="none" stroke="#EC1C23" stroke-width="0.8" opacity="0.30"/>
-          <circle r="13" fill="none" stroke="#EC1C23" stroke-width="1.2" opacity="0.55"/>
-          <circle r="8" fill="#FFFFFF" stroke="#EC1C23" stroke-width="2"/>
-          <circle r="3.5" fill="#EC1C23"/>
+        <!-- Destination port (right) — Same style -->
+        <g transform="translate(620,180)">
+          <circle r="14" fill="none" stroke="#EC1C23" stroke-width="1" opacity="0.35"/>
+          <circle r="9" fill="#EC1C23"/>
+          <circle r="3.5" fill="#FFFFFF"/>
         </g>
         
-        <!-- Egypt Hub (Center-bottom — Cairo) — Distinctive dark marker -->
-        <g transform="translate(400,430)">
-          <circle r="12" fill="none" stroke="#3A393A" stroke-width="0.8" opacity="0.35"/>
+        <!-- Egypt Hub (center-bottom) — Dark distinctive marker -->
+        <g transform="translate(400,440)">
+          <circle r="12" fill="none" stroke="#3A393A" stroke-width="1" opacity="0.30"/>
           <circle r="7" fill="#3A393A"/>
-          <circle r="2.5" fill="#FFC107"/>
-        </g>
-        
-        <!-- Side nodes — subtle satellite points -->
-        <g opacity="0.5">
-          <circle cx="170" cy="455" r="3.5" fill="#3A393A"/>
-          <circle cx="630" cy="455" r="3.5" fill="#3A393A"/>
+          <circle r="2.5" fill="#EC1C23"/>
         </g>
       </svg>
       
@@ -2648,9 +2617,9 @@ function renderCoverPage(ctx){
            HEADER — Real Company Logo + Name
            ═══════════════════════════════════════════════ -->
       <div style="position:absolute;top:18mm;${oppAlign}:18mm;display:flex;align-items:center;gap:14px;z-index:10;${isEn ? '' : 'flex-direction:row-reverse;'}">
-        <img src="data:image/png;base64,${PDF_LOGO_B64}" style="height:54px;width:auto;display:block;">
+        <img src="data:image/png;base64,${PDF_LOGO_B64}" style="height:58px;width:auto;display:block;">
         <div style="${isEn ? 'text-align:left;' : 'text-align:right;'}">
-          <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;color:#3A393A;line-height:1.15;letter-spacing:-0.01em;">Straight Line Logistics & Trade</div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:17px;color:#3A393A;line-height:1.15;letter-spacing:-0.01em;">Straight Line Logistics & Trade</div>
           <div style="font-weight:600;font-size:10px;color:#5A5755;margin-top:3px;line-height:1.3;">${isEn ? 'Shipping & Trading Solutions' : '\u0633\u062a\u0631\u064a\u062a \u0644\u0627\u064a\u0646 \u0644\u0644\u0634\u062d\u0646 \u0648\u0627\u0644\u062a\u062c\u0627\u0631\u0629'}</div>
         </div>
       </div>
@@ -2659,11 +2628,11 @@ function renderCoverPage(ctx){
            TITLE
            ═══════════════════════════════════════════════ -->
       <div style="position:absolute;top:75mm;${textAlign}:18mm;text-align:${textAlign};z-index:10;max-width:160mm;">
-        <div style="font-size:56px;font-weight:900;color:#3A393A;line-height:0.95;letter-spacing:-2.2px;">${t.titleAr1}</div>
-        <div style="font-size:56px;font-weight:900;color:#3A393A;line-height:0.95;letter-spacing:-2.2px;">${t.titleAr2}</div>
-        <div style="margin-top:12px;font-size:11px;color:#3A393A;font-weight:600;line-height:1.5;max-width:140mm;">${t.subtitle}</div>
+        <div style="font-size:58px;font-weight:900;color:#3A393A;line-height:0.95;letter-spacing:-2.2px;">${t.titleAr1}</div>
+        <div style="font-size:58px;font-weight:900;color:#3A393A;line-height:0.95;letter-spacing:-2.2px;">${t.titleAr2}</div>
+        <div style="margin-top:14px;font-size:12px;color:#3A393A;font-weight:600;line-height:1.5;max-width:140mm;">${t.subtitle}</div>
         <!-- Decorative line under title -->
-        <div style="margin-top:14px;width:60mm;height:3px;background:linear-gradient(to ${isEn ? 'right' : 'left'}, #EC1C23, rgba(236,28,35,0));border-radius:2px;"></div>
+        <div style="margin-top:16px;width:60mm;height:3px;background:linear-gradient(to ${isEn ? 'right' : 'left'}, #EC1C23, rgba(236,28,35,0));border-radius:2px;"></div>
       </div>
       
       <!-- ═══════════════════════════════════════════════
@@ -2672,7 +2641,7 @@ function renderCoverPage(ctx){
       <div style="position:absolute;top:222mm;left:18mm;right:18mm;z-index:10;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         
         <!-- Prepared For -->
-        <div style="background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);border:1px solid rgba(58,57,58,0.12);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+        <div style="background:#FFFFFF;border:1px solid rgba(58,57,58,0.10);box-shadow:0 2px 8px rgba(58,57,58,0.04);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
           <div style="width:34px;height:34px;background:#EC1C23;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
@@ -2684,7 +2653,7 @@ function renderCoverPage(ctx){
         </div>
         
         <!-- Quote Number -->
-        <div style="background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);border:1px solid rgba(58,57,58,0.12);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+        <div style="background:#FFFFFF;border:1px solid rgba(58,57,58,0.10);box-shadow:0 2px 8px rgba(58,57,58,0.04);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
           <div style="width:34px;height:34px;background:#EC1C23;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
           </div>
@@ -2696,7 +2665,7 @@ function renderCoverPage(ctx){
         </div>
         
         <!-- Route -->
-        <div style="background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);border:1px solid rgba(58,57,58,0.12);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+        <div style="background:#FFFFFF;border:1px solid rgba(58,57,58,0.10);box-shadow:0 2px 8px rgba(58,57,58,0.04);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
           <div style="width:34px;height:34px;background:#EC1C23;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           </div>
@@ -2708,7 +2677,7 @@ function renderCoverPage(ctx){
         </div>
         
         <!-- Shipping Type -->
-        <div style="background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);border:1px solid rgba(58,57,58,0.12);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+        <div style="background:#FFFFFF;border:1px solid rgba(58,57,58,0.10);box-shadow:0 2px 8px rgba(58,57,58,0.04);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
           <div style="width:34px;height:34px;background:#EC1C23;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="11" rx="1"/><line x1="7" y1="8" x2="7" y2="19"/><line x1="11" y1="8" x2="11" y2="19"/><line x1="15" y1="8" x2="15" y2="19"/></svg>
           </div>
@@ -4375,8 +4344,29 @@ ${fontLink}
   }
   /* Screen preview */
   @media screen {
-    body{padding:80px 20px 40px;background:#e5e7eb;display:flex;flex-direction:column;align-items:center;gap:24px;}
-    .pdf-page{margin:0;box-shadow:0 10px 30px rgba(0,0,0,0.18);background:#FFF;flex-shrink:0;}
+    html{direction:ltr;}
+    body{
+      padding:80px 20px 40px;
+      background:#e5e7eb;
+      direction:ltr;
+      min-width:230mm;
+    }
+    .pages-wrapper{
+      display:block;
+      width:210mm;
+      margin:0 auto;
+    }
+    .pdf-page{
+      width:210mm !important;
+      height:297mm !important;
+      margin:0 0 24px 0 !important;
+      box-shadow:0 10px 30px rgba(0,0,0,0.18);
+      background:#FFF;
+      display:block !important;
+      position:relative;
+      box-sizing:border-box;
+    }
+    .pdf-page:last-child{margin-bottom:0 !important;}
     .print-controls{
       position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;
       display:flex;gap:10px;background:#FFF;padding:14px 22px;
@@ -4402,7 +4392,9 @@ ${fontLink}
     ? 'In the print dialog choose <strong>"Save as PDF"</strong> — Margins: <strong>"None"</strong>'
     : 'في نافذة الطباعة اختر <strong>"حفظ بصيغة PDF"</strong> (Save as PDF) — هوامش <strong>"بدون"</strong> (None)'}</div>
 </div>
+<div class="pages-wrapper">
 ${allPagesHtml}
+</div>
 <script>
   // Auto-open print dialog after fonts have loaded
   window.addEventListener('load', function(){
