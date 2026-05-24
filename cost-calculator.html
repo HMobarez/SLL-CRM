@@ -2556,144 +2556,183 @@ function renderCoverPage(ctx){
   return `
     <div class="pdf-page" style="background:#FFC107;padding:0;margin:0;position:relative;overflow:hidden;direction:${dirAttr};width:210mm;height:297mm;">
       
-      <!-- World map background (orange/yellow tones) -->
-      <svg style="position:absolute;bottom:55mm;left:0;width:100%;height:75mm;opacity:0.18;pointer-events:none;z-index:1;" viewBox="0 0 800 250" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
-        <g fill="#C68A00">
-          <path d="M 50 60 Q 80 30 130 35 L 175 50 L 200 75 L 195 100 L 170 115 L 130 120 L 90 105 L 60 85 Z"/>
-          <path d="M 210 25 L 235 22 L 250 35 L 245 55 L 220 55 L 208 42 Z"/>
-          <path d="M 175 145 L 195 165 L 210 195 L 215 225 L 205 245 L 185 240 L 175 215 L 173 180 Z"/>
-          <path d="M 320 50 L 360 45 L 385 60 L 390 80 L 365 95 L 330 95 L 315 80 L 312 62 Z"/>
-          <path d="M 295 55 L 310 53 L 315 65 L 305 75 L 295 70 Z"/>
-          <path d="M 330 100 L 380 95 L 410 115 L 425 145 L 425 185 L 410 215 L 385 230 L 360 225 L 340 200 L 330 170 L 325 140 Z"/>
-          <path d="M 435 195 L 445 200 L 445 220 L 435 225 L 432 210 Z"/>
-          <path d="M 400 60 L 470 50 L 540 60 L 600 80 L 640 100 L 660 125 L 640 145 L 600 150 L 555 145 L 510 135 L 460 115 L 420 95 Z"/>
-          <path d="M 510 140 L 530 145 L 545 170 L 535 195 L 515 190 L 505 165 Z"/>
-          <path d="M 570 95 L 615 92 L 640 105 L 635 125 L 605 130 L 575 125 Z"/>
-          <path d="M 615 195 L 670 192 L 705 205 L 700 230 L 660 235 L 620 225 L 612 210 Z"/>
-          <path d="M 695 105 L 710 108 L 715 125 L 705 135 L 695 130 L 690 115 Z"/>
-          <path d="M 620 165 L 660 165 L 680 175 L 675 185 L 635 188 L 615 178 Z"/>
+      <!-- ═══════════════════════════════════════════════
+           STYLE E — GLOBAL NETWORK (Premium Refined)
+           Clean wireframe globe + animated-look port nodes
+           ═══════════════════════════════════════════════ -->
+      
+      <!-- Subtle warm gradient overlay -->
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 35%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0) 55%);z-index:1;"></div>
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 20% 80%, rgba(58,57,58,0.06) 0%, rgba(58,57,58,0) 50%);z-index:1;"></div>
+      
+      <!-- Premium Wireframe Globe (positioned above info cards) -->
+      <svg style="position:absolute;top:108mm;left:50%;transform:translateX(-50%);width:165mm;height:165mm;opacity:0.13;z-index:2;pointer-events:none;" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(200,200)" fill="none" stroke="#3A393A" stroke-width="1.1" stroke-linecap="round">
+          <!-- Main equatorial circle -->
+          <circle r="180" stroke-width="1.4"/>
+          <!-- Horizontal meridians -->
+          <ellipse rx="180" ry="55" opacity="0.85"/>
+          <ellipse rx="180" ry="110" opacity="0.7"/>
+          <ellipse rx="180" ry="160" opacity="0.55"/>
+          <!-- Vertical meridians -->
+          <ellipse rx="55" ry="180" opacity="0.85"/>
+          <ellipse rx="110" ry="180" opacity="0.7"/>
+          <ellipse rx="160" ry="180" opacity="0.55"/>
+          <!-- Pole indicator dots -->
+          <circle cx="0" cy="-180" r="2.5" fill="#3A393A" stroke="none"/>
+          <circle cx="0" cy="180" r="2.5" fill="#3A393A" stroke="none"/>
         </g>
       </svg>
       
-      <!-- Decorative sparkles -->
-      <div style="position:absolute;bottom:12mm;${isEn ? 'left' : 'right'}:18mm;color:#FFE082;font-size:14px;opacity:0.7;z-index:2;">\u2726</div>
-      <div style="position:absolute;bottom:18mm;${isEn ? 'left' : 'right'}:24mm;color:#FFE082;font-size:10px;opacity:0.7;z-index:2;">\u2726</div>
-      
-      <!-- Header: Logo + Company Name -->
-      <div style="position:absolute;top:18mm;${oppAlign}:18mm;display:flex;align-items:flex-start;gap:14px;z-index:5;${isEn ? '' : 'flex-direction:row-reverse;'}">
-        <img src="data:image/png;base64,${PDF_LOGO_B64}" style="height:50px;width:auto;display:block;">
-        <div style="${isEn ? 'text-align:left;' : 'text-align:right;'}padding-top:4px;">
-          <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;color:#3A393A;line-height:1.15;letter-spacing:-0.01em;">Straight Line Logistics & Trade</div>
-          <div style="font-weight:600;font-size:10px;color:#5A5755;margin-top:2px;line-height:1.3;">${isEn ? 'Shipping & Trading Solutions' : '\u0633\u062a\u0631\u064a\u062a \u0644\u0627\u064a\u0646 \u0644\u0644\u0634\u062d\u0646 \u0648\u0627\u0644\u062a\u062c\u0627\u0631\u0629'}</div>
-        </div>
-      </div>
-      
-      <!-- Title section -->
-      <div style="position:absolute;top:75mm;${textAlign}:18mm;text-align:${textAlign};z-index:5;max-width:120mm;">
-        <div style="font-size:54px;font-weight:900;color:#3A393A;line-height:0.95;letter-spacing:-2.2px;">${t.titleAr1}</div>
-        <div style="font-size:54px;font-weight:900;color:#3A393A;line-height:0.95;letter-spacing:-2.2px;">${t.titleAr2}</div>
-        <div style="margin-top:10px;font-size:11px;color:#3A393A;font-weight:600;line-height:1.5;">${t.subtitle}</div>
-      </div>
-      
-      <!-- Info Cards Grid 2x2 -->
-      <div style="position:absolute;top:145mm;${isEn ? 'left' : 'right'}:18mm;${isEn ? 'right' : 'left'}:55mm;z-index:5;display:flex;flex-direction:column;gap:11px;">
+      <!-- Elegant Network Routes (smooth curves, no dashed clutter) -->
+      <svg style="position:absolute;top:108mm;left:0;width:100%;height:165mm;z-index:3;pointer-events:none;" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <!-- Gradient for main route (origin → destination) -->
+          <linearGradient id="route-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#EC1C23" stop-opacity="0.95"/>
+            <stop offset="50%" stop-color="#EC1C23" stop-opacity="1"/>
+            <stop offset="100%" stop-color="#EC1C23" stop-opacity="0.95"/>
+          </linearGradient>
+          <!-- Pulse animation effect (visual only, static) -->
+          <radialGradient id="pulse-grad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#EC1C23" stop-opacity="0.4"/>
+            <stop offset="100%" stop-color="#EC1C23" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
         
-        <!-- Row 1 -->
-        <div style="display:flex;gap:14px;${isEn ? '' : 'flex-direction:row-reverse;'}">
-          
-          <!-- Prepared For -->
-          <div style="display:flex;align-items:center;gap:10px;flex:1;${isEn ? '' : 'flex-direction:row-reverse;'}">
-            <div style="width:32px;height:32px;background:rgba(236,28,35,0.06);border:1.5px solid #EC1C23;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EC1C23" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            </div>
-            <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:${isEn ? 'flex-start' : 'flex-end'};text-align:${textAlign};">
-              <div style="font-size:9px;color:#5A5755;font-weight:600;margin-bottom:1px;line-height:1.2;">${t.preparedFor}</div>
-              <div style="font-size:12px;font-weight:800;color:#3A393A;line-height:1.2;">${formData.clientName || '\u2014'}</div>
-              ${formData.clientCompany ? `<div style="font-size:9px;color:#5A5755;margin-top:1px;line-height:1.2;">${formData.clientCompany}</div>` : ''}
-            </div>
+        <!-- Main route: solid elegant curve with subtle shadow -->
+        <path d="M 155,200 Q 400,90 645,235" fill="none" stroke="#3A393A" stroke-width="3.5" stroke-linecap="round" opacity="0.10"/>
+        <path d="M 155,200 Q 400,90 645,235" fill="none" stroke="url(#route-grad)" stroke-width="2.2" stroke-linecap="round"/>
+        
+        <!-- Smooth secondary route arcs (no harsh dashes) -->
+        <path d="M 155,200 Q 280,330 400,430" fill="none" stroke="#EC1C23" stroke-width="1.3" opacity="0.35"/>
+        <path d="M 645,235 Q 540,335 400,430" fill="none" stroke="#EC1C23" stroke-width="1.3" opacity="0.35"/>
+        
+        <!-- Tiny tertiary connectors (very subtle) -->
+        <path d="M 155,200 Q 110,310 170,455" fill="none" stroke="#3A393A" stroke-width="0.9" opacity="0.18"/>
+        <path d="M 645,235 Q 700,310 630,455" fill="none" stroke="#3A393A" stroke-width="0.9" opacity="0.18"/>
+        
+        <!-- Origin port (left) — Layered pulse rings -->
+        <g transform="translate(155,200)">
+          <circle r="30" fill="url(#pulse-grad)"/>
+          <circle r="20" fill="none" stroke="#EC1C23" stroke-width="0.8" opacity="0.30"/>
+          <circle r="13" fill="none" stroke="#EC1C23" stroke-width="1.2" opacity="0.55"/>
+          <circle r="8" fill="#FFFFFF" stroke="#EC1C23" stroke-width="2"/>
+          <circle r="3.5" fill="#EC1C23"/>
+        </g>
+        
+        <!-- Destination port (right) — Same layered design -->
+        <g transform="translate(645,235)">
+          <circle r="30" fill="url(#pulse-grad)"/>
+          <circle r="20" fill="none" stroke="#EC1C23" stroke-width="0.8" opacity="0.30"/>
+          <circle r="13" fill="none" stroke="#EC1C23" stroke-width="1.2" opacity="0.55"/>
+          <circle r="8" fill="#FFFFFF" stroke="#EC1C23" stroke-width="2"/>
+          <circle r="3.5" fill="#EC1C23"/>
+        </g>
+        
+        <!-- Egypt Hub (Center-bottom — Cairo) — Distinctive dark marker -->
+        <g transform="translate(400,430)">
+          <circle r="12" fill="none" stroke="#3A393A" stroke-width="0.8" opacity="0.35"/>
+          <circle r="7" fill="#3A393A"/>
+          <circle r="2.5" fill="#FFC107"/>
+        </g>
+        
+        <!-- Side nodes — subtle satellite points -->
+        <g opacity="0.5">
+          <circle cx="170" cy="455" r="3.5" fill="#3A393A"/>
+          <circle cx="630" cy="455" r="3.5" fill="#3A393A"/>
+        </g>
+      </svg>
+      
+      <!-- ═══════════════════════════════════════════════
+           HEADER — Real Company Logo + Name
+           ═══════════════════════════════════════════════ -->
+      <div style="position:absolute;top:18mm;${oppAlign}:18mm;display:flex;align-items:center;gap:14px;z-index:10;${isEn ? '' : 'flex-direction:row-reverse;'}">
+        <img src="data:image/png;base64,${PDF_LOGO_B64}" style="height:54px;width:auto;display:block;">
+        <div style="${isEn ? 'text-align:left;' : 'text-align:right;'}">
+          <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;color:#3A393A;line-height:1.15;letter-spacing:-0.01em;">Straight Line Logistics & Trade</div>
+          <div style="font-weight:600;font-size:10px;color:#5A5755;margin-top:3px;line-height:1.3;">${isEn ? 'Shipping & Trading Solutions' : '\u0633\u062a\u0631\u064a\u062a \u0644\u0627\u064a\u0646 \u0644\u0644\u0634\u062d\u0646 \u0648\u0627\u0644\u062a\u062c\u0627\u0631\u0629'}</div>
+        </div>
+      </div>
+      
+      <!-- ═══════════════════════════════════════════════
+           TITLE
+           ═══════════════════════════════════════════════ -->
+      <div style="position:absolute;top:75mm;${textAlign}:18mm;text-align:${textAlign};z-index:10;max-width:160mm;">
+        <div style="font-size:56px;font-weight:900;color:#3A393A;line-height:0.95;letter-spacing:-2.2px;">${t.titleAr1}</div>
+        <div style="font-size:56px;font-weight:900;color:#3A393A;line-height:0.95;letter-spacing:-2.2px;">${t.titleAr2}</div>
+        <div style="margin-top:12px;font-size:11px;color:#3A393A;font-weight:600;line-height:1.5;max-width:140mm;">${t.subtitle}</div>
+        <!-- Decorative line under title -->
+        <div style="margin-top:14px;width:60mm;height:3px;background:linear-gradient(to ${isEn ? 'right' : 'left'}, #EC1C23, rgba(236,28,35,0));border-radius:2px;"></div>
+      </div>
+      
+      <!-- ═══════════════════════════════════════════════
+           INFO CARDS — 2x2 Grid (premium glass cards)
+           ═══════════════════════════════════════════════ -->
+      <div style="position:absolute;top:222mm;left:18mm;right:18mm;z-index:10;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        
+        <!-- Prepared For -->
+        <div style="background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);border:1px solid rgba(58,57,58,0.12);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+          <div style="width:34px;height:34px;background:#EC1C23;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
-          
-          <!-- Quote Number -->
-          <div style="display:flex;align-items:center;gap:10px;flex:1;${isEn ? '' : 'flex-direction:row-reverse;'}">
-            <div style="width:32px;height:32px;background:rgba(236,28,35,0.06);border:1.5px solid #EC1C23;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EC1C23" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
-            </div>
-            <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:${isEn ? 'flex-start' : 'flex-end'};text-align:${textAlign};">
-              <div style="font-size:9px;color:#5A5755;font-weight:600;margin-bottom:1px;line-height:1.2;">${t.quoteNum}</div>
-              <div style="font-size:12px;font-weight:800;color:#3A393A;line-height:1.2;font-family:'Outfit',sans-serif;direction:ltr;">${formData.quotationNum || '\u2014'}</div>
-              <div style="font-size:9px;color:#5A5755;margin-top:1px;line-height:1.2;">${dateDisplay}</div>
-            </div>
+          <div style="flex:1;min-width:0;text-align:${textAlign};">
+            <div style="font-size:9px;color:#5A5755;font-weight:700;line-height:1.2;text-transform:uppercase;letter-spacing:0.04em;">${t.preparedFor}</div>
+            <div style="font-size:13px;font-weight:800;color:#3A393A;line-height:1.25;margin-top:2px;">${formData.clientName || '\u2014'}</div>
+            ${formData.clientCompany ? `<div style="font-size:9px;color:#5A5755;margin-top:1px;line-height:1.2;">${formData.clientCompany}</div>` : ''}
           </div>
         </div>
         
-        <!-- Row 2 -->
-        <div style="display:flex;gap:14px;${isEn ? '' : 'flex-direction:row-reverse;'}">
-          
-          <!-- Route -->
-          <div style="display:flex;align-items:center;gap:10px;flex:1;${isEn ? '' : 'flex-direction:row-reverse;'}">
-            <div style="width:32px;height:32px;background:rgba(236,28,35,0.06);border:1.5px solid #EC1C23;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EC1C23" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            </div>
-            <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:${isEn ? 'flex-start' : 'flex-end'};text-align:${textAlign};">
-              <div style="font-size:9px;color:#5A5755;font-weight:600;margin-bottom:1px;line-height:1.2;">${t.route}</div>
-              <div style="font-size:12px;font-weight:800;color:#3A393A;line-height:1.2;">${formData.originCountry || '\u2014'} ${arrowRight} ${formData.destCountry || '\u2014'}</div>
-              ${(formData.originPort || formData.destPort) ? `<div style="font-size:9px;color:#5A5755;margin-top:1px;line-height:1.2;">${formData.originPort || ''} ${arrowLeft} ${formData.destPort || ''}</div>` : ''}
-            </div>
+        <!-- Quote Number -->
+        <div style="background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);border:1px solid rgba(58,57,58,0.12);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+          <div style="width:34px;height:34px;background:#EC1C23;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
           </div>
-          
-          <!-- Shipping Type -->
-          <div style="display:flex;align-items:center;gap:10px;flex:1;${isEn ? '' : 'flex-direction:row-reverse;'}">
-            <div style="width:32px;height:32px;background:rgba(236,28,35,0.06);border:1.5px solid #EC1C23;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EC1C23" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="11" rx="1"/><line x1="7" y1="8" x2="7" y2="19"/><line x1="11" y1="8" x2="11" y2="19"/><line x1="15" y1="8" x2="15" y2="19"/></svg>
-            </div>
-            <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:${isEn ? 'flex-start' : 'flex-end'};text-align:${textAlign};">
-              <div style="font-size:9px;color:#5A5755;font-weight:600;margin-bottom:1px;line-height:1.2;">${t.shippingType}</div>
-              <div style="font-size:12px;font-weight:800;color:#3A393A;line-height:1.2;">${shippingDisplay}</div>
-            </div>
+          <div style="flex:1;min-width:0;text-align:${textAlign};">
+            <div style="font-size:9px;color:#5A5755;font-weight:700;line-height:1.2;text-transform:uppercase;letter-spacing:0.04em;">${t.quoteNum}</div>
+            <div style="font-size:13px;font-weight:800;color:#3A393A;line-height:1.25;margin-top:2px;font-family:'Outfit',sans-serif;direction:ltr;${isEn ? '' : 'text-align:right;'}">${formData.quotationNum || '\u2014'}</div>
+            <div style="font-size:9px;color:#5A5755;margin-top:1px;line-height:1.2;">${dateDisplay}</div>
+          </div>
+        </div>
+        
+        <!-- Route -->
+        <div style="background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);border:1px solid rgba(58,57,58,0.12);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+          <div style="width:34px;height:34px;background:#EC1C23;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;text-align:${textAlign};">
+            <div style="font-size:9px;color:#5A5755;font-weight:700;line-height:1.2;text-transform:uppercase;letter-spacing:0.04em;">${t.route}</div>
+            <div style="font-size:13px;font-weight:800;color:#3A393A;line-height:1.25;margin-top:2px;">${formData.originCountry || '\u2014'} ${arrowRight} ${formData.destCountry || '\u2014'}</div>
+            ${(formData.originPort || formData.destPort) ? `<div style="font-size:9px;color:#5A5755;margin-top:1px;line-height:1.2;">${formData.originPort || ''} ${arrowLeft} ${formData.destPort || ''}</div>` : ''}
+          </div>
+        </div>
+        
+        <!-- Shipping Type -->
+        <div style="background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);border:1px solid rgba(58,57,58,0.12);border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px;${isEn ? '' : 'flex-direction:row-reverse;'}">
+          <div style="width:34px;height:34px;background:#EC1C23;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="11" rx="1"/><line x1="7" y1="8" x2="7" y2="19"/><line x1="11" y1="8" x2="11" y2="19"/><line x1="15" y1="8" x2="15" y2="19"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;text-align:${textAlign};">
+            <div style="font-size:9px;color:#5A5755;font-weight:700;line-height:1.2;text-transform:uppercase;letter-spacing:0.04em;">${t.shippingType}</div>
+            <div style="font-size:13px;font-weight:800;color:#3A393A;line-height:1.25;margin-top:2px;">${shippingDisplay}</div>
           </div>
         </div>
       </div>
       
-      <!-- Plane illustration (left/right side, top area) -->
-      <svg style="position:absolute;top:138mm;${isEn ? 'right' : 'left'}:14mm;width:55px;height:38px;z-index:6;" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="55" cy="35" rx="38" ry="7" fill="#FFFFFF" stroke="#3A393A" stroke-width="0.5"/>
-        <path d="M 30 35 L 15 50 L 22 50 L 40 38 Z" fill="#EC1C23"/>
-        <path d="M 30 35 L 15 22 L 22 22 L 40 32 Z" fill="#EC1C23"/>
-        <path d="M 88 35 L 82 22 L 88 22 L 95 30 Z" fill="#EC1C23"/>
-        <circle cx="45" cy="33" r="1.2" fill="#3A393A"/>
-        <circle cx="55" cy="33" r="1.2" fill="#3A393A"/>
-        <circle cx="65" cy="33" r="1.2" fill="#3A393A"/>
-        <circle cx="75" cy="33" r="1.2" fill="#3A393A"/>
-        <ellipse cx="15" cy="35" rx="6" ry="3.5" fill="#EC1C23"/>
-      </svg>
-      
-      <!-- Dashed path -->
-      <svg style="position:absolute;top:180mm;left:0;width:100%;height:60mm;z-index:4;pointer-events:none;" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
-        ${isEn 
-          ? '<path d="M 50 30 Q 200 110 350 60 Q 380 90 350 160" fill="none" stroke="#EC1C23" stroke-width="2.5" stroke-dasharray="6 5"/>'
-          : '<path d="M 350 30 Q 200 110 50 60 Q 20 90 50 160" fill="none" stroke="#EC1C23" stroke-width="2.5" stroke-dasharray="6 5"/>'}
-      </svg>
-      
-      <!-- Container -->
-      <svg style="position:absolute;top:185mm;${isEn ? 'right' : 'left'}:22mm;width:55px;height:42px;z-index:6;" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg">
-        <line x1="50" y1="0" x2="50" y2="10" stroke="#3A393A" stroke-width="1.5"/>
-        <path d="M 45 8 L 55 8 L 55 12 L 45 12 Z" fill="#3A393A"/>
-        <rect x="15" y="15" width="75" height="42" fill="#EC1C23" stroke="#3A393A" stroke-width="0.8"/>
-        <line x1="22" y1="20" x2="22" y2="52" stroke="#A01017" stroke-width="0.4"/>
-        <line x1="30" y1="20" x2="30" y2="52" stroke="#A01017" stroke-width="0.4"/>
-        <line x1="38" y1="20" x2="38" y2="52" stroke="#A01017" stroke-width="0.4"/>
-        <line x1="46" y1="20" x2="46" y2="52" stroke="#A01017" stroke-width="0.4"/>
-        <line x1="54" y1="20" x2="54" y2="52" stroke="#A01017" stroke-width="0.4"/>
-        <line x1="62" y1="20" x2="62" y2="52" stroke="#A01017" stroke-width="0.4"/>
-        <line x1="70" y1="20" x2="70" y2="52" stroke="#A01017" stroke-width="0.4"/>
-        <line x1="78" y1="20" x2="78" y2="52" stroke="#A01017" stroke-width="0.4"/>
-        <text x="52" y="40" font-family="Outfit" font-size="12" font-weight="900" fill="#FFF" text-anchor="middle">SLL</text>
-      </svg>
-      
-      <!-- Slogan -->
-      <div style="position:absolute;bottom:30mm;left:0;right:0;text-align:center;padding:0 18mm;z-index:7;">
-        <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:#3A393A;letter-spacing:-0.01em;margin-bottom:8px;">${t.sloganEn}</div>
-        ${!isEn ? `<div style="font-size:19px;font-weight:800;color:#EC1C23;">${t.sloganAr}</div>` : ''}
+      <!-- ═══════════════════════════════════════════════
+           SLOGAN (Bottom)
+           ═══════════════════════════════════════════════ -->
+      <div style="position:absolute;bottom:18mm;left:0;right:0;text-align:center;padding:0 18mm;z-index:10;">
+        <!-- Decorative dots -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:8px;">
+          <div style="width:4px;height:4px;background:#EC1C23;border-radius:50%;"></div>
+          <div style="width:24mm;height:1px;background:#3A393A;opacity:0.25;"></div>
+          <div style="width:6px;height:6px;background:#EC1C23;border-radius:50%;"></div>
+          <div style="width:24mm;height:1px;background:#3A393A;opacity:0.25;"></div>
+          <div style="width:4px;height:4px;background:#EC1C23;border-radius:50%;"></div>
+        </div>
+        <div style="font-family:'Outfit',sans-serif;font-size:17px;font-weight:700;color:#3A393A;letter-spacing:-0.01em;margin-bottom:5px;">${t.sloganEn}</div>
+        ${!isEn ? `<div style="font-size:18px;font-weight:800;color:#EC1C23;">${t.sloganAr}</div>` : ''}
       </div>
     </div>
   `;
@@ -4336,22 +4375,22 @@ ${fontLink}
   }
   /* Screen preview */
   @media screen {
-    body{padding:20px;background:#e5e7eb;}
-    .pdf-page{margin:0 auto 20px;box-shadow:0 6px 24px rgba(0,0,0,0.15);background:#FFF;}
+    body{padding:80px 20px 40px;background:#e5e7eb;display:flex;flex-direction:column;align-items:center;gap:24px;}
+    .pdf-page{margin:0;box-shadow:0 10px 30px rgba(0,0,0,0.18);background:#FFF;flex-shrink:0;}
     .print-controls{
-      position:fixed;top:20px;left:20px;z-index:9999;
-      display:flex;gap:10px;background:#FFF;padding:14px 18px;
+      position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;
+      display:flex;gap:10px;background:#FFF;padding:14px 22px;
       border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.18);
       align-items:center;
     }
     .print-controls button{
-      background:#EC1C23;color:#FFF;border:none;padding:10px 18px;
+      background:#EC1C23;color:#FFF;border:none;padding:10px 20px;
       font-weight:700;font-size:13px;cursor:pointer;border-radius:6px;
       font-family:'Cairo',sans-serif;
     }
     .print-controls button:hover{background:#C71F2D;}
     .print-controls .hint{
-      font-size:11px;color:#6B7280;max-width:240px;line-height:1.5;
+      font-size:11px;color:#6B7280;max-width:280px;line-height:1.5;
     }
   }
 </style>
