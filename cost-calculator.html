@@ -495,6 +495,10 @@ body{
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       PDF English
     </button>
+    <button class="btn-action" onclick="exportSummaryImage()" style="background:#22C997;color:#FFF;border-color:#22C997">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      ملخص (صورة)
+    </button>
   </div>
 </header>
 
@@ -743,6 +747,13 @@ body{
           <span class="en-label">EGYPT INTERNAL EXPENSES (EGP)</span>
         </div>
         <div class="section-body" id="internalExpensesBody"></div>
+        <div style="padding:10px 16px;border-top:1px dashed var(--line);display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="detailedInternalPDF" style="width:16px;height:16px;cursor:pointer;accent-color:#EC1C23;">
+          <label for="detailedInternalPDF" style="font-size:12px;color:var(--charcoal);cursor:pointer;font-weight:600;">
+            📋 عرض كل بنود المصاريف الداخلية مفصّلة في الـ PDF
+            <span style="display:block;font-size:10px;color:#6B7280;font-weight:400;margin-top:2px;">افتراضياً تظهر مجمّعة في 3 بنود — فعّل ده لعرضها كلها منفصلة</span>
+          </label>
+        </div>
       </div>
       
       <!-- Section 7: Commissions -->
@@ -1502,6 +1513,7 @@ function calculate(){
   let totalVatUSD = 0;
   let totalProfitTaxUSD = 0;
   let totalExtraTaxUSD = 0;
+  const extraTaxByName = {};  // ★ group extra taxes by their name
   
   const productResults = state.products.map(p => {
     const realUSD = p.realValueUSD;
@@ -1525,6 +1537,10 @@ function calculate(){
     if(p.extraTaxEnabled){
       extra = acceptedUSD * (p.extraTaxPct / 100);
       totalExtraTaxUSD += extra;
+      // ★ Track extra tax by name (group same-named taxes together)
+      const taxName = (p.extraTaxName || '').trim() || 'ضريبة إضافية';
+      if(!extraTaxByName[taxName]) extraTaxByName[taxName] = 0;
+      extraTaxByName[taxName] += extra;
     }
     
     return {...p, computedAcceptedUSD: acceptedUSD, customsDuty, vat, profitTax, extra};
@@ -1592,6 +1608,7 @@ function calculate(){
       totalVatUSD, vatEGP,
       totalProfitTaxUSD, profitTaxEGP,
       totalExtraTaxUSD, extraTaxEGP,
+      extraTaxByName,  // ★ {name: usdAmount} for detailed display
       totalCustomsTaxesUSD, totalCustomsTaxesEGP
     },
     internal: {
@@ -1665,9 +1682,15 @@ function renderResults(){
     html += resultRow('الضريبة الجمركية', r.productsTotals.totalCustomsDutyUSD, r.productsTotals.customsDutyEGP);
     html += resultRow('ضريبة القيمة المضافة (VAT)', r.productsTotals.totalVatUSD, r.productsTotals.vatEGP);
     html += resultRow('الأرباح ت/ص', r.productsTotals.totalProfitTaxUSD, r.productsTotals.profitTaxEGP);
-    if(r.productsTotals.totalExtraTaxUSD > 0){
-      html += resultRow('ضرائب إضافية', r.productsTotals.totalExtraTaxUSD, r.productsTotals.extraTaxEGP);
-    }
+    // ★ Extra taxes by name
+    const extraByNameSummary = r.productsTotals.extraTaxByName || {};
+    const customsRateSummary = r.customsRate || r.usdRate || 52;
+    Object.keys(extraByNameSummary).forEach(taxName => {
+      const usd = extraByNameSummary[taxName];
+      if(usd > 0){
+        html += resultRow(taxName, usd, usd * customsRateSummary);
+      }
+    });
     html += subtotalRow('إجمالي الجمارك والضرائب', r.productsTotals.totalCustomsTaxesUSD, r.productsTotals.totalCustomsTaxesEGP);
   }
   
@@ -3907,6 +3930,8 @@ function _sectionTotal(label, usd, egp, isEn, st){
 }
 
 // PAGE 2: ALL COSTS — PREMIUM DARK THEME (Most Important Page)
+// ★ Now shows ALL custom docs + ALL internal expense items
+// ★ Smart pagination: splits across 2 pages if too many items
 function renderCompactCostBreakdownPart1(ctx){
   const r = ctx.r;
   const lang = ctx.lang || 'ar';
@@ -3926,137 +3951,244 @@ function renderCompactCostBreakdownPart1(ctx){
   const profitPcts = getUniquePcts('profitTaxPct');
   const fmtPcts = (arr) => arr.length === 0 ? '' : arr.map(v => `${v}%`).join(isEn ? ' & ' : ' و ');
   
-  // Translations
   const tt = {
     exportTitle: isEn ? '🚢 Expenses in Export Country' : '🚢 المصاريف في بلد التصدير',
     importTitle: isEn ? '🏛️ Expenses in Import Country' : '🏛️ المصاريف في بلد الاستيراد',
     commissionsTitle: isEn ? '💼 Commissions & Banking Fees' : '💼 العمولات والمصاريف البنكية',
     customsNote: isEn ? '(on Accepted Value $' : '(على القيمة المقبولة $',
-    
-    clearanceFees: isEn ? 'Clearance Fees' : 'أتعاب التخليص الجمركي',
-    shippingLineReceipts: isEn ? 'Shipping Line & Port Authority Receipts' : 'إيصالات الخط الملاحي وهيئة الميناء',
-    portSub: isEn ? 'Includes internal transport, tips & miscellaneous' : 'يشمل إيصالات النقل الداخلي وإكراميات ونثريات',
-    
     grandTitle: isEn ? '💰 Total Costs Summary' : '💰 ملخص إجمالي التكاليف',
     totalExpenses: isEn ? 'Total all costs & expenses' : 'إجمالي جميع التكاليف والمصاريف',
     plusGoods: isEn ? '+ Actual goods value (to supplier)' : '+ قيمة البضاعة الفعلية (للمورد)',
-    grandTotal: isEn ? '💰 Grand Total (Total Landed Cost)' : '💰 المجموع الكلي'
+    grandTotal: isEn ? '💰 Grand Total (Total Landed Cost)' : '💰 المجموع الكلي',
+    contdTitle: isEn ? '(continued)' : '(تابع)'
   };
   
-  // DARK THEME STYLES — premium look
-  const sectionStyle = 'background:#3A393A;border:1px solid #1F1E1F;border-radius:10px;padding:14px 18px;margin-bottom:11px;box-shadow:0 2px 8px rgba(0,0,0,0.08);';
-  const sectionHeaderStyle = 'font-size:14px;font-weight:800;color:#FFF;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid rgba(236,28,35,0.4);display:flex;align-items:center;gap:8px;';
-  const itemStyle = 'display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,0.12);';
-  const lastItemStyle = 'display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;';
-  const labelStyle = 'font-size:12px;font-weight:600;color:#FFF;flex:1;line-height:1.4;';
-  const subStyle = 'font-size:9px;color:rgba(255,255,255,0.55);font-weight:500;margin-top:1px;';
-  const valuesStyle = 'display:flex;gap:16px;align-items:baseline;';
-  const usdStyle = 'font-family:Outfit,sans-serif;font-size:12px;font-weight:700;color:rgba(255,255,255,0.95);min-width:80px;text-align:left;direction:ltr;';
-  const egpStyle = 'font-family:Outfit,sans-serif;font-size:12px;font-weight:800;color:#EC1C23;min-width:100px;text-align:left;direction:ltr;';
+  // DARK THEME STYLES — density-aware (compress spacing when many items)
+  // Computed after items are built (see below). Declared with let for reassignment.
+  let sectionStyle, sectionHeaderStyle, itemStyle, lastItemStyle, labelStyle, subStyle, valuesStyle, usdStyle, egpStyle;
+  let item;
   
-  const item = (label, sub, usd, egp, isLast) => `
-    <div style="${isLast ? lastItemStyle : itemStyle}">
-      <div style="${labelStyle}">
-        <div>${label}</div>
-        ${sub ? `<div style="${subStyle}">${sub}</div>` : ''}
+  const buildStyles = (dn) => {
+    // dn = density factor 1.0 (roomy) → 0.62 (very tight)
+    const secPad = Math.round(14 * dn);
+    const secMb = Math.round(11 * dn);
+    const secHdrMb = Math.round(10 * dn);
+    const secHdrPb = Math.round(8 * dn);
+    const secHdrFs = (12.5 + 1.5*dn).toFixed(1);
+    const itemPad = Math.max(3, Math.round(6 * dn));
+    const lblFs = (10.5 + 1.5*dn).toFixed(1);
+    const valFs = (10.5 + 1.5*dn).toFixed(1);
+    sectionStyle = `background:#3A393A;border:1px solid #1F1E1F;border-radius:10px;padding:${secPad}px 18px;margin-bottom:${secMb}px;box-shadow:0 2px 8px rgba(0,0,0,0.08);`;
+    sectionHeaderStyle = `font-size:${secHdrFs}px;font-weight:800;color:#FFF;margin-bottom:${secHdrMb}px;padding-bottom:${secHdrPb}px;border-bottom:2px solid rgba(236,28,35,0.4);display:flex;align-items:center;gap:8px;`;
+    itemStyle = `display:flex;justify-content:space-between;align-items:baseline;padding:${itemPad}px 0;border-bottom:1px dashed rgba(255,255,255,0.12);`;
+    lastItemStyle = `display:flex;justify-content:space-between;align-items:baseline;padding:${itemPad}px 0;`;
+    labelStyle = `font-size:${lblFs}px;font-weight:600;color:#FFF;flex:1;line-height:1.35;`;
+    subStyle = 'font-size:9px;color:rgba(255,255,255,0.55);font-weight:500;margin-top:1px;';
+    valuesStyle = 'display:flex;gap:16px;align-items:baseline;';
+    usdStyle = `font-family:Outfit,sans-serif;font-size:${valFs}px;font-weight:700;color:rgba(255,255,255,0.95);min-width:80px;text-align:left;direction:ltr;`;
+    egpStyle = `font-family:Outfit,sans-serif;font-size:${valFs}px;font-weight:800;color:#EC1C23;min-width:100px;text-align:left;direction:ltr;`;
+    item = (label, sub, usd, egp, isLast) => `
+      <div style="${isLast ? lastItemStyle : itemStyle}">
+        <div style="${labelStyle}">
+          <div>${label}</div>
+          ${sub ? `<div style="${subStyle}">${sub}</div>` : ''}
+        </div>
+        <div style="${valuesStyle}">
+          <div style="${usdStyle}">$${fmt(usd, 0)}</div>
+          <div style="${egpStyle}">${fmt(egp, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+        </div>
       </div>
-      <div style="${valuesStyle}">
-        <div style="${usdStyle}">$${fmt(usd, 0)}</div>
-        <div style="${egpStyle}">${fmt(egp, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
-      </div>
-    </div>
-  `;
+    `;
+  };
+  buildStyles(1); // default roomy; recomputed below once item count is known
   
   const dutyLabel = dutyPcts.length > 0 ? `${t.customsDuty} (${fmtPcts(dutyPcts)})` : t.customsDuty;
   const vatLabel = vatPcts.length > 0 ? `${t.vat} (${fmtPcts(vatPcts)})` : t.vat;
   const profitLabel = profitPcts.length > 0 ? `${t.profit} (${fmtPcts(profitPcts)})` : t.profit;
   
-  // Split internal expenses into 2 items
+  // ─── Build SECTION 1: Export Country items (incl. custom docs) ───
+  const exportItems = [];
+  exportItems.push({label: t.intlShipping, sub: ctx.containerCountText || '', usd: r.shipping.shippingUSD, egp: r.shipping.shippingEGP});
+  if(r.shipping.originCertEnabled !== false && (r.shipping.originCertUSD > 0)){
+    exportItems.push({label: t.coo, sub: t.cooSub, usd: r.shipping.originCertUSD, egp: r.shipping.originCertEGP});
+  }
+  if(r.shipping.acidCargoxEnabled !== false && (r.shipping.acidCargoxUSD > 0)){
+    exportItems.push({label: t.acid, sub: t.acidSub, usd: r.shipping.acidCargoxUSD, egp: r.shipping.acidCargoxEGP});
+  }
+  // ★ ALL custom documents (the missing piece!)
+  (r.shipping.customDocs || []).forEach(d => {
+    if(d.name && (d.costUSD > 0 || d.costEGP > 0)){
+      exportItems.push({label: d.name, sub: isEn ? 'Additional document' : 'مستند إضافي', usd: d.costUSD, egp: d.costEGP});
+    }
+  });
+  
+  // ─── Build SECTION 2: Import Country items (customs + internal) ───
+  const importItems = [];
+  if(r.productsTotals.totalAcceptedUSD > 0){
+    importItems.push({label: dutyLabel, sub: t.customsSub, usd: r.productsTotals.totalCustomsDutyUSD, egp: r.productsTotals.customsDutyEGP});
+    importItems.push({label: vatLabel, sub: t.vatSub, usd: r.productsTotals.totalVatUSD, egp: r.productsTotals.vatEGP});
+    importItems.push({label: profitLabel, sub: t.profitSub, usd: r.productsTotals.totalProfitTaxUSD, egp: r.productsTotals.profitTaxEGP});
+    // ★ Extra taxes by their actual names (instead of generic "ضريبة إضافية")
+    const extraByName = r.productsTotals.extraTaxByName || {};
+    const customsRate = r.customsRate || usdRate;
+    Object.keys(extraByName).forEach(taxName => {
+      const usd = extraByName[taxName];
+      if(usd > 0){
+        importItems.push({label: taxName, sub: '', usd: usd, egp: usd * customsRate});
+      }
+    });
+  }
+  
+  // ★ Internal expenses: grouped (default) OR detailed (if checkbox)
+  const detailedInternal = (typeof document !== 'undefined') && document.getElementById('detailedInternalPDF') && document.getElementById('detailedInternalPDF').checked;
   const intB = r.internal.breakdown || {};
-  const clearanceEGP = parseFloat(intB.clearance) || 0;
-  const clearanceUSD = clearanceEGP / usdRate;
+  const gv = (k) => parseFloat(intB[k]) || 0;  // get value helper
   
-  const restEGP = (parseFloat(intB.shippingLine) || 0) 
-                + (parseFloat(intB.portAuth) || 0) 
-                + (parseFloat(intB.customsOffice) || 0)
-                + (parseFloat(intB.transport) || 0)
-                + (parseFloat(intB.otherReceipts) || 0)
-                + (parseFloat(intB.misc) || 0);
-  const restUSD = restEGP / usdRate;
+  if(detailedInternal){
+    // ─── OPTION 2: All items detailed ───
+    if(Array.isArray(r.internal.items) && r.internal.items.length > 0){
+      r.internal.items.forEach(it => {
+        const egp = it.valueEGP || 0;
+        if(egp > 0){
+          const usd = usdRate > 0 ? egp / usdRate : 0;
+          const lbl = isEn ? (it.label_en || it.key) : (it.label_ar || it.key);
+          importItems.push({label: lbl, sub: '', usd: usd, egp: egp});
+        }
+      });
+    }
+  } else {
+    // ─── OPTION 1: Grouped into 3 items ───
+    // 1) Clearance alone
+    const clearanceEGP = gv('clearance');
+    if(clearanceEGP > 0){
+      importItems.push({label: isEn ? 'Customs Clearance Fees' : 'أتعاب التخليص الجمركي', sub: '', usd: clearanceEGP/usdRate, egp: clearanceEGP});
+    }
+    // 2) Port + Shipping line + Customs office + Transport (merged)
+    const grp2EGP = gv('shippingLine') + gv('portAuth') + gv('customsOffice') + gv('transport');
+    if(grp2EGP > 0){
+      importItems.push({
+        label: isEn ? 'Port, Shipping Line, Customs & Transport' : 'إيصالات الميناء والخط الملاحي والجمارك والنقل',
+        sub: isEn ? 'Port authority + shipping line + customs office + internal transport' : 'هيئة الميناء + الخط الملاحي + مصلحة الجمارك + النقل الداخلي',
+        usd: grp2EGP/usdRate, egp: grp2EGP
+      });
+    }
+    // 3) Other receipts + Miscellaneous (merged)
+    const grp3EGP = gv('otherReceipts') + gv('misc');
+    if(grp3EGP > 0){
+      importItems.push({
+        label: isEn ? 'Other Receipts & Miscellaneous' : 'إيصالات أخرى وإكراميات ونثريات',
+        sub: '',
+        usd: grp3EGP/usdRate, egp: grp3EGP
+      });
+    }
+  }
   
-  return `
+  // ─── Build SECTION 3: Commissions ───
+  const commItems = [];
+  commItems.push({label: `${t.cardComm} (${ctx.formData.cardCommissionPct || 1.5}%)`, sub: t.cardSub, usd: r.commissions.cardCommissionUSD, egp: r.commissions.cardCommissionEGP});
+  commItems.push({label: `${t.sllComm} (${ctx.formData.sllCommissionPct || 3}%)`, sub: t.sllSub, usd: r.commissions.sllCommissionUSD, egp: r.commissions.sllCommissionEGP});
+  if((r.commissions.bankFeesUSD + r.commissions.otherFeesUSD) > 0){
+    commItems.push({label: t.bank, sub: '', usd: r.commissions.bankFeesUSD + r.commissions.otherFeesUSD, egp: r.commissions.bankFeesEGP + r.commissions.otherFeesEGP});
+  }
+  
+  // ─── PAGINATION DECISION ───
+  // Default (grouped internal expenses) → ALWAYS one page, items are few.
+  // Detailed mode (checkbox ON) → split into 2 clean pages so nothing is cut off.
+  // Safety net: if grouped mode somehow has an unusually large number of items
+  // (many custom docs / named taxes), still allow a split to avoid overflow.
+  const totalItems = exportItems.length + importItems.length + commItems.length;
+  const needsSplit = detailedInternal ? true : (totalItems > 22);
+  
+  // ─── DENSITY: compress spacing so a single page never overflows ───
+  // When NOT splitting, scale down padding/font as item count grows.
+  // ~14 items fit comfortably at dn=1. Beyond that we tighten toward 0.62.
+  if(!needsSplit){
+    let dn = 1;
+    if(totalItems > 14) dn = Math.max(0.62, 1 - (totalItems - 14) * 0.045);
+    buildStyles(dn);
+  } else {
+    // Split mode: each page is lighter; keep comfortable spacing.
+    buildStyles(0.92);
+  }
+  
+  // helper to render a section block
+  const renderSection = (title, items, note) => {
+    if(items.length === 0) return '';
+    let h = `<div style="${sectionStyle}"><div style="${sectionHeaderStyle}">${title}${note ? ` <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.65);">${note}</span>` : ''}</div>`;
+    items.forEach((it, idx) => {
+      h += item(it.label, it.sub, it.usd, it.egp, idx === items.length - 1);
+    });
+    h += `</div>`;
+    return h;
+  };
+  
+  const grandTotalBlock = `
+    <div style="background:linear-gradient(135deg,#EC1C23 0%,#C71F2D 100%);color:#FFF;padding:16px 20px;border-radius:10px;margin-top:14px;box-shadow:0 4px 12px rgba(236,28,35,0.25);">
+      <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);letter-spacing:0.5px;margin-bottom:10px;">${tt.grandTitle}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.25);">
+        <div style="font-size:12px;font-weight:700;">${tt.totalExpenses}</div>
+        <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
+          <div>$${fmt(r.totals.totalExpensesUSD, 0)}</div>
+          <div>${fmt(r.totals.totalExpensesEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.25);">
+        <div style="font-size:12px;font-weight:700;">${tt.plusGoods}</div>
+        <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
+          <div>$${fmt(r.productsTotals.totalRealUSD, 0)}</div>
+          <div>${fmt(r.productsTotals.totalRealEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:8px;border-top:2px solid #FFF;">
+        <div style="font-size:15px;font-weight:900;">${tt.grandTotal}</div>
+        <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;font-size:17px;font-weight:900;">
+          <div>$${fmt(r.totals.grandTotalUSD, 0)}</div>
+          <div>${fmt(r.totals.grandTotalEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const pageWrap = (innerContent, pageNumLabel, isContinued) => `
     <div class="pdf-page">
-      <div style="${getPageStyle(lang)}">
+      <div style="${getPageStyle(lang).replace('height:297mm;','min-height:297mm;').replace('overflow:hidden;','overflow:visible;')}">
         ${getSideBars(lang)}
         <div style="${getContentPadding(lang, '14mm', '14mm', '10mm')}">
-        ${pdfPageHeader(isEn ? 'All Cost Items' : 'جميع بنود التكاليف', isEn ? 'Cost Breakdown' : 'تفاصيل التكاليف', '02', lang)}
-        
-        <!-- Premium "Main Page" Badge -->
+        ${pdfPageHeader(isEn ? 'All Cost Items' : 'جميع بنود التكاليف', (isEn ? 'Cost Breakdown' : 'تفاصيل التكاليف') + (isContinued ? ' ' + tt.contdTitle : ''), '02', lang)}
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:7px 14px;background:linear-gradient(${isEn?'90deg':'270deg'}, rgba(236,28,35,0.08) 0%, transparent 100%);border-${isEn?'left':'right'}:3px solid #EC1C23;border-radius:0 6px 6px 0;">
-          <span style="font-size:11px;font-weight:800;color:#EC1C23;letter-spacing:0.5px;">${isEn ? 'COMPLETE COST BREAKDOWN' : 'البيان الكامل لتفاصيل التكاليف'}</span>
+          <span style="font-size:11px;font-weight:800;color:#EC1C23;letter-spacing:0.5px;">${isEn ? 'COMPLETE COST BREAKDOWN' : 'البيان الكامل لتفاصيل التكاليف'}${isContinued ? ` — ${tt.contdTitle}` : ''}</span>
         </div>
-        
-        <!-- SECTION 1: EXPORT COUNTRY -->
-        <div style="${sectionStyle}">
-          <div style="${sectionHeaderStyle}">${tt.exportTitle}</div>
-          ${item(t.intlShipping, ctx.containerCountText || '', r.shipping.shippingUSD, r.shipping.shippingEGP, false)}
-          ${item(t.coo, t.cooSub, r.shipping.originCertUSD, r.shipping.originCertEGP, false)}
-          ${item(t.acid, t.acidSub, r.shipping.acidCargoxUSD, r.shipping.acidCargoxEGP, true)}
-        </div>
-        
-        <!-- SECTION 2: IMPORT COUNTRY (Customs + 2 Internal items) -->
-        <div style="${sectionStyle}">
-          <div style="${sectionHeaderStyle}">${tt.importTitle} <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.65);">${tt.customsNote}${fmt(r.productsTotals.totalAcceptedUSD, 0)})</span></div>
-          
-          ${item(dutyLabel, t.customsSub, r.productsTotals.totalCustomsDutyUSD, r.productsTotals.customsDutyEGP, false)}
-          ${item(vatLabel, t.vatSub, r.productsTotals.totalVatUSD, r.productsTotals.vatEGP, false)}
-          ${item(profitLabel, t.profitSub, r.productsTotals.totalProfitTaxUSD, r.productsTotals.profitTaxEGP, false)}
-          ${item(tt.clearanceFees, '', clearanceUSD, clearanceEGP, false)}
-          ${item(tt.shippingLineReceipts, tt.portSub, restUSD, restEGP, true)}
-        </div>
-        
-        <!-- SECTION 3: COMMISSIONS & BANKING -->
-        <div style="${sectionStyle}">
-          <div style="${sectionHeaderStyle}">${tt.commissionsTitle}</div>
-          ${item(`${t.cardComm} (${ctx.formData.cardCommissionPct || 1.5}%)`, t.cardSub, r.commissions.cardCommissionUSD, r.commissions.cardCommissionEGP, false)}
-          ${item(`${t.sllComm} (${ctx.formData.sllCommissionPct || 3}%)`, t.sllSub, r.commissions.sllCommissionUSD, r.commissions.sllCommissionEGP, false)}
-          ${item(t.bank, '', r.commissions.bankFeesUSD + r.commissions.otherFeesUSD, r.commissions.bankFeesEGP + r.commissions.otherFeesEGP, true)}
-        </div>
-        
-        <!-- GRAND TOTAL — Red accent on dark -->
-        <div style="background:linear-gradient(135deg,#EC1C23 0%,#C71F2D 100%);color:#FFF;padding:16px 20px;border-radius:10px;margin-top:14px;box-shadow:0 4px 12px rgba(236,28,35,0.25);">
-          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);letter-spacing:0.5px;margin-bottom:10px;">${tt.grandTitle}</div>
-          
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.25);">
-            <div style="font-size:12px;font-weight:700;">${tt.totalExpenses}</div>
-            <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
-              <div>$${fmt(r.totals.totalExpensesUSD, 0)}</div>
-              <div>${fmt(r.totals.totalExpensesEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
-            </div>
-          </div>
-          
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.25);">
-            <div style="font-size:12px;font-weight:700;">${tt.plusGoods}</div>
-            <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;font-size:13px;font-weight:700;">
-              <div>$${fmt(r.productsTotals.totalRealUSD, 0)}</div>
-              <div>${fmt(r.productsTotals.totalRealEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
-            </div>
-          </div>
-          
-          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:8px;border-top:2px solid #FFF;">
-            <div style="font-size:15px;font-weight:900;">${tt.grandTotal}</div>
-            <div style="display:flex;gap:16px;font-family:Outfit,sans-serif;font-size:17px;font-weight:900;">
-              <div>$${fmt(r.totals.grandTotalUSD, 0)}</div>
-              <div>${fmt(r.totals.grandTotalEGP, 0)} ${isEn ? 'EGP' : 'ج.م'}</div>
-            </div>
-          </div>
-        </div>
-        
+        ${innerContent}
         ${pdfFooter('02', '06', lang)}
         </div>
       </div>
     </div>
   `;
+  
+  if(!needsSplit){
+    // ─── Single page (normal case) ───
+    const content = 
+      renderSection(tt.exportTitle, exportItems) +
+      renderSection(tt.importTitle, importItems, importItems.length > 0 ? `${tt.customsNote}${fmt(r.productsTotals.totalAcceptedUSD, 0)})` : '') +
+      renderSection(tt.commissionsTitle, commItems) +
+      grandTotalBlock;
+    return pageWrap(content, '02', false);
+  }
+  
+  // ─── Split across 2 pages (balanced & clean) ───
+  // Page A: Export country + Import country (customs + detailed internal)
+  // Page B: Commissions + Grand Total
+  // In detailed mode the Import section is the large one, so it anchors page A;
+  // commissions + totals get a clean page B with breathing room.
+  const pageA = 
+    renderSection(tt.exportTitle, exportItems) +
+    renderSection(tt.importTitle, importItems, importItems.length > 0 ? `${tt.customsNote}${fmt(r.productsTotals.totalAcceptedUSD, 0)})` : '');
+  
+  const pageB = 
+    renderSection(tt.commissionsTitle, commItems) +
+    grandTotalBlock;
+  
+  return pageWrap(pageA, '02', false) + '\n' + pageWrap(pageB, '02', true);
 }
 
 // PAGE 3: Basic Info + Cost Factor + Example
@@ -4268,6 +4400,137 @@ function renderCompactCostBreakdownPart2(ctx){
 }
 
 // ============================================================
+// EXPORT SUMMARY AS IMAGE — captures the on-screen side summary
+// (avoids html2canvas Arabic-shaping bugs by reusing rendered DOM)
+// ============================================================
+async function exportSummaryImage(){
+  const r = state.results;
+  if(!r){ showToast('\u0645\u0646 \u0641\u0636\u0644\u0643 \u0623\u0643\u0645\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0623\u0648\u0644\u0627\u064b', 'error'); return; }
+  if(typeof html2canvas === 'undefined'){ showToast('\u0645\u0643\u062a\u0628\u0629 \u0627\u0644\u0635\u0648\u0631 \u063a\u064a\u0631 \u0645\u062d\u0645\u0651\u0644\u0629', 'error'); return; }
+
+  showLoader('\u062c\u0627\u0631\u064a \u062a\u062c\u0647\u064a\u0632 \u0635\u0648\u0631\u0629 \u0627\u0644\u0645\u0644\u062e\u0635...');
+
+  try {
+    const fd = collectFormData();
+    const usdRate = parseFloat(fd.usdRate) || r.usdRate || 52;
+
+    // Shipping type label
+    const shippingTypeLabels = {FCL:'\u0634\u062d\u0646 \u0628\u062d\u0631\u064a \u2014 \u062d\u0627\u0648\u064a\u0627\u062a FCL', LCL:'\u0634\u062d\u0646 \u0628\u062d\u0631\u064a \u062c\u0632\u0626\u064a LCL', AIR:'\u0634\u062d\u0646 \u062c\u0648\u064a', LAND:'\u0634\u062d\u0646 \u0628\u0631\u064a'};
+    const shipLabel = shippingTypeLabels[fd.shippingType] || fd.shippingType || '';
+
+    // Grab the LIVE side summary panel (already rendered correctly by the browser)
+    const liveSummary = document.querySelector('.results-panel');
+    if(!liveSummary){ hideLoader(); showToast('\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0644\u062e\u0635', 'error'); return; }
+
+    // Clone it so we can wrap it with header + footer without touching the page
+    const summaryClone = liveSummary.cloneNode(true);
+    summaryClone.style.boxShadow = 'none';
+    summaryClone.style.border = 'none';
+    summaryClone.style.borderRadius = '0';
+    summaryClone.style.margin = '0';
+    summaryClone.style.maxHeight = 'none';
+    summaryClone.style.height = 'auto';
+    summaryClone.style.overflow = 'visible';
+    // Make sure any inner scroll containers are expanded
+    summaryClone.querySelectorAll('*').forEach(el => {
+      if(el.style){ el.style.maxHeight='none'; el.style.overflow='visible'; }
+    });
+    // ★ CRITICAL FIX: letter-spacing breaks Arabic letter-joining in html2canvas.
+    // Remove it from section titles (the red headers) and force Cairo + normal spacing.
+    summaryClone.querySelectorAll('.result-section-title').forEach(el => {
+      el.style.letterSpacing = 'normal';
+      el.style.textTransform = 'none';
+      el.style.fontFamily = "'Cairo',sans-serif";
+    });
+    // The English sub-spans inside titles can keep their look but normalize spacing too
+    summaryClone.querySelectorAll('.result-section-title .en').forEach(el => {
+      el.style.letterSpacing = 'normal';
+    });
+    // Belt-and-suspenders: clear letter-spacing on every element (Arabic-safe)
+    summaryClone.querySelectorAll('*').forEach(el => {
+      if(el.style && el.style.letterSpacing) el.style.letterSpacing = 'normal';
+    });
+
+    // Build wrapper: header (logo) + cloned summary + disclaimer + footer
+    const wrap = document.createElement('div');
+    wrap.id = '__summaryExportWrap';
+    wrap.style.cssText = "position:fixed;top:-99999px;left:-99999px;width:600px;background:#FAF7F2;font-family:'Cairo',sans-serif;direction:rtl;";
+
+    // ★ Scoped style override: kill letter-spacing on Arabic titles (html2canvas fix)
+    const styleOverride = document.createElement('style');
+    styleOverride.textContent = '#__summaryExportWrap .result-section-title{letter-spacing:normal !important;text-transform:none !important;font-family:"Cairo",sans-serif !important;} #__summaryExportWrap [style*="letter-spacing"]{letter-spacing:normal !important;}';
+    wrap.appendChild(styleOverride);
+
+    const header = document.createElement('div');
+    header.style.cssText = "background:linear-gradient(135deg,#3A393A 0%,#2A292A 100%);padding:20px 26px;display:flex;align-items:center;justify-content:space-between;";
+    header.innerHTML = '<div style="text-align:right;font-family:\'Cairo\',sans-serif;">'
+      + '<div style="font-family:\'Outfit\',sans-serif;font-weight:800;font-size:16px;color:#FFF;">Straight Line Logistics &amp; Trade</div>'
+      + '<div style="font-size:11px;color:#FFC107;font-weight:600;margin-top:3px;">\u0645\u0644\u062e\u0635 \u062a\u0642\u062f\u064a\u0631\u064a \u0644\u062a\u0643\u0627\u0644\u064a\u0641 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f</div>'
+      + '</div>'
+      + '<img src="data:image/png;base64,' + PDF_LOGO_B64 + '" style="height:44px;width:auto;">';
+
+    // Client info bar
+    const infoBar = document.createElement('div');
+    infoBar.style.cssText = "background:#FFF;padding:11px 26px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #EC1C23;font-family:'Cairo',sans-serif;";
+    infoBar.innerHTML = '<div style="text-align:right;">'
+      + '<div style="font-size:10px;color:#9CA3AF;font-weight:600;">\u0627\u0644\u0639\u0645\u064a\u0644</div>'
+      + '<div style="font-size:14px;font-weight:800;color:#3A393A;">' + (fd.clientName || fd.clientCompany || '\u2014') + '</div>'
+      + '</div>'
+      + '<div style="text-align:left;">'
+      + '<div style="font-size:10px;color:#9CA3AF;font-weight:600;">' + shipLabel + '</div>'
+      + '<div style="font-size:12px;font-weight:700;color:#3A393A;direction:ltr;">' + (fd.originCountry||'') + ' \u2190 ' + (fd.destCountry||'\u0645\u0635\u0631') + '</div>'
+      + '</div>';
+
+    // Disclaimer
+    const disclaimer = document.createElement('div');
+    disclaimer.style.cssText = "background:#FFF;padding:11px 26px;border-top:1px solid #EAE6DD;font-family:'Cairo',sans-serif;";
+    disclaimer.innerHTML = '<div style="font-size:9.5px;color:#6B7280;line-height:1.7;text-align:center;">\u062c\u0645\u064a\u0639 \u0627\u0644\u0628\u0646\u0648\u062f \u062a\u0642\u0631\u064a\u0628\u064a\u0629 \u0648\u063a\u064a\u0631 \u0625\u0644\u0632\u0627\u0645\u064a\u0629\u060c \u062d\u064a\u062b \u062a\u062e\u0636\u0639 \u0642\u064a\u0645\u0629 \u0648\u062a\u0628\u0646\u064a\u062f \u0627\u0644\u0628\u0636\u0627\u0639\u0629 \u0627\u0644\u0645\u0633\u062a\u0648\u0631\u062f\u0629 \u0644\u062a\u0642\u062f\u064a\u0631 \u0627\u0644\u0647\u064a\u0626\u0627\u062a \u0627\u0644\u062d\u0643\u0648\u0645\u064a\u0629\u060c \u0648\u0642\u064a\u0645\u0629 \u0627\u0644\u0634\u062d\u0646 \u0644\u0648\u0642\u062a \u0627\u0644\u062a\u0646\u0641\u064a\u0630\u060c \u0648\u0628\u0627\u0642\u064a \u0627\u0644\u0645\u0635\u0627\u0631\u064a\u0641 \u062a\u0642\u0631\u064a\u0628\u064a\u0629.</div>';
+
+    // Footer
+    const footer = document.createElement('div');
+    footer.style.cssText = "background:#3A393A;padding:10px 26px;text-align:center;font-family:'Cairo',sans-serif;";
+    footer.innerHTML = '<div style="font-size:10px;color:rgba(255,255,255,0.7);">\u0633\u0639\u0631 \u0627\u0644\u0635\u0631\u0641 ' + fmt(usdRate,0) + ' \u062c.\u0645 \u00b7 ' + new Date().toLocaleDateString('ar-EG') + '</div>'
+      + '<div style="font-size:11px;color:#FFC107;font-weight:700;margin-top:3px;">\u0623\u0642\u0635\u0631 \u0637\u0631\u064a\u0642 \u0628\u064a\u0646\u0643 \u0648\u0628\u064a\u0646 \u0628\u0636\u0627\u0626\u0639\u0643</div>';
+
+    // Wrap the cloned summary with white padding
+    const summaryWrap = document.createElement('div');
+    summaryWrap.style.cssText = "background:#FFF;padding:8px 14px;";
+    summaryWrap.appendChild(summaryClone);
+
+    wrap.appendChild(header);
+    wrap.appendChild(infoBar);
+    wrap.appendChild(summaryWrap);
+    wrap.appendChild(disclaimer);
+    wrap.appendChild(footer);
+    document.body.appendChild(wrap);
+
+    // Ensure fonts ready
+    try {
+      if(document.fonts && document.fonts.ready){
+        await document.fonts.ready;
+      }
+    } catch(e){}
+    await new Promise(res => setTimeout(res, 300));
+
+    const canvas = await html2canvas(wrap, {scale: 2.5, backgroundColor: '#FAF7F2', logging: false, useCORS: true, allowTaint: true});
+    wrap.remove();
+
+    const link = document.createElement('a');
+    const safeName = (fd.clientName || fd.quotationNum || 'summary').replace(/[^\w\u0600-\u06FF-]/g, '_');
+    link.download = 'SLL_' + safeName + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+
+    hideLoader();
+    showToast('\u062a\u0645 \u062a\u0635\u062f\u064a\u0631 \u0635\u0648\u0631\u0629 \u0627\u0644\u0645\u0644\u062e\u0635 \u2713', 'success');
+  } catch(e){
+    hideLoader();
+    console.error('[Summary Image]', e);
+    showToast('\u062e\u0637\u0623 \u0641\u064a \u062a\u0635\u062f\u064a\u0631 \u0627\u0644\u0635\u0648\u0631\u0629: ' + e.message.substring(0,50), 'error');
+  }
+}
+
+// ============================================================
 // MAIN PDF GENERATION — Native Print-to-PDF (perfect Arabic)
 // ============================================================
 async function generatePDF(lang){
@@ -4329,9 +4592,9 @@ ${fontLink}
   *{margin:0;padding:0;box-sizing:border-box;font-family:${fontFamily};-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body{background:#FFF;color:#2D2D2D;direction:rtl;}
   .pdf-page{
-    width:210mm;height:297mm;
-    page-break-after:always;page-break-inside:avoid;
-    box-sizing:border-box;overflow:hidden;
+    width:210mm;min-height:297mm;
+    page-break-after:always;
+    box-sizing:border-box;overflow:visible;
     position:relative;
   }
   .pdf-page:last-child{page-break-after:auto;}
