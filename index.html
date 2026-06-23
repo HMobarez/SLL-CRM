@@ -1019,7 +1019,7 @@ async function loadAllData(){
     });
     
     // Load daily contacted
-    const {data:dc} = await supa.from("daily_contacted").select("*");
+    const {data:dc} = await supa.from("daily_contacted").select("*").range(0, 49999);
     MC.dailyByChannel = MC.dailyByChannel || {};
     if(dc) dc.forEach(d => {
       // Store by channel
@@ -1059,7 +1059,7 @@ async function loadAllData(){
     }
     
     // Load all leads (RLS will filter based on role)
-    const {data:leads, error:lerr} = await supa.from("leads").select("*").order("dt", {ascending:false}).order("tm", {ascending:false});
+    const {data:leads, error:lerr} = await supa.from("leads").select("*").order("dt", {ascending:false}).order("tm", {ascending:false}).range(0, 49999);
     if(lerr)throw lerr;
     
     LEADS = (leads||[]).map(l => ({
