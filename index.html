@@ -622,13 +622,10 @@ const DD={
 };
 // Manual monthly data
 let MC={coords:{},channels:{},daily:{}};
-COORD_USERS.forEach(c=>{MC.coords[c.name]={};MONTHS.forEach((_,i)=>{MC.coords[c.name][i]=0;});MC.daily[c.name]={};});
-DD.source.forEach(s=>{MC.channels[s]={};MONTHS.forEach((_,i)=>{MC.channels[s][i]=0;});});
-// Seed sample data
-const seedC={"A'laa":[693,693,693,694,111,0,0,0,0,0,0,0],"Fatma":[594,594,594,594,95,0,0,0,0,0,0,0],"Mayar":[684,684,684,683,109,0,0,0,0,0,0,0],"Rawda":[700,700,700,702,112,0,0,0,0,0,0,0],"Ahlam":[654,654,654,653,105,0,0,0,0,0,0,0],"Sama":[0,0,0,0,0,0,0,0,0,0,0,0],"Soha":[0,0,0,0,0,0,0,0,0,0,0,0]};
-Object.entries(seedC).forEach(([nm,arr])=>{if(MC.coords[nm])arr.forEach((v,i)=>{MC.coords[nm][i]=v;});});
-const seedCh={"Whatsapp":[6950,7200,6800,6500,7100,6900,7300,6600,7000,6800,7200,6998],"Facebook":[1600,1700,1650,1580,1620,1590,1640,1610,1660,1570,1680,1607],"Google":[420,440,410,400,430,415,445,405,435,395,450,427],"Phone call":[620,640,610,600,630,615,645,605,635,595,650,601]};
-Object.entries(seedCh).forEach(([ch,arr])=>{if(MC.channels[ch])arr.forEach((v,i)=>{MC.channels[ch][i]=v;});});
+COORD_USERS.forEach(c=>{MC.coords[c.name]={};MC.daily[c.name]={};});
+DD.source.forEach(s=>{MC.channels[s]={};});
+// Seed sample data removed — using real imported data only
+// (MC.coords / MC.channels are populated from daily_contacted in loadAllData)
 
 let LEADS=[];
 let nextId=9419,rrIdx=0,curUser=null,curLeadId=null,pgLeads=1,PER=10,lView="table",NOTIFS=[],charts={};
@@ -999,11 +996,11 @@ async function loadAllData(){
     COORD_USERS.forEach(c => {
       MC.coords[c.name] = {};
       MC.daily[c.name] = {};
-      MONTHS.forEach((_,i) => MC.coords[c.name][i] = 0);
+      // (no month-zero init needed; keys are year-month)
     });
     DD.source.forEach(s => {
       MC.channels[s] = {};
-      MONTHS.forEach((_,i) => MC.channels[s][i] = 0);
+      // (no month-zero init needed; keys are year-month)
     });
     
     // Load monthly contacted
@@ -1045,14 +1042,15 @@ async function loadAllData(){
     if(dc){
       dc.forEach(d => {
         if(!d.date || !d.coord_name) return;
-        const month = new Date(d.date).getMonth();
-        // Channel-monthly: add to MC.channels[channel][month]
+        const _dd = new Date(d.date);
+        const month = _dd.getFullYear() + "-" + _dd.getMonth();
+        // Channel-monthly: add to MC.channels[channel][year-month]
         const ch = d.channel || null;
         if(ch && ch !== "_total"){
           if(!MC.channels[ch]) MC.channels[ch] = {};
           MC.channels[ch][month] = (MC.channels[ch][month] || 0) + (parseInt(d.count) || 0);
         }
-        // Coordinator-monthly: add to MC.coords[coord_name][month]
+        // Coordinator-monthly: add to MC.coords[coord_name][year-month]
         if(!MC.coords[d.coord_name]) MC.coords[d.coord_name] = {};
         MC.coords[d.coord_name][month] = (MC.coords[d.coord_name][month] || 0) + (parseInt(d.count) || 0);
       });
@@ -4381,25 +4379,26 @@ function totalContactedInRange(coordName){
   if(!coordName){
     // All coordinators total
     return COORD_USERS.reduce(function(sum,c){
-      return sum+months.reduce(function(s,mv){return s+(MC.coords[c.name]&&MC.coords[c.name][mv.m]!==undefined?MC.coords[c.name][mv.m]:0);},0);
+      return sum+months.reduce(function(s,mv){return s+(MC.coords[c.name]&&MC.coords[c.name][mv.y+"-"+mv.m]!==undefined?MC.coords[c.name][mv.y+"-"+mv.m]:0);},0);
     },0);
   }
   return months.reduce(function(sum,mv){
-    return sum+(MC.coords[coordName]&&MC.coords[coordName][mv.m]!==undefined?MC.coords[coordName][mv.m]:0);
+    return sum+(MC.coords[coordName]&&MC.coords[coordName][mv.y+"-"+mv.m]!==undefined?MC.coords[coordName][mv.y+"-"+mv.m]:0);
   },0);
 }
 function totalContactedAll(){
-  // Sum all months ever (for dashboard quick view)
+  // Sum ALL values in MC.coords (any key) — works with year-month keys
   return COORD_USERS.reduce(function(sum,c){
-    return sum+MONTHS.reduce(function(s,_,i){return s+(MC.coords[c.name]&&MC.coords[c.name][i]!==undefined?MC.coords[c.name][i]:0);},0);
+    const obj=MC.coords[c.name];
+    if(!obj)return sum;
+    return sum+Object.values(obj).reduce(function(s,v){return s+(parseInt(v)||0);},0);
   },0);
 }
 function myTotalContactedAll(){
-  // For a coordinator: sum all their monthly contacts
   if(!curUser||curUser.role!=="coordinator")return 0;
-  return MONTHS.reduce(function(s,_,i){
-    return s+(MC.coords[curUser.name]&&MC.coords[curUser.name][i]!==undefined?MC.coords[curUser.name][i]:0);
-  },0);
+  const obj=MC.coords[curUser.name];
+  if(!obj)return 0;
+  return Object.values(obj).reduce(function(s,v){return s+(parseInt(v)||0);},0);
 }
 
 // ═══ PERIOD FILTERS ═══
@@ -4486,11 +4485,11 @@ function totalContactedForPeriod(coordName,period){
   const months=getMonthsForPeriod(period);
   if(!coordName){
     return COORD_USERS.reduce(function(sum,c){
-      return sum+months.reduce(function(s,mv){return s+(MC.coords[c.name]&&MC.coords[c.name][mv.m]!==undefined?MC.coords[c.name][mv.m]:0);},0);
+      return sum+months.reduce(function(s,mv){return s+(MC.coords[c.name]&&MC.coords[c.name][mv.y+"-"+mv.m]!==undefined?MC.coords[c.name][mv.y+"-"+mv.m]:0);},0);
     },0);
   }
   return months.reduce(function(sum,mv){
-    return sum+(MC.coords[coordName]&&MC.coords[coordName][mv.m]!==undefined?MC.coords[coordName][mv.m]:0);
+    return sum+(MC.coords[coordName]&&MC.coords[coordName][mv.y+"-"+mv.m]!==undefined?MC.coords[coordName][mv.y+"-"+mv.m]:0);
   },0);
 }
 function getTodayDailyContacted(coordName){
@@ -4654,7 +4653,7 @@ function renderRT(tab){
       const pot=l.filter(x=>x.src===src).length;
       const act=l.filter(x=>x.src===src&&x.st==="عميل فعلي").length;
       const can=l.filter(x=>x.src===src&&x.st==="لاغي").length;
-      const contacted=months.reduce((sum,{m})=>sum+(MC.channels[src]?.[m]||0),0);
+      const contacted=months.reduce((sum,{y,m})=>sum+(MC.channels[src]?.[y+"-"+m]||0),0);
       return{src,contacted,pot,act,can,conv:pct(act,pot),cancelRate:pct(can,pot)};
     }).filter(x=>x.pot>0||x.contacted>0);
     const actuals=l.filter(x=>x.st==="عميل فعلي");
@@ -4677,7 +4676,7 @@ function renderRT(tab){
           </tr>`).join("")}
           <tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">
             <td style="padding:8px 10px">الإجمالي</td>
-            <td style="padding:8px 10px;text-align:right;font-family:Outfit">${months.reduce((s,{m})=>s+DD.source.reduce((ss,ch)=>ss+(MC.channels[ch]?.[m]||0),0),0).toLocaleString()}</td>
+            <td style="padding:8px 10px;text-align:right;font-family:Outfit">${months.reduce((s,{y,m})=>s+DD.source.reduce((ss,ch)=>ss+(MC.channels[ch]?.[y+"-"+m]||0),0),0).toLocaleString()}</td>
             <td style="padding:8px 10px;text-align:right;color:var(--blue2)">${l.length}</td>
             <td style="padding:8px 10px;text-align:right;color:var(--green)">${l.filter(x=>x.st==="عميل فعلي").length}</td>
             <td style="padding:8px 10px;text-align:right;color:var(--red)">${l.filter(x=>x.st==="لاغي").length}</td>
@@ -4790,7 +4789,7 @@ function renderRT(tab){
     const cd=COORD_USERS.map(c=>{
       const m=l.filter(x=>x.byId===c.id);
       const act=m.filter(x=>x.st==="عميل فعلي").length,can=m.filter(x=>x.st==="لاغي").length;
-      const contacted=months.reduce((sum,{m:mi})=>sum+(MC.coords[c.name]?.[mi]||0),0);
+      const contacted=months.reduce((sum,{y:yi,m:mi})=>sum+(MC.coords[c.name]?.[yi+"-"+mi]||0),0);
       const quality=m.length?pct(m.filter(x=>x.src&&x.nm&&x.prod).length,m.length):0;
       const c2l=contacted>0?pct(m.length,contacted):0;
       const l2a=m.length>0?pct(act,m.length):0;
