@@ -1298,8 +1298,14 @@ function subscribeToChanges(){
       if(payload.new){
         const n = payload.new;
         NOTIFS.unshift({text:n.text,sub:n.sub||"",clr:n.color||"var(--blue2)",read:false,lid:n.lead_id,kind:n.kind,_supaId:n.id});
-        showToast("🔔", n.text || "إشعار جديد");
-        playNotifSound();
+        // إشعار الاحتفال بعميل فعلي → اعرض الاحتفال ملء الشاشة
+        if(n.kind==="active_celebration" && typeof window.celebrateActiveClient==="function"){
+          window._celebrateMsg = n.sub || "";
+          window.celebrateActiveClient();
+        } else {
+          showToast("🔔", n.text || "إشعار جديد");
+          playNotifSound();
+        }
         renderNotifs();
         if(curUser.role==="admin") flashTopbar();
       }
@@ -3069,21 +3075,20 @@ function bindForm(){
       },{once:true});
     }
   });
-  // ★ DUPLICATE CHECK — Live detection على الموبايل (Only for new leads)
+  // ★ DUPLICATE CHECK — Live detection على الموبايل الأول والثاني (Only for new leads)
   if(!curLeadId){
-    const mobEl=body?.querySelector("[name='mob']");
-    if(mobEl){
-      let _dupTimer=null;
-      mobEl.addEventListener("input",()=>{
+    let _dupTimer=null;
+    function _bindDup(el){
+      if(!el) return;
+      el.addEventListener("input",()=>{
         clearTimeout(_dupTimer);
-        const v=mobEl.value.trim();
-        if(v.length<7){
-          hideDuplicateWarning();
-          return;
-        }
+        const v=el.value.trim();
+        if(v.length<7){ hideDuplicateWarning(); return; }
         _dupTimer=setTimeout(()=>checkDuplicateMobile(v),800);
       });
     }
+    _bindDup(body?.querySelector("[name='mob']"));
+    _bindDup(body?.querySelector("[name='mob2']"));
   }
 }
 
@@ -7928,6 +7933,8 @@ function renderContactsUI(data){
   html += '<button class="btn" onclick="downloadContactsTemplate()" style="font-size:11px;background:var(--blue-bg);color:var(--blue2);border:1px solid rgba(75,124,245,.3)">📥 تحميل Template</button>';
   html += '<button class="btn" onclick="$(\'contacts-upload\').click()" style="font-size:11px;background:var(--green-bg);color:var(--green);border:1px solid rgba(34,201,151,.3)">📤 رفع Excel</button>';
   html += '<input type="file" id="contacts-upload" accept=".xlsx,.xls" style="display:none" onchange="uploadContactsExcel(event)">';
+  // ★ زر حفظ كل التغييرات مرة واحدة
+  html += '<button id="contacts-save-btn" class="btn primary" onclick="saveAllContactCells()" style="font-size:11px;display:none">💾 حفظ التغييرات (<span id="contacts-dirty-count">0</span>)</button>';
   html += '</div>';
   
   html += '</div>';
@@ -7987,7 +7994,7 @@ function renderContactsUI(data){
     visChannels.forEach(c=>{
       const val = dayData[c.name] || 0;
       html += '<td style="padding:2px 4px;text-align:center;border-left:1px solid var(--border)">';
-      html += '<input type="number" min="0" value="'+(val||"")+'" placeholder="0" data-date="'+dateStr+'" data-channel="'+c.name+'" onblur="saveContactCell(this)" style="width:60px;height:28px;text-align:center;background:'+(val>0?'rgba(34,201,151,.06)':'transparent')+';border:1px solid '+(val>0?'rgba(34,201,151,.3)':'transparent')+';border-radius:5px;color:var(--text);font-size:11px;font-weight:'+(val>0?'700':'400')+'">';
+      html += '<input type="number" min="0" value="'+(val||"")+'" placeholder="0" data-date="'+dateStr+'" data-channel="'+c.name+'" oninput="markContactCellDirty(this)" data-orig="'+(val||"")+'" style="width:60px;height:28px;text-align:center;background:'+(val>0?'rgba(34,201,151,.06)':'transparent')+';border:1px solid '+(val>0?'rgba(34,201,151,.3)':'transparent')+';border-radius:5px;color:var(--text);font-size:11px;font-weight:'+(val>0?'700':'400')+'">';
       html += '</td>';
     });
     html += '<td style="padding:6px 10px;text-align:center;font-weight:700;color:'+(dayTotal>0?'var(--blue2)':'var(--text4)')+';font-size:12px;background:rgba(75,124,245,.04)">'+(dayTotal||"—")+'</td>';
@@ -8027,6 +8034,81 @@ function onContactsMonthChange(v){
 function onContactsCoordChange(v){
   _contactsViewState.coordId = v;
   renderContacts();
+}
+
+// ═══ NEW: حفظ مجمّع لخانات Contacts (بدون reload لكل خانة) ═══
+function markContactCellDirty(input){
+  const orig = input.dataset.orig || "";
+  const cur = input.value.trim();
+  if(cur !== orig){
+    input.dataset.dirty = "1";
+    input.style.background = "rgba(255,193,7,.15)";
+    input.style.border = "1px solid var(--yellow,#FFC107)";
+    input.style.fontWeight = "700";
+  } else {
+    delete input.dataset.dirty;
+    const v = parseInt(cur);
+    input.style.background = (v>0)?"rgba(34,201,151,.06)":"transparent";
+    input.style.border = "1px solid "+((v>0)?"rgba(34,201,151,.3)":"transparent");
+    input.style.fontWeight = (v>0)?"700":"400";
+  }
+  _updateContactsDirtyCount();
+}
+
+function _updateContactsDirtyCount(){
+  const dirty = document.querySelectorAll('#pg-contacts input[data-dirty="1"]');
+  const btn = document.getElementById("contacts-save-btn");
+  const cnt = document.getElementById("contacts-dirty-count");
+  if(cnt) cnt.textContent = dirty.length;
+  if(btn) btn.style.display = dirty.length>0 ? "" : "none";
+}
+
+async function saveAllContactCells(){
+  if(!supa){showToast("❌","لا يوجد اتصال");return;}
+  const coordId = _contactsViewState.coordId;
+  if(!coordId){showToast("⚠","اختر كوردينتور");return;}
+  const coord = USERS.find(u=>u.id===coordId);
+  const coordName = coord?.name || "?";
+  const dirty = Array.from(document.querySelectorAll('#pg-contacts input[data-dirty="1"]'));
+  if(dirty.length===0){showToast("⚠","لا يوجد تغييرات");return;}
+
+  const upserts = [];
+  const deletes = [];
+  dirty.forEach(input => {
+    const dt = input.dataset.date;
+    const ch = input.dataset.channel;
+    const v = parseInt(input.value);
+    if(isNaN(v) || v<=0){
+      deletes.push({coord_id:coordId, date:dt, channel:ch});
+    } else {
+      upserts.push({coord_id:coordId, coord_name:coordName, date:dt, channel:ch, count:v});
+    }
+  });
+
+  try {
+    showToast("⏳","جاري الحفظ...");
+    if(upserts.length){
+      const {error} = await supa.from("daily_contacted").upsert(upserts, {onConflict:"coord_id,date,channel"});
+      if(error) throw error;
+    }
+    for(const d of deletes){
+      await supa.from("daily_contacted").delete().match(d);
+    }
+    // حدّث الحالة المحلية
+    if(!MC.dailyByChannel) MC.dailyByChannel = {};
+    if(!MC.dailyByChannel[coordName]) MC.dailyByChannel[coordName] = {};
+    upserts.forEach(u=>{
+      if(!MC.dailyByChannel[coordName][u.date]) MC.dailyByChannel[coordName][u.date]={};
+      MC.dailyByChannel[coordName][u.date][u.channel] = u.count;
+    });
+    showToast("✓","تم حفظ "+(upserts.length+deletes.length)+" تغيير");
+    NOTIFS = NOTIFS.filter(n => n.kind !== "daily-channel-reminder");
+    renderNotifs();
+    // إعادة بناء مرة واحدة بعد الحفظ الكامل (مش لكل خانة)
+    renderContacts();
+  } catch(e){
+    showToast("❌","فشل الحفظ: "+e.message.substring(0,60));
+  }
 }
 
 async function saveContactCell(input){
@@ -8981,6 +9063,7 @@ function playCelebrationSound(){
   }catch(e){}
 }
 
+window.celebrateActiveClient = celebrateActiveClient;
 function celebrateActiveClient(){
   // overlay
   const ov=document.createElement("div");
@@ -8989,9 +9072,11 @@ function celebrateActiveClient(){
   // رسالة وسط الشاشة
   const card=document.createElement("div");
   card.style.cssText="text-align:center;transform:scale(.7);animation:sllCelebPop .6s cubic-bezier(.34,1.56,.64,1) forwards;";
+  const _msg = window._celebrateMsg || "";
   card.innerHTML='<div style="font-size:90px;line-height:1">🎉</div>'+
     '<div style="font-size:30px;font-weight:900;color:#22C997;margin-top:6px;font-family:Cairo,sans-serif;text-shadow:0 2px 20px rgba(34,201,151,.5)">عميل فعلي جديد!</div>'+
-    '<div style="font-size:15px;color:#fff;margin-top:6px;font-weight:600;opacity:.9">تحويل ناجح — أحسنت! 👏</div>';
+    (_msg?'<div style="font-size:16px;color:#fff;margin-top:8px;font-weight:700;opacity:.95">'+_msg+'</div>':'');
+  window._celebrateMsg = "";
   ov.appendChild(card);
   document.body.appendChild(ov);
 
@@ -9498,7 +9583,40 @@ async function _saveActiveClientData(lead, acData){
       lead_id: lead._supaId||lead.id, user_name: curUserName(),
       action: "✅ عميل فعلي · كود: "+acData.active_code+(acData.paid_amount?" · مدفوع: "+acData.paid_amount+" "+acData.paid_currency:" · "+acData.paid_currency)
     });
+    // ابعت إشعار احتفال لكل المعنيين: السيلز + الكوordinator + كل الأدمنز
+    await _notifyActiveCelebration(lead);
   }catch(e){ console.error("[ActiveClient] save error", e); }
+}
+
+async function _notifyActiveCelebration(lead){
+  if(typeof supa==="undefined"||!supa) return;
+  try{
+    const targets = new Set();
+    // السيلز صاحب الليد
+    if(lead.repId) targets.add(lead.repId);
+    // الكوordinator
+    if(lead.byId) targets.add(lead.byId);
+    // كل الأدمنز
+    const USERS_ARR = (typeof USERS!=="undefined")?USERS:[];
+    USERS_ARR.forEach(u => { if(u.role==="admin" && u.id) targets.add(u.id); });
+    // الشخص اللي عمل التحويل بيشوف الاحتفال محلياً، نشيله من قائمة الإشعارات لتجنّب التكرار
+    const myId = (typeof curUser!=="undefined"&&curUser)?curUser.id:null;
+    const rows = [];
+    targets.forEach(uid => {
+      if(uid===myId) return; // ده بيشوف الاحتفال محلياً
+      rows.push({
+        user_id: uid,
+        text: "🎉 عميل فعلي جديد — "+(lead.nm||""),
+        sub: "حوّله "+curUserName(),
+        color: "#22C997",
+        lead_id: lead._supaId||lead.id,
+        kind: "active_celebration"
+      });
+    });
+    if(rows.length){
+      await supa.from("notifications").insert(rows);
+    }
+  }catch(e){ console.error("[ActiveCelebration] notify error", e); }
 }
 // ════════════════════════════════════════════════
 // حقن علامات ✏️ في شاشة الليد بعد عرضها
@@ -9844,18 +9962,13 @@ console.log("[FieldEdit] ✓ Field editing + change tracking + active-client for
 const SVC_GROUPS = [
   {
     key:"trading", label:"Trading Services", labelAr:"خدمات تجارية",
-    color:"#185FA5",
-    services:["توفير موردين","زيارة معرض الكانتون","السفر للصين","السفر لتركيا","السفر لألمانيا","فحص منتجات"]
+    color:"#2D2D2D",
+    services:["توفير موردين","زيارة معرض الكانتون","السفر للصين","السفر لتركيا","السفر لألمانيا","فحص منتجات","دراسة تكاليف الاستيراد"]
   },
   {
-    key:"roi", label:"ROI / دراسة استيرادية", labelAr:"دراسة استيرادية",
-    color:"#7F77DD",
-    services:["دراسة تكاليف الاستيراد"]
-  },
-  {
-    key:"freight", label:"Freight & Customs", labelAr:"شحن وتخليص",
-    color:"#0F6E56",
-    services:["شحن بحري","شحن جوي","شحن بري","تخليص جمركي","CargoX","خدمة شاملة"]
+    key:"freight", label:"Freight & Customs Services", labelAr:"شحن وتخليص",
+    color:"#555555",
+    services:["شحن بحري","شحن جوي","شحن بري","تخليص جمركي","البطاقة الاستيرادية","CargoX","خدمة شاملة"]
   },
 ];
 
@@ -9873,17 +9986,21 @@ function primaryGroup(svcArr){
 }
 
 // ─── بناء الجدول الذكي ───
-window.buildSmartMatrix = function(actives){
-  // perSales[rep] = { total, groups:{trading:n,roi:n,freight:n}, svc:{خدمة:n} }
+window.buildSmartMatrix = function(actives, axis){
+  // axis: "rep" (السيلز) أو "by" (الكوordinator)
+  axis = axis || "rep";
+  const axisField = axis;
+  const axisLabel = axis==="by" ? "الكوردينتور" : "السيلز";
+  // perSales[name] = { total, groups, svc }
   const perSales = {};
   // إجمالي عام لكل خدمة (للصف الأخير) — لكن فقط للعميل المُصنّف في مجموعتها
   const grandSvc = {};
-  const grandGroup = { trading:0, roi:0, freight:0 };
+  const grandGroup = { trading:0, freight:0 };
   let grandTotal = 0;
 
   actives.forEach(l => {
-    const rep = l.rep || "غير محدد";
-    if(!perSales[rep]) perSales[rep] = { total:0, groups:{trading:0,roi:0,freight:0}, svc:{} };
+    const rep = l[axisField] || "غير محدد";
+    if(!perSales[rep]) perSales[rep] = { total:0, groups:{trading:0,freight:0}, svc:{} };
     const g = primaryGroup(l.svc||[]);
     if(!g) return; // عميل بلا خدمة معروفة — لا يُحسب
     perSales[rep].total++;
@@ -9914,13 +10031,13 @@ window.buildSmartMatrix = function(actives){
 
   // ─── HTML ───
   let h = '<div class="card" style="margin-bottom:14px">';
-  h += '<div class="card-title">🏆 مصفوفة السيلز × الخدمات (ذكية)</div>';
-  h += '<div class="card-sub">كل عميل فعلي يُحسب في مجموعة واحدة فقط — حسب الأولوية: Trading ← ROI ← Freight</div>';
+  h += '<div class="card-title">🏆 مصفوفة '+axisLabel+' × الخدمات (ذكية)</div>';
+  h += '<div class="card-sub">كل عميل فعلي يُحسب في مجموعة واحدة فقط — حسب الأولوية: Trading ← Freight</div>';
   h += '<div style="overflow-x:auto;margin-top:12px"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:640px">';
 
   // ── رأس المجموعات (الصف الأول) ──
   h += '<thead><tr style="background:var(--bg2)">';
-  h += '<th rowspan="2" style="padding:8px 10px;text-align:right;font-weight:700;color:var(--text2);font-size:10px;border-bottom:2px solid var(--border);border-left:1px solid var(--border)">السيلز</th>';
+  h += '<th rowspan="2" style="padding:8px 10px;text-align:right;font-weight:700;color:var(--text2);font-size:10px;border-bottom:2px solid var(--border);border-left:1px solid var(--border)">'+axisLabel+'</th>';
   h += '<th rowspan="2" style="padding:8px 10px;text-align:center;font-weight:800;color:var(--blue2);font-size:10px;background:rgba(75,124,245,.08);border-bottom:2px solid var(--border);border-left:2px solid var(--border)">الإجمالي</th>';
   activeSvcByGroup.forEach(g => {
     h += '<th colspan="'+(g.cols.length+1)+'" style="padding:8px 10px;text-align:center;font-weight:800;color:#ffffff;font-size:11px;background:'+g.color+';border-bottom:1px solid var(--border);border-left:2px solid var(--border);text-shadow:0 1px 2px rgba(0,0,0,.3);letter-spacing:.3px">'+g.label+'</th>';
@@ -10006,11 +10123,16 @@ function patchActiveClients(){
           const t = c.querySelector(".card-title");
           if(t && t.textContent.includes("Sales × Services Matrix")) oldCard = c;
         });
-        const smartHtml = buildSmartMatrix(actives);
+        // جدول السيلز + جدول الكوordinator (الاتنين)
+        const smartHtmlRep = buildSmartMatrix(actives, "rep");
+        const smartHtmlBy  = buildSmartMatrix(actives, "by");
         if(oldCard){
           const wrap = document.createElement("div");
-          wrap.innerHTML = smartHtml;
-          oldCard.replaceWith(wrap.firstElementChild);
+          wrap.innerHTML = smartHtmlRep + smartHtmlBy;
+          // نستبدل الكارت القديم بالاتنين
+          const frag = document.createDocumentFragment();
+          while(wrap.firstElementChild) frag.appendChild(wrap.firstElementChild);
+          oldCard.replaceWith(frag);
         }
       }catch(e){ console.warn("[SmartMatrix]", e); }
     }, 20);
@@ -10018,6 +10140,54 @@ function patchActiveClients(){
   console.log("[SmartMatrix] ✓ patched renderActiveClientsTab");
 }
 patchActiveClients();
+
+// ─── حقن الجدول الذكي في التقارير الشخصية (سيلز/كوordinator) ───
+function patchPersonalReports(){
+  ["renderSalesReports","renderCoordReports"].forEach(function(fnName){
+    if(typeof window[fnName] !== "function"){ return; }
+    if(window["_patched_"+fnName]) return;
+    window["_patched_"+fnName] = true;
+    const _orig = window[fnName];
+    const isCoord = fnName==="renderCoordReports";
+    window[fnName] = function(){
+      _orig.apply(this, arguments);
+      setTimeout(function(){
+        try{
+          if(typeof curUser==="undefined" || !curUser) return;
+          const cont = document.getElementById("pg-myreports");
+          if(!cont) return;
+          if(document.getElementById("personal-smart-matrix")) return; // مفيش تكرار
+          // عملاء الشخص الحالي الفعليين (حسب دوره)
+          const allL = (typeof LEADS!=="undefined")?LEADS:[];
+          // احترام فلتر الفترة المختارة في التقرير الشخصي
+          let rng = null;
+          try{
+            const per = isCoord ? coordRptPeriod : salesRptPeriod;
+            rng = getPeriodRange(per);
+          }catch(e){}
+          const mine = allL.filter(function(l){
+            if(l.st!=="عميل فعلي") return false;
+            const own = isCoord ? (l.byId===curUser.id) : (l.repId===curUser.id);
+            if(!own) return false;
+            if(rng && l.dt){ return l.dt>=rng.fromStr && l.dt<=rng.toStr; }
+            return true;
+          });
+          if(!mine.length) return;
+          const axis = isCoord ? "by" : "rep";
+          const wrap = document.createElement("div");
+          wrap.id = "personal-smart-matrix";
+          wrap.innerHTML = '<div style="margin-top:14px"><div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">🛒 توزيع خدمات عملائي الفعليين</div>' + buildSmartMatrix(mine, axis) + '</div>';
+          cont.appendChild(wrap);
+        }catch(e){ console.warn("[PersonalMatrix]", e); }
+      }, 30);
+    };
+  });
+  // لو الدوال لسه ماتعرّفتش، نحاول تاني
+  if(typeof window.renderSalesReports!=="function" || typeof window.renderCoordReports!=="function"){
+    setTimeout(patchPersonalReports, 400);
+  }
+}
+patchPersonalReports();
 
 })();
 </script>
