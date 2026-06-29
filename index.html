@@ -10171,11 +10171,17 @@ function injectPersonalMatrix(){
       if(rng && l.dt){ return l.dt>=rng.fromStr && l.dt<=rng.toStr; }
       return true;
     });
-    if(!mine.length) return;
     const axis = isCoord ? "by" : "rep";
     const wrap = document.createElement("div");
     wrap.id = "personal-smart-matrix";
-    wrap.innerHTML = '<div style="margin-top:14px"><div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">🛒 توزيع خدمات عملائي الفعليين</div>' + buildSmartMatrix(mine, axis) + '</div>';
+    let inner = '<div style="margin-top:14px"><div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">🛒 توزيع خدمات عملائي الفعليين</div>';
+    if(!mine.length){
+      inner += '<div class="card" style="padding:18px;text-align:center;color:var(--text3);font-size:12px">لا يوجد عملاء فعليون في هذه الفترة بعد.</div>';
+    } else {
+      inner += buildSmartMatrix(mine, axis);
+    }
+    inner += '</div>';
+    wrap.innerHTML = inner;
     cont.appendChild(wrap);
   }catch(e){ console.warn("[PersonalMatrix]", e); }
 }
@@ -10188,6 +10194,7 @@ function patchPersonalReports(){
   window.renderMyReports = function(){
     _orig.apply(this, arguments);
     setTimeout(injectPersonalMatrix, 60);
+    setTimeout(injectPersonalMatrix, 300);
   };
   console.log("[PersonalMatrix] ✓ patched renderMyReports");
 }
