@@ -10278,6 +10278,229 @@ applyChartTweaks();
 })();
 </script>
 
+<!-- ════════════════════════════════════════════════════════════
+     MULTI-SELECT FILTERS + MONTH FILTER (لـ Leads table)
+     - فلاتر الحالة/المصدر/السيلز/الكوordinator/Score/الأولوية → multi-select
+     - فلتر شهر سريع (بالإضافة لفلتر التاريخ الكلاندر)
+     ════════════════════════════════════════════════════════════ -->
+<style>
+.msf-wrap{position:relative;display:inline-block}
+.msf-btn{height:32px;padding:0 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;font-family:inherit;min-width:90px}
+.msf-btn:hover{border-color:var(--blue2)}
+.msf-btn .msf-cnt{background:var(--blue2);color:#fff;border-radius:9px;padding:0 6px;font-size:9px;font-weight:700;min-width:16px;text-align:center}
+.msf-btn .msf-cnt.zero{display:none}
+.msf-arrow{margin-right:auto;opacity:.5;font-size:9px}
+.msf-pop{position:absolute;top:36px;right:0;z-index:5000;background:var(--surface,#fff);border:1px solid var(--border);border-radius:9px;box-shadow:0 8px 28px rgba(0,0,0,.16);padding:6px;min-width:190px;max-height:280px;overflow-y:auto;display:none}
+.msf-pop.open{display:block}
+.msf-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text)}
+.msf-opt:hover{background:var(--bg3)}
+.msf-opt input{width:15px;height:15px;cursor:pointer;accent-color:var(--blue2)}
+.msf-tools{display:flex;gap:4px;padding:4px 4px 6px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.msf-tools button{flex:1;font-size:10px;padding:4px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;cursor:pointer;color:var(--text2)}
+.msf-tools button:hover{background:var(--blue-bg);color:var(--blue2)}
+</style>
+<script>
+(function(){
+'use strict';
+
+// حالة الفلاتر المتعددة المختارة
+window.MSF = window.MSF || { st:[], src:[], rep:[], coord:[], sc:[], pri:[], month:"" };
+
+// يبني dropdown متعدد الاختيار
+function buildMSF(key, label, options){
+  const sel = window.MSF[key] || [];
+  let h = '<div class="msf-wrap">';
+  h += '<button type="button" class="msf-btn" onclick="MSFtoggle(event,\''+key+'\')">';
+  h += '<span>'+label+'</span>';
+  h += '<span class="msf-cnt '+(sel.length?'':'zero')+'" id="msf-cnt-'+key+'">'+sel.length+'</span>';
+  h += '<span class="msf-arrow">▾</span></button>';
+  h += '<div class="msf-pop" id="msf-pop-'+key+'">';
+  h += '<div class="msf-tools"><button type="button" onclick="MSFall(\''+key+'\')">الكل</button><button type="button" onclick="MSFnone(\''+key+'\')">مسح</button></div>';
+  options.forEach(function(o){
+    const val = (typeof o==="object")?o.val:o;
+    const txt = (typeof o==="object")?o.txt:o;
+    const checked = sel.includes(val)?"checked":"";
+    h += '<label class="msf-opt"><input type="checkbox" value="'+val+'" '+checked+' onchange="MSFchange(\''+key+'\',this)"><span>'+txt+'</span></label>';
+  });
+  h += '</div></div>';
+  return h;
+}
+
+window.MSFtoggle = function(ev, key){
+  ev.stopPropagation();
+  const pop = document.getElementById("msf-pop-"+key);
+  if(!pop) return;
+  const isOpen = pop.classList.contains("open");
+  // اقفل الكل
+  document.querySelectorAll(".msf-pop.open").forEach(p=>p.classList.remove("open"));
+  if(!isOpen) pop.classList.add("open");
+};
+
+window.MSFchange = function(key, cb){
+  const arr = window.MSF[key] || [];
+  if(cb.checked){ if(!arr.includes(cb.value)) arr.push(cb.value); }
+  else { const i=arr.indexOf(cb.value); if(i>-1) arr.splice(i,1); }
+  window.MSF[key] = arr;
+  _updateMSFCount(key);
+  if(typeof filterL==="function") filterL();
+};
+
+window.MSFall = function(key){
+  const pop = document.getElementById("msf-pop-"+key);
+  const vals = [];
+  pop.querySelectorAll('input[type=checkbox]').forEach(cb=>{ cb.checked=true; vals.push(cb.value); });
+  window.MSF[key] = vals;
+  _updateMSFCount(key);
+  if(typeof filterL==="function") filterL();
+};
+window.MSFnone = function(key){
+  const pop = document.getElementById("msf-pop-"+key);
+  pop.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false);
+  window.MSF[key] = [];
+  _updateMSFCount(key);
+  if(typeof filterL==="function") filterL();
+};
+function _updateMSFCount(key){
+  const c = document.getElementById("msf-cnt-"+key);
+  const n = (window.MSF[key]||[]).length;
+  if(c){ c.textContent=n; c.classList.toggle("zero", n===0); }
+}
+
+// اقفل الـ popups لما تدوس بره
+document.addEventListener("click", function(e){
+  if(!e.target.closest(".msf-wrap")){
+    document.querySelectorAll(".msf-pop.open").forEach(p=>p.classList.remove("open"));
+  }
+});
+
+// ─── فلتر الشهر السريع ───
+function buildMonthFilter(){
+  // آخر 18 شهر + الشهور الجاية شهرين
+  const now = new Date();
+  const opts = ['<option value="">📅 كل الشهور</option>'];
+  for(let i=-2; i<=18; i++){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const y=d.getFullYear(), m=d.getMonth();
+    const val = y+"-"+String(m+1).padStart(2,"0");
+    const months=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+    const sel = window.MSF.month===val?" selected":"";
+    opts.push('<option value="'+val+'"'+sel+'>'+months[m]+' '+y+'</option>');
+  }
+  return '<select class="fsel" id="ls-month" onchange="MSFmonth(this.value)" title="فلتر شهر سريع" style="min-width:120px">'+opts.join("")+'</select>';
+}
+window.MSFmonth = function(val){
+  window.MSF.month = val;
+  if(typeof filterL==="function") filterL();
+};
+
+// ─── استبدال شريط الفلاتر القديم بالجديد ───
+function rebuildFilterBar(){
+  const fbar = document.querySelector("#pg-leads .fbar");
+  if(!fbar) return;
+  if(fbar.dataset.msfDone) return;
+
+  // القيم المتاحة
+  const statusOpts = [{val:"جديد",txt:"🆕 جديد"},{val:"reactivated",txt:"♻️ مسترد"}];
+  (DD.status||[]).forEach(s=>statusOpts.push(s));
+  const srcOpts = (DD.source||[]).slice();
+  const repOpts = (typeof SALES_USERS!=="undefined"?SALES_USERS:[]).map(s=>s.name);
+  const coordOpts = (typeof COORD_USERS!=="undefined"?COORD_USERS:[]).map(c=>c.name);
+  const scOpts = ["Hot","Warm","Cold"];
+  const priOpts = (DD.priority||[]).slice();
+
+  // نلاقي الـ selects القديمة ونستبدلها
+  const isAdmin = curUser.role==="admin";
+  const isCoord = curUser.role==="coordinator";
+
+  // نبني الفلاتر الجديدة
+  const oldStatus = document.getElementById("ls-st");
+  if(oldStatus){ const w=document.createElement("span"); w.innerHTML=buildMSF("st","الحالة",statusOpts); oldStatus.replaceWith(w.firstElementChild); }
+  const oldSrc = document.getElementById("ls-src");
+  if(oldSrc){ const w=document.createElement("span"); w.innerHTML=buildMSF("src","المصدر",srcOpts); oldSrc.replaceWith(w.firstElementChild); }
+  const oldRep = document.getElementById("ls-rep");
+  if(oldRep){ const w=document.createElement("span"); w.innerHTML=buildMSF("rep","Sales",repOpts); oldRep.replaceWith(w.firstElementChild); }
+  const oldCoord = document.getElementById("ls-coord");
+  if(oldCoord){ const w=document.createElement("span"); w.innerHTML=buildMSF("coord","Coord",coordOpts); oldCoord.replaceWith(w.firstElementChild); }
+  const oldSc = document.getElementById("ls-sc");
+  if(oldSc){ const w=document.createElement("span"); w.innerHTML=buildMSF("sc","Score",scOpts); oldSc.replaceWith(w.firstElementChild); }
+  const oldPri = document.getElementById("ls-pri");
+  if(oldPri){ const w=document.createElement("span"); w.innerHTML=buildMSF("pri","الأولوية",priOpts); oldPri.replaceWith(w.firstElementChild); }
+
+  // نضيف فلتر الشهر قبل فلتر التاريخ
+  const dateWrap = document.getElementById("ls-dt-from");
+  if(dateWrap){
+    const dateBox = dateWrap.closest("div");
+    const mw = document.createElement("span");
+    mw.innerHTML = buildMonthFilter();
+    dateBox.parentNode.insertBefore(mw.firstElementChild, dateBox);
+  }
+
+  fbar.dataset.msfDone = "1";
+}
+
+// ─── اعتراض filteredL لتطبيق الفلاتر المتعددة + الشهر ───
+function patchFilteredL(){
+  if(typeof window.filteredL !== "function"){ setTimeout(patchFilteredL, 300); return; }
+  if(window._filteredLPatched) return;
+  window._filteredLPatched = true;
+  const _orig = window.filteredL;
+  window.filteredL = function(){
+    // نستخدم الأصلية لكن نلغي تأثير الـ selects القديمة (مبقتش موجودة)
+    let l = _orig.apply(this, arguments);
+    const M = window.MSF;
+    // multi-select فلاتر
+    if(M.st && M.st.length){
+      l = l.filter(x=>{
+        return M.st.some(s=>{
+          if(s==="جديد") return isNew(x);
+          if(s==="reactivated") return isReactivated(x);
+          return x.st===s;
+        });
+      });
+    }
+    if(M.src && M.src.length) l = l.filter(x=>M.src.includes(x.src));
+    if(M.rep && M.rep.length) l = l.filter(x=>M.rep.includes(x.rep));
+    if(M.coord && M.coord.length) l = l.filter(x=>M.coord.includes(x.by));
+    if(M.sc && M.sc.length) l = l.filter(x=>M.sc.includes(scoreLbl(score(x))));
+    if(M.pri && M.pri.length) l = l.filter(x=>M.pri.includes(x.priority));
+    // فلتر الشهر (YYYY-MM)
+    if(M.month) l = l.filter(x=>x.dt && x.dt.substring(0,7)===M.month);
+    return l;
+  };
+  console.log("[MultiFilter] ✓ filteredL patched");
+}
+patchFilteredL();
+
+// ─── اعتراض renderLeadsContent عشان نعيد بناء شريط الفلاتر ───
+function patchRenderLeads(){
+  if(typeof window.renderLeadsContent !== "function"){ setTimeout(patchRenderLeads, 300); return; }
+  if(window._msfRenderPatched) return;
+  window._msfRenderPatched = true;
+  const _orig = window.renderLeadsContent;
+  window.renderLeadsContent = function(){
+    _orig.apply(this, arguments);
+    setTimeout(rebuildFilterBar, 10);
+  };
+  console.log("[MultiFilter] ✓ renderLeadsContent patched");
+}
+patchRenderLeads();
+
+// نظّف عند clearFilters
+if(typeof window.clearFilters === "function"){
+  const _origClear = window.clearFilters;
+  window.clearFilters = function(){
+    window.MSF = { st:[], src:[], rep:[], coord:[], sc:[], pri:[], month:"" };
+    _origClear.apply(this, arguments);
+    setTimeout(function(){
+      const fb=document.querySelector("#pg-leads .fbar"); if(fb) delete fb.dataset.msfDone;
+      if(typeof renderLeadsContent==="function") renderLeadsContent();
+    }, 10);
+  };
+}
+
+})();
+</script>
+
 <div style="position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:var(--text4);pointer-events:none;z-index:10;font-family:Outfit;letter-spacing:.04em">
   Developed by <strong style="color:var(--text3)">Straight Line Group</strong>
 </div>
