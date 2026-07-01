@@ -1016,7 +1016,18 @@ async function loadAllData(){
     });
     
     // Load daily contacted
-    const {data:dc} = await supa.from("daily_contacted").select("*").range(0, 49999);
+    let dc = [];
+    {
+      const B=1000; let f=0;
+      while(true){
+        const {data:ch,error:e}=await supa.from("daily_contacted").select("*").range(f,f+B-1);
+        if(e) break;
+        if(!ch||ch.length===0) break;
+        dc=dc.concat(ch);
+        if(ch.length<B) break;
+        f+=B; if(f>200000) break;
+      }
+    }
     MC.dailyByChannel = MC.dailyByChannel || {};
     if(dc) dc.forEach(d => {
       // Store by channel
@@ -1056,9 +1067,29 @@ async function loadAllData(){
       });
     }
     
-    // Load all leads (RLS will filter based on role)
-    const {data:leads, error:lerr} = await supa.from("leads").select("*").order("dt", {ascending:false}).order("tm", {ascending:false}).range(0, 49999);
-    if(lerr)throw lerr;
+    // Load all leads via PAGINATION (batches of 1000) — يتحمّل آلاف الليدز بأمان
+    console.log("[loadAllData] Fetching leads (paginated)...");
+    let leads = [];
+    {
+      const BATCH = 1000;
+      let from = 0;
+      while(true){
+        const to = from + BATCH - 1;
+        const {data:chunk, error:lerr} = await supa.from("leads")
+          .select("*")
+          .order("dt", {ascending:false})
+          .order("tm", {ascending:false})
+          .range(from, to);
+        if(lerr) throw lerr;
+        if(!chunk || chunk.length===0) break;
+        leads = leads.concat(chunk);
+        console.log("[loadAllData] leads batch:", from, "→", from+chunk.length-1, "(total "+leads.length+")");
+        if(chunk.length < BATCH) break;  // آخر دفعة
+        from += BATCH;
+        if(from > 200000) break;  // أمان: حد أقصى
+      }
+    }
+    console.log("[loadAllData] Got", leads.length, "leads (done)");
     
     LEADS = (leads||[]).map(l => ({
       id: l.id,
