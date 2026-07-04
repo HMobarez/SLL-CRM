@@ -765,43 +765,63 @@ body{
         <div class="section-body">
           <div class="form-grid cols-2">
             <div class="form-field">
-              <label>عمولة البطاقة الاستيرادية <span class="helper">% من القيمة المقبولة</span></label>
-              <div class="form-input-group">
-                <input type="number" id="cardCommissionPct" class="form-input text-num" value="7" step="0.01">
-                <div class="input-suffix">%</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                <input type="checkbox" id="enableCardCommission" checked onchange="toggleFeeField('cardCommission');calculate();" style="width:16px;height:16px;cursor:pointer;">
+                <label for="enableCardCommission" style="margin:0;cursor:pointer;">عمولة البطاقة الاستيرادية <span class="helper">% من القيمة المقبولة</span></label>
               </div>
-              <div style="font-size:10px;color:var(--gray);margin-top:3px;font-style:italic;">حد أدنى: 7,000 ج.م</div>
-            </div>
-            <div class="form-field">
-              <label>عمولة SLL Trading <span class="helper">% من القيمة الفعلية</span></label>
-              <div class="form-input-group">
-                <input type="number" id="sllCommissionPct" class="form-input text-num" value="5" step="0.01">
-                <div class="input-suffix">%</div>
-              </div>
-            </div>
-            <div class="form-field">
-              <label>مصاريف بنكية</label>
-              <div class="dual-currency">
-                <div class="sub-field">
-                  <label>بالدولار</label>
-                  <input type="number" id="bankFeesUSD" class="form-input text-num" value="200" step="0.01">
+              <div id="cardCommissionField">
+                <div class="form-input-group">
+                  <input type="number" id="cardCommissionPct" class="form-input text-num" value="7" step="0.01">
+                  <div class="input-suffix">%</div>
                 </div>
-                <div class="sub-field">
-                  <label>بالجنيه (محسوب)</label>
-                  <input type="text" id="bankFeesEGP" class="form-input text-num" readonly>
+                <div style="font-size:10px;color:var(--gray);margin-top:3px;font-style:italic;">حد أدنى: 7,000 ج.م</div>
+              </div>
+            </div>
+            <div class="form-field">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                <input type="checkbox" id="enableSllCommission" checked onchange="toggleFeeField('sllCommission');calculate();" style="width:16px;height:16px;cursor:pointer;">
+                <label for="enableSllCommission" style="margin:0;cursor:pointer;">عمولة SLL Trading <span class="helper">% من القيمة الفعلية</span></label>
+              </div>
+              <div id="sllCommissionField">
+                <div class="form-input-group">
+                  <input type="number" id="sllCommissionPct" class="form-input text-num" value="5" step="0.01">
+                  <div class="input-suffix">%</div>
                 </div>
               </div>
             </div>
             <div class="form-field">
-              <label>مصاريف أخرى</label>
-              <div class="dual-currency">
-                <div class="sub-field">
-                  <label>بالدولار</label>
-                  <input type="number" id="otherFeesUSD" class="form-input text-num" value="200" step="0.01">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                <input type="checkbox" id="enableBankFees" checked onchange="toggleFeeField('bankFees');calculate();" style="width:16px;height:16px;cursor:pointer;">
+                <label for="enableBankFees" style="margin:0;cursor:pointer;">مصاريف بنكية</label>
+              </div>
+              <div id="bankFeesField">
+                <div class="dual-currency">
+                  <div class="sub-field">
+                    <label>بالدولار</label>
+                    <input type="number" id="bankFeesUSD" class="form-input text-num" value="200" step="0.01">
+                  </div>
+                  <div class="sub-field">
+                    <label>بالجنيه (محسوب)</label>
+                    <input type="text" id="bankFeesEGP" class="form-input text-num" readonly>
+                  </div>
                 </div>
-                <div class="sub-field">
-                  <label>بالجنيه (محسوب)</label>
-                  <input type="text" id="otherFeesEGP" class="form-input text-num" readonly>
+              </div>
+            </div>
+            <div class="form-field">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                <input type="checkbox" id="enableOtherFees" checked onchange="toggleFeeField('otherFees');calculate();" style="width:16px;height:16px;cursor:pointer;">
+                <label for="enableOtherFees" style="margin:0;cursor:pointer;">مصاريف أخرى</label>
+              </div>
+              <div id="otherFeesField">
+                <div class="dual-currency">
+                  <div class="sub-field">
+                    <label>بالدولار</label>
+                    <input type="number" id="otherFeesUSD" class="form-input text-num" value="200" step="0.01">
+                  </div>
+                  <div class="sub-field">
+                    <label>بالجنيه (محسوب)</label>
+                    <input type="text" id="otherFeesEGP" class="form-input text-num" readonly>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1490,6 +1510,20 @@ function updateInternalDisplays(){
 // ============================================================
 // CALCULATION ENGINE
 // ============================================================
+// ─── مساعدات الـ checkboxes للقسم 7 ───
+function _feeEnabled(id){
+  const el = document.getElementById(id);
+  return el ? el.checked : true;
+}
+function toggleFeeField(key){
+  const cb = document.getElementById('enable'+key.charAt(0).toUpperCase()+key.slice(1));
+  const field = document.getElementById(key+'Field');
+  if(field && cb){
+    field.style.opacity = cb.checked ? '1' : '0.4';
+    field.style.pointerEvents = cb.checked ? 'auto' : 'none';
+  }
+}
+
 function calculate(){
   const usdRate = parseFloat(document.getElementById('usdRate').value) || 52;
   const customsRate = parseFloat(document.getElementById('customsUsdRate').value) || 52;
@@ -1560,23 +1594,35 @@ function calculate(){
   const internalEGP = Object.values(state.internalExpenses).reduce((s,v) => s + (v || 0), 0);
   const internalUSD = internalEGP / usdRate;
   
-  // Commissions
+  // Commissions — كل بند يُحسب فقط لو الـ checkbox متفعّل
+  const cardEnabled = _feeEnabled('enableCardCommission');
+  const sllEnabled  = _feeEnabled('enableSllCommission');
+  const bankEnabled = _feeEnabled('enableBankFees');
+  const otherEnabled= _feeEnabled('enableOtherFees');
+
   const cardPct = parseFloat(document.getElementById('cardCommissionPct').value) || 0;
   const sllPct = parseFloat(document.getElementById('sllCommissionPct').value) || 0;
   
-  let cardCommissionUSD = totalAcceptedUSD * (cardPct / 100);
-  let cardCommissionEGP = cardCommissionUSD * customsRate;
-  if(cardCommissionEGP < 7000 && totalAcceptedUSD > 0){
-    cardCommissionEGP = 7000;
-    cardCommissionUSD = cardCommissionEGP / usdRate;
+  let cardCommissionUSD = 0, cardCommissionEGP = 0;
+  if(cardEnabled){
+    cardCommissionUSD = totalAcceptedUSD * (cardPct / 100);
+    cardCommissionEGP = cardCommissionUSD * customsRate;
+    // الحد الأدنى (7,000 ج.م) يتطبّق فقط لو الخدمة مطلوبة
+    if(cardCommissionEGP < 7000 && totalAcceptedUSD > 0){
+      cardCommissionEGP = 7000;
+      cardCommissionUSD = cardCommissionEGP / usdRate;
+    }
   }
   
-  const sllCommissionUSD = totalRealUSD * (sllPct / 100);
-  const sllCommissionEGP = sllCommissionUSD * usdRate;
+  let sllCommissionUSD = 0, sllCommissionEGP = 0;
+  if(sllEnabled){
+    sllCommissionUSD = totalRealUSD * (sllPct / 100);
+    sllCommissionEGP = sllCommissionUSD * usdRate;
+  }
   
-  const bankFeesUSD = parseFloat(document.getElementById('bankFeesUSD').value) || 0;
+  const bankFeesUSD = bankEnabled ? (parseFloat(document.getElementById('bankFeesUSD').value) || 0) : 0;
   const bankFeesEGP = bankFeesUSD * usdRate;
-  const otherFeesUSD = parseFloat(document.getElementById('otherFeesUSD').value) || 0;
+  const otherFeesUSD = otherEnabled ? (parseFloat(document.getElementById('otherFeesUSD').value) || 0) : 0;
   const otherFeesEGP = otherFeesUSD * usdRate;
   
   const totalCommissionsUSD = cardCommissionUSD + sllCommissionUSD + bankFeesUSD + otherFeesUSD;
@@ -2288,6 +2334,7 @@ async function loadCRMUsers(){
     }
     window.crmUsers = data || [];
     populateSalespersonDropdown();
+    autoSelectCurrentUser();  // ★ يختار اليوزر الحالي (اللي فاتح) تلقائياً
     console.log('[Calculator] Loaded', window.crmUsers.length, 'users from CRM');
     
     // ★ Subscribe to realtime profile changes — auto-refresh dropdown
@@ -2361,6 +2408,30 @@ function onSalespersonChange(){
   document.getElementById('salespersonRole').value = u.job_title || (u.role === 'sales' ? 'Sales Account Manager' : u.role === 'coordinator' ? 'Sales Coordinator' : '');
   document.getElementById('salesphone').value = u.phone || '';
   document.getElementById('salesemail').value = u.email || '';
+}
+
+// ★ يقرا جلسة الـ CRM المشتركة ويختار اليوزر الحالي تلقائياً
+function autoSelectCurrentUser(){
+  try {
+    const sel = document.getElementById('salesperson');
+    if(!sel || sel.value) return;  // لو المستخدم اختار حاجة بالفعل، ما نغيّرش
+    // نقرا جلسة Supabase المشتركة مع الـ CRM
+    const raw = localStorage.getItem('sll-crm-auth-session');
+    if(!raw) return;
+    let email = null;
+    try {
+      const sess = JSON.parse(raw);
+      email = sess?.user?.email || sess?.currentSession?.user?.email || null;
+    } catch(e){ return; }
+    if(!email) return;
+    // ندوّر على اليوزر بإيميله
+    const me = window.crmUsers.find(u => (u.email||'').toLowerCase() === email.toLowerCase());
+    if(me){
+      sel.value = me.id;
+      onSalespersonChange();  // يملأ الاسم والإيميل والتليفون والمسمى
+      console.log('[Calculator] Auto-selected current user:', me.name);
+    }
+  } catch(e){ console.warn('[Calculator] autoSelect failed:', e.message); }
 }
 
 // Load all defaults from calc_defaults table, indexed by shipping_type
@@ -2467,13 +2538,13 @@ function buildPDFContext(){
     FCL40HQ: 'شحن بحري — حاويات FCL'
   };
   const shippingTypesEn = {
-    FCL: 'Sea Freight — FCL Containers',
-    LCL: 'Sea Freight LCL (Partial)',
+    FCL: 'FCL Sea Freight',
+    LCL: 'LCL Sea Freight',
     AIR: 'Air Freight',
     LAND: 'Land Freight',
     // Legacy support
-    FCL20: 'Sea Freight — FCL Containers',
-    FCL40HQ: 'Sea Freight — FCL Containers'
+    FCL20: 'FCL Sea Freight',
+    FCL40HQ: 'FCL Sea Freight'
   };
   const containerLabelsAr = {
     '20FT':'حاوية 20 قدم','40FT':'حاوية 40 قدم','40HC':'حاوية 40 قدم HC','45HC':'حاوية 45 قدم HC',
@@ -4008,7 +4079,9 @@ function renderCompactCostBreakdownPart1(ctx){
   
   // ─── Build SECTION 1: Export Country items (incl. custom docs) ───
   const exportItems = [];
-  exportItems.push({label: t.intlShipping, sub: ctx.containerCountText || '', usd: r.shipping.shippingUSD, egp: r.shipping.shippingEGP});
+  if(r.shipping.shippingUSD > 0){
+    exportItems.push({label: t.intlShipping, sub: ctx.containerCountText || '', usd: r.shipping.shippingUSD, egp: r.shipping.shippingEGP});
+  }
   if(r.shipping.originCertEnabled !== false && (r.shipping.originCertUSD > 0)){
     exportItems.push({label: t.coo, sub: t.cooSub, usd: r.shipping.originCertUSD, egp: r.shipping.originCertEGP});
   }
@@ -4083,10 +4156,14 @@ function renderCompactCostBreakdownPart1(ctx){
     }
   }
   
-  // ─── Build SECTION 3: Commissions ───
+  // ─── Build SECTION 3: Commissions ─── (البنود الصفرية/غير المطلوبة لا تظهر)
   const commItems = [];
-  commItems.push({label: `${t.cardComm} (${ctx.formData.cardCommissionPct || 1.5}%)`, sub: t.cardSub, usd: r.commissions.cardCommissionUSD, egp: r.commissions.cardCommissionEGP});
-  commItems.push({label: `${t.sllComm} (${ctx.formData.sllCommissionPct || 3}%)`, sub: t.sllSub, usd: r.commissions.sllCommissionUSD, egp: r.commissions.sllCommissionEGP});
+  if(r.commissions.cardCommissionUSD > 0){
+    commItems.push({label: `${t.cardComm} (${ctx.formData.cardCommissionPct || 1.5}%)`, sub: t.cardSub, usd: r.commissions.cardCommissionUSD, egp: r.commissions.cardCommissionEGP});
+  }
+  if(r.commissions.sllCommissionUSD > 0){
+    commItems.push({label: `${t.sllComm} (${ctx.formData.sllCommissionPct || 3}%)`, sub: t.sllSub, usd: r.commissions.sllCommissionUSD, egp: r.commissions.sllCommissionEGP});
+  }
   if((r.commissions.bankFeesUSD + r.commissions.otherFeesUSD) > 0){
     commItems.push({label: t.bank, sub: '', usd: r.commissions.bankFeesUSD + r.commissions.otherFeesUSD, egp: r.commissions.bankFeesEGP + r.commissions.otherFeesEGP});
   }
@@ -4203,7 +4280,7 @@ function renderCompactCostBreakdownPart2(ctx){
     : '0.0';
   const usdRate = ctx.formData.usdRate || r.usdRate || 50;
   const customsRate = ctx.formData.customsUsdRate || r.customsRate || 51.5;
-  const shipmentDesc = ctx.shippingDisplay || ctx.formData.shippingType || '';
+  const shipmentDesc = getLocalizedShipping(ctx).shippingDisplay || ctx.formData.shippingType || '';
   
   // Build products customs breakdown (only show if products exist)
   const products = r.products || ctx.formData.products || [];
