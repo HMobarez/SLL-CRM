@@ -2985,8 +2985,8 @@ function buildForm(l){
     return`<select name="${nm}"${dis?" disabled":""} style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;width:100%;${dis?"opacity:.35":""}">
       <option value="">— اختر —</option>${opts.map(o=>'<option'+(o===val?' selected':'')+'>'+o+'</option>').join('')}</select>`;
   }
-  function inp(nm,val,type,dis,ph){
-    return`<input type="${type||"text"}" name="${nm}" value="${val||""}" placeholder="${ph||""}" ${dis?"disabled":""} style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;width:100%;${dis?"opacity:.35":""}">`;
+  function inp(nm,val,type,dis,ph,oninp){
+    return`<input type="${type||"text"}" name="${nm}" value="${val||""}" placeholder="${ph||""}" ${dis?"disabled":""} ${oninp?("inputmode=\"decimal\" oninput=\""+oninp+"\""):""} style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;width:100%;${dis?"opacity:.35":""}">`;
   }
   function ta(nm,val,dis){
     return`<textarea name="${nm}" ${dis?"disabled":""} style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:7px 8px;height:56px;color:var(--text);font-size:12px;outline:none;width:100%;resize:vertical;${dis?"opacity:.35":""}">${val||""}</textarea>`;
@@ -3015,7 +3015,7 @@ function buildForm(l){
         <div class="ff s3"><label>المنتج المطلوب</label>${inp("prod",l?.prod,"text",false,"وصف المنتج")}</div>
         <div class="ff"><label>الكمية</label>${inp("qty",l?.qty,"text",false)}</div>
         <div class="ff"><label>الوحدة</label>${inp("unit",l?.unit,"text",false,"طن / حاوية")}</div>
-        <div class="ff"><label>رأس المال (USD) <span style="color:var(--text3);font-weight:400">— اختياري</span></label>${inp("cap",l?.cap,"text",false,"اتركه فارغ إن لم يكن متاح")}</div>
+        <div class="ff"><label>رأس المال (USD) <span style="color:var(--text3);font-weight:400">— اختياري</span></label>${inp("cap",l?.cap,"text",false,"اتركه فارغ إن لم يكن متاح","this.value=this.value.replace(/[^0-9.]/g,'').replace(/(\\..*)\\./g,'$1')")}</div>
         <div class="ff"><label>مستورد / مصدر</label>${sel("ie",DD.ie,l?.ie)}</div>
         <div class="ff"><label>توفر المورد</label>${sel("sup",DD.supply,l?.sup)}</div>
         <div class="ff"><label>أولوية العميل</label>${sel("priority",DD.priority,l?.priority||"عادي")}</div>
@@ -3635,7 +3635,10 @@ function openReactivate(id){
     +'<button class="btn primary" onclick="confirmReactivate('+id+')">✓ إعادة تفعيل</button>'
     +'</div></div></div>';
   const wrap=document.createElement("div");wrap.innerHTML=html;
-  document.body.appendChild(wrap.firstChild);
+  const modalEl=wrap.firstChild;
+  if(modalEl&&modalEl.dataset) modalEl.dataset.dynamic="1";
+  document.querySelectorAll("#react-modal").forEach(x=>x.remove());
+  document.body.appendChild(modalEl);
 }
 
 // ═══ ADD-CALL FLOW (Unlimited via extra_calls JSONB) ═══
@@ -3644,6 +3647,19 @@ function openAddCall(id){
   if(!l){showToast("❌","Lead غير موجود");return;}
   const allowed=(curUser.role==="sales"&&l.repId===curUser.id)||curUser.role==="admin";
   if(!allowed){showToast("⚠","غير مسموح");return;}
+  // تحقّق من ترتيب المكالمات — لازم نملأ الفاضي بالترتيب
+  if(!l.c1){
+    showToast("⚠","سجّل المكالمة الأولى الأول (من نموذج التعديل)");
+    return;
+  }
+  if(l.c1 && !l.c2){
+    showToast("⚠","سجّل المكالمة الثانية الأول (المكان الفاضي)");
+    return;
+  }
+  if(l.c1 && l.c2 && !l.c3){
+    showToast("⚠","سجّل المكالمة الثالثة الأول (المكان الفاضي)");
+    return;
+  }
   // Count existing calls (legacy c1/c2/c3 + extra_calls)
   let count=0;
   if(l.c1)count++;
@@ -3684,7 +3700,11 @@ function openAddCall(id){
     +'<button class="btn primary" onclick="confirmAddCall('+id+','+nextN+')">✓ حفظ المكالمة</button>'
     +'</div></div></div>';
   const wrap=document.createElement("div");wrap.innerHTML=html;
-  document.body.appendChild(wrap.firstChild);
+  const modalEl=wrap.firstChild;
+  if(modalEl&&modalEl.dataset) modalEl.dataset.dynamic="1";
+  // نظّف أي نسخة قديمة بنفس الـ id قبل الحقن
+  document.querySelectorAll("#addcall-modal").forEach(x=>x.remove());
+  document.body.appendChild(modalEl);
   setTimeout(()=>$("ac-note")?.focus(),100);
 }
 
@@ -6572,7 +6592,20 @@ function openCostCalculator(){
 }
 
 // ═══ UTILS ═══
-function closeM(id){$(id)?.classList.remove("open");}
+function closeM(id){
+  // نشيل كل العناصر بالـ id ده (قد يكون فيه مكرر من النوافذ الديناميكية)
+  const els = document.querySelectorAll("#"+CSS.escape(id));
+  els.forEach(el => {
+    el.classList.remove("open");
+    // لو نافذة ديناميكية (اتعملت بـ createElement)، نشيلها تماماً
+    if(el.dataset && el.dataset.dynamic === "1"){
+      el.remove();
+    }
+  });
+  // تنظيف أي نافذة ديناميكية متكررة بنفس الـ id
+  const dupes = document.querySelectorAll("#"+CSS.escape(id)+"[data-dynamic='1']");
+  dupes.forEach(d => d.remove());
+}
 document.querySelectorAll(".mov").forEach(o=>{o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("open");});});
 function showToast(icon,msg){
   const t=$("toast");$("t-ic").textContent=icon;$("t-msg").textContent=msg;
@@ -9383,6 +9416,7 @@ window.closeDynModal = window.closeDynModal || function(id){var el=document.getE
 
 // ─── الحقول الجوهرية (بدون الأولوية) ───
 const CORE_FIELDS = [
+  { key:"nm",   label:"اسم العميل",        type:"text" },
   { key:"svc",  label:"الخدمات المطلوبة", type:"multi" },
   { key:"cap",  label:"رأس المال (USD)",  type:"text" },
   { key:"qty",  label:"الكمية",            type:"text" },
@@ -9567,9 +9601,9 @@ window.openActiveClientForm = function(leadId, onConfirm){
   h+='<input id="ac-code" type="text" value="'+(l.activeCode||"").replace(/"/g,"&quot;")+'" placeholder="كود الحسابات" style="width:100%;height:38px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:0 10px;color:var(--text);font-size:13px"></div>';
   // المبلغ المدفوع — اختياري
   h+='<div style="margin-bottom:13px"><label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px">المبلغ المدفوع <span style="color:var(--text3);font-weight:400">— اختياري</span></label>';
-  h+='<input id="ac-amount" type="text" value="'+(l.paidAmount||"").replace(/"/g,"&quot;")+'" placeholder="0.00" style="width:100%;height:38px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:0 10px;color:var(--text);font-size:13px"></div>';
-  // العملة — إجباري
-  h+='<div style="margin-bottom:6px"><label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px">العملة <span style="color:var(--red)">*</span></label>';
+  h+='<input id="ac-amount" type="text" inputmode="decimal" value="'+(l.paidAmount||"").replace(/"/g,"&quot;")+'" placeholder="0.00" oninput="this.value=this.value.replace(/[^0-9.]/g,\'\').replace(/(\\..*)\\./g,\'$1\')" style="width:100%;height:38px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:0 10px;color:var(--text);font-size:13px"></div>';
+  // العملة — اختياري
+  h+='<div style="margin-bottom:6px"><label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px">العملة <span style="color:var(--text4);font-weight:400">(اختياري)</span></label>';
   h+='<select id="ac-currency" class="fsel" style="width:100%;height:38px"><option value="">— اختر العملة —</option>'+
     CURRENCIES.map(c=>'<option'+(c===l.paidCurrency?' selected':'')+'>'+c+'</option>').join("")+'</select></div>';
   h+='</div>';
@@ -9585,7 +9619,6 @@ window.confirmActiveClient = function(){
   const amount = (document.getElementById("ac-amount")||{}).value || "";
   const currency = (document.getElementById("ac-currency")||{}).value || "";
   if(!code.trim()){ if(typeof showToast==="function") showToast("⚠️","كود العميل الفعلي إجباري"); return; }
-  if(!currency){ if(typeof showToast==="function") showToast("⚠️","اختر العملة"); return; }
   const data = { active_code: code.trim(), paid_amount: amount.trim(), paid_currency: currency };
   const cb = window._activeClientCb;
   closeDynModal("active-client-modal");
