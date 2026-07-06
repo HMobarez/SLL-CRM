@@ -3107,6 +3107,17 @@ function bindForm(){
       },{once:true});
     }
   });
+  // ★ تنظيف الموبايل — يشيل المسافات والرموز ويصلّح الأكواد الدولية
+  function _bindMobClean(el){
+    if(!el) return;
+    // عند اللصق: ننظّف بعد لحظة (نسيب اللصق يحصل الأول)
+    el.addEventListener("paste",()=>{ setTimeout(()=>{ el.value=cleanEgyptMobile(el.value); el.dispatchEvent(new Event("input")); },10); });
+    // عند فقدان التركيز: ننظّف نهائياً
+    el.addEventListener("blur",()=>{ el.value=cleanEgyptMobile(el.value); });
+  }
+  _bindMobClean(body?.querySelector("[name='mob']"));
+  _bindMobClean(body?.querySelector("[name='mob2']"));
+
   // ★ DUPLICATE CHECK — Live detection على الموبايل الأول والثاني (Only for new leads)
   if(!curLeadId){
     let _dupTimer=null;
@@ -3114,6 +3125,9 @@ function bindForm(){
       if(!el) return;
       el.addEventListener("input",()=>{
         clearTimeout(_dupTimer);
+        // ★ صفّر علم التكرار فوراً — لأن الرقم اتغيّر، لازم يتفحص من جديد
+        window._duplicateMatches=null;
+        window._duplicateAcknowledged=false;
         const v=el.value.trim();
         if(v.length<7){ hideDuplicateWarning(); return; }
         _dupTimer=setTimeout(()=>checkDuplicateMobile(v),800);
@@ -3122,6 +3136,31 @@ function bindForm(){
     _bindDup(body?.querySelector("[name='mob']"));
     _bindDup(body?.querySelector("[name='mob2']"));
   }
+}
+
+// ═══ تنظيف رقم الموبايل المصري ═══
+function cleanEgyptMobile(raw){
+  if(!raw) return "";
+  let s = String(raw);
+  // نشيل الرموز الاتجاهية الخفية (RTL/LTR marks)
+  s = s.replace(/[\u200e\u200f\u202a\u202b\u202c\u2066\u2067\u2068\u2069]/g,"");
+  // نشيل المسافات والشرطات والأقواس
+  s = s.replace(/[\s\-()]/g,"");
+  // نشيل رمز + من الأول
+  s = s.replace(/^\+/,"");
+  // نستخرج الأرقام بس
+  let d = s.replace(/\D/g,"");
+  if(!d) return "";
+  // ── أكواد مصر الدولية في الأول ──
+  // 00201xxxxxxxxx → نشيل 0020
+  if(d.startsWith("0020")) d = d.slice(4);
+  // 201xxxxxxxxx (كود 20 بعد شيل الأصفار) → نشيل 20
+  else if(d.startsWith("20") && d.length>=12) d = d.slice(2);
+  // لو بقى الرقم بيبدأ بـ 1 وطوله 10 → نضيف صفر (مصري)
+  if(d.length===10 && d.startsWith("1")) d = "0"+d;
+  // لو لسه أطول من 11 → ناخد آخر 11 رقم (طالما فيه كود مصر في الأول)
+  if(d.length>11) d = d.slice(-11);
+  return d;
 }
 
 // ═══ DUPLICATE DETECTION ═══
@@ -3160,6 +3199,8 @@ function hideDuplicateWarning(){
   const w=$("dup-warning");
   if(w)w.remove();
   window._duplicateAcknowledged=false;
+  window._duplicateMatches=null;   // ★ صفّر العلم عشان الرقم الجديد يقدر يتحفظ
+  window._duplicateMobile=null;
 }
 function showDuplicateWarning(matches, mobile){
   hideDuplicateWarning();
@@ -3384,7 +3425,7 @@ async function saveLead(){
         ad_num: get("ad_num")||"",
         dt: get("dt") || today(),
         tm: get("tm") || nowTime(),
-        nm: get("nm"), company: get("company")||"", mob: get("mob"), mob2: get("mob2")||"", nat: get("nat"),
+        nm: get("nm"), company: get("company")||"", mob: cleanEgyptMobile(get("mob")), mob2: cleanEgyptMobile(get("mob2")||""), nat: get("nat"),
         imp: get("imp"), exp: get("exp"),
         spec: get("spec"), prod: get("prod"),
         qty: get("qty"), unit: get("unit"), cap: get("cap"),
