@@ -535,9 +535,9 @@ tr.sla1-row .sticky-actions{background:rgba(245,82,82,0.06);}
 <!-- MODALS -->
 <div class="mov" id="lead-modal">
   <div class="modal" style="max-width:880px">
-    <div class="mhdr"><h2 id="lm-ttl">New Lead</h2><button class="mx" onclick="closeM('lead-modal')">×</button></div>
+    <div class="mhdr"><h2 id="lm-ttl">New Lead</h2><button class="mx" onclick="closeLeadModalGuarded()">×</button></div>
     <div class="mbody" id="lm-body"></div>
-    <div class="mftr"><button class="btn" onclick="closeM('lead-modal')">إلغاء</button><button class="btn primary" onclick="saveLead()">💾 حفظ</button></div>
+    <div class="mftr"><button class="btn" onclick="closeLeadModalGuarded()">إلغاء</button><button class="btn primary" onclick="saveLead()">💾 حفظ</button></div>
   </div>
 </div>
 <div class="mov" id="view-modal">
@@ -2121,23 +2121,17 @@ function renderLeadsPage(){
     <select class="fsel" id="ls-pri" onchange="filterL()">
       <option value="">كل الأولويات</option>${DD.priority.map(p=>`<option>${p}</option>`).join("")}
     </select>
-    <div style="display:flex;gap:3px;align-items:center;background:var(--bg3);padding:0 8px;border-radius:6px;border:1px solid var(--border2);height:32px">
-      <span style="font-size:10px;color:var(--text3)">تسجيل:</span>
-      <input type="date" id="ls-dt-from" onchange="filterL()" title="من" style="background:transparent;border:none;color:var(--text);font-size:10px;outline:none;width:105px">
-      <span style="font-size:10px;color:var(--text3)">→</span>
-      <input type="date" id="ls-dt-to" onchange="filterL()" title="إلى" style="background:transparent;border:none;color:var(--text);font-size:10px;outline:none;width:105px">
-    </div>
-    <div style="display:flex;gap:3px;align-items:center;background:var(--bg3);padding:0 8px;border-radius:6px;border:1px solid var(--border2);height:32px">
-      <span style="font-size:10px;color:var(--text3)">متابعة:</span>
-      <input type="date" id="ls-fu-from" onchange="filterL()" title="من" style="background:transparent;border:none;color:var(--text);font-size:10px;outline:none;width:105px">
-      <span style="font-size:10px;color:var(--text3)">→</span>
-      <input type="date" id="ls-fu-to" onchange="filterL()" title="إلى" style="background:transparent;border:none;color:var(--text);font-size:10px;outline:none;width:105px">
-    </div>
+    <div id="drp-reg" style="position:relative"></div>
+    <div id="drp-fu" style="position:relative"></div>
+    <input type="hidden" id="ls-dt-from"><input type="hidden" id="ls-dt-to">
+    <input type="hidden" id="ls-fu-from"><input type="hidden" id="ls-fu-to">
     <button class="btn sm primary" onclick="setFUT()" title="اليوم: مسجلين اليوم + متابعة اليوم + لم يتم الرد + متابعات متأخرة">📅 اليوم</button>
     <button class="btn sm" onclick="clearFilters()" title="مسح">✖</button>
   </div>
   <div id="leads-content"></div>`;
   renderLeadsContent();
+  // ★ هيّئ الـ date range pickers
+  if(typeof renderDrp==="function"){ renderDrp("reg"); renderDrp("fu"); }
 }
 function setFUT(){
   // "اليوم" = leads registered today OR with follow-up today
@@ -3138,29 +3132,43 @@ function bindForm(){
   }
 }
 
-// ═══ تنظيف رقم الموبايل المصري ═══
+// ═══ تنظيف رقم الموبايل (مصري → يتظبط / دولي → يتساب بس ينضّف) ═══
 function cleanEgyptMobile(raw){
   if(!raw) return "";
   let s = String(raw);
   // نشيل الرموز الاتجاهية الخفية (RTL/LTR marks)
   s = s.replace(/[\u200e\u200f\u202a\u202b\u202c\u2066\u2067\u2068\u2069]/g,"");
-  // نشيل المسافات والشرطات والأقواس
+  // نشيل المسافات والشرطات والأقواس (لكل الأرقام)
   s = s.replace(/[\s\-()]/g,"");
-  // نشيل رمز + من الأول
-  s = s.replace(/^\+/,"");
-  // نستخرج الأرقام بس
+  const hasPlus = s.trim().startsWith("+");
+  // نستخرج الأرقام
   let d = s.replace(/\D/g,"");
   if(!d) return "";
-  // ── أكواد مصر الدولية في الأول ──
-  // 00201xxxxxxxxx → نشيل 0020
-  if(d.startsWith("0020")) d = d.slice(4);
-  // 201xxxxxxxxx (كود 20 بعد شيل الأصفار) → نشيل 20
-  else if(d.startsWith("20") && d.length>=12) d = d.slice(2);
-  // لو بقى الرقم بيبدأ بـ 1 وطوله 10 → نضيف صفر (مصري)
-  if(d.length===10 && d.startsWith("1")) d = "0"+d;
-  // لو لسه أطول من 11 → ناخد آخر 11 رقم (طالما فيه كود مصر في الأول)
-  if(d.length>11) d = d.slice(-11);
-  return d;
+
+  // ── نحدّد هل الرقم مصري؟ ──
+  // مصري لو: كود مصر (+20 / 0020 / 20) + رقم موبايل، أو 01xxxxxxxxx، أو 1xxxxxxxxx (10)
+  const isEgyptCode = (d.startsWith("0020") && d.length>=13) ||
+                      (d.startsWith("20") && d.length>=12 && (d[2]==="1")) ||
+                      (d.startsWith("201") && d.length>=12);
+  const isEgyptLocal = (d.startsWith("01") && d.length===11) ||
+                       (d.startsWith("1") && d.length===10);
+
+  if(isEgyptCode){
+    // شيل كود مصر وخلّيه محلي
+    if(d.startsWith("0020")) d = d.slice(4);
+    else if(d.startsWith("20")) d = d.slice(2);
+    if(d.length===10 && d.startsWith("1")) d = "0"+d;
+    if(d.length>11) d = d.slice(-11);
+    return d;
+  }
+  if(isEgyptLocal){
+    if(d.length===10 && d.startsWith("1")) d = "0"+d;
+    return d;
+  }
+
+  // ── رقم دولي غير مصري → نسيبه زي ما هو (بس اتشالت المسافات) ──
+  // لو كان فيه + في الأصل، نرجّعه
+  return hasPlus ? ("+"+d) : d;
 }
 
 // ═══ DUPLICATE DETECTION ═══
@@ -6647,7 +6655,38 @@ function closeM(id){
   const dupes = document.querySelectorAll("#"+CSS.escape(id)+"[data-dynamic='1']");
   dupes.forEach(d => d.remove());
 }
-document.querySelectorAll(".mov").forEach(o=>{o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("open");});});
+
+// ═══ إغلاق نموذج الليد مع تحذير لو فيه بيانات غير محفوظة ═══
+function closeLeadModalGuarded(){
+  // نتحقق فقط للـ Lead الجديد (مش التعديل)
+  const isNew = !curLeadId;
+  if(isNew && leadFormHasData()){
+    if(!confirm("⚠️ لديك بيانات لم يتم حفظها.\n\nهل تريد الخروج بدون حفظ؟ ستفقد كل ما أدخلته.")){
+      return; // المستخدم اختار البقاء
+    }
+  }
+  closeM('lead-modal');
+}
+// يتحقق لو فيه أي بيانات مدخلة في النموذج
+function leadFormHasData(){
+  const body = document.getElementById("lm-body");
+  if(!body) return false;
+  const fields = body.querySelectorAll("input, textarea, select");
+  for(const f of fields){
+    if(f.type==="hidden" || f.disabled) continue;
+    if(f.type==="checkbox" || f.type==="radio"){ if(f.checked) return true; continue; }
+    const v = (f.value||"").trim();
+    if(v && v!=="—") return true;
+  }
+  return false;
+}
+document.querySelectorAll(".mov").forEach(o=>{o.addEventListener("click",e=>{
+  if(e.target===o){
+    // نموذج الليد الجديد: نستخدم الإغلاق المحمي (تحذير لو فيه بيانات)
+    if(o.id==="lead-modal"){ closeLeadModalGuarded(); }
+    else o.classList.remove("open");
+  }
+});});
 function showToast(icon,msg){
   const t=$("toast");$("t-ic").textContent=icon;$("t-msg").textContent=msg;
   t.classList.add("on");setTimeout(()=>t.classList.remove("on"),3200);
@@ -10688,6 +10727,141 @@ if(typeof window.clearFilters === "function"){
 })();
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════
+// DATE RANGE PICKER — كلاندر موحّد (زي بوكينج) بعلامة زرقاء
+// ═══════════════════════════════════════════════════════════
+window._drpState = { reg:{from:null,to:null}, fu:{from:null,to:null}, open:null, viewMonth:null, viewYear:null, picking:{} };
+
+function drpFmt(d){ // Date → "YYYY-MM-DD"
+  if(!d) return "";
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+  return y+"-"+m+"-"+day;
+}
+function drpParse(s){ if(!s) return null; const p=s.split("-"); return new Date(+p[0],+p[1]-1,+p[2]); }
+function drpLabel(which){
+  const st=_drpState[which];
+  if(!st.from && !st.to) return which==="reg"?"تاريخ التسجيل":"تاريخ المتابعة";
+  const f=st.from?drpFmt(st.from):"…", t=st.to?drpFmt(st.to):"…";
+  return f+" → "+t;
+}
+function toggleDrp(which, ev){
+  if(ev) ev.stopPropagation();
+  if(_drpState.open===which){ _drpState.open=null; renderDrp(which); return; }
+  _drpState.open=which;
+  const st=_drpState[which];
+  const base=st.from||new Date();
+  _drpState.viewMonth=base.getMonth(); _drpState.viewYear=base.getFullYear();
+  _drpState.picking[which]=false;
+  renderDrp(which);
+}
+function drpNav(which, delta, ev){
+  if(ev) ev.stopPropagation();
+  let m=_drpState.viewMonth+delta, y=_drpState.viewYear;
+  if(m<0){m=11;y--;} if(m>11){m=0;y++;}
+  _drpState.viewMonth=m; _drpState.viewYear=y;
+  renderDrp(which);
+}
+function drpPick(which, dateStr, ev){
+  if(ev) ev.stopPropagation();
+  const d=drpParse(dateStr);
+  const st=_drpState[which];
+  if(!_drpState.picking[which] || (st.from && st.to)){
+    // بداية اختيار جديد
+    st.from=d; st.to=null; _drpState.picking[which]=true;
+  } else {
+    // إكمال الاختيار
+    if(d < st.from){ st.to=st.from; st.from=d; }
+    else st.to=d;
+    _drpState.picking[which]=false;
+    // طبّق الفلتر
+    syncDrpToInputs(which);
+    if(typeof filterL==="function") filterL();
+  }
+  renderDrp(which);
+}
+function drpClear(which, ev){
+  if(ev) ev.stopPropagation();
+  _drpState[which]={from:null,to:null};
+  _drpState.picking[which]=false;
+  syncDrpToInputs(which);
+  if(typeof filterL==="function") filterL();
+  renderDrp(which);
+}
+function syncDrpToInputs(which){
+  const st=_drpState[which];
+  if(which==="reg"){
+    const a=document.getElementById("ls-dt-from"), b=document.getElementById("ls-dt-to");
+    if(a) a.value=st.from?drpFmt(st.from):""; if(b) b.value=st.to?drpFmt(st.to):"";
+  } else {
+    const a=document.getElementById("ls-fu-from"), b=document.getElementById("ls-fu-to");
+    if(a) a.value=st.from?drpFmt(st.from):""; if(b) b.value=st.to?drpFmt(st.to):"";
+  }
+}
+function drpBuildCalendar(which){
+  const y=_drpState.viewYear, m=_drpState.viewMonth;
+  const st=_drpState[which];
+  const first=new Date(y,m,1), startDay=first.getDay();
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const months=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+  const dows=["أحد","إثن","ثلا","أرب","خمي","جمع","سبت"];
+  let h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+  h+='<button onclick="drpNav(\''+which+'\',-1,event)" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--text)">‹</button>';
+  h+='<div style="font-weight:700;font-size:12px;color:var(--text)">'+months[m]+' '+y+'</div>';
+  h+='<button onclick="drpNav(\''+which+'\',1,event)" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--text)">›</button>';
+  h+='</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">';
+  dows.forEach(d=>h+='<div style="text-align:center;font-size:9px;color:var(--text4);font-weight:700;padding:2px">'+d+'</div>');
+  h+='</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">';
+  for(let i=0;i<startDay;i++) h+='<div></div>';
+  for(let day=1;day<=daysInMonth;day++){
+    const cur=new Date(y,m,day), curStr=drpFmt(cur);
+    let inRange=false, isFrom=false, isTo=false;
+    if(st.from && st.to){ inRange = cur>=st.from && cur<=st.to; }
+    if(st.from && drpFmt(st.from)===curStr) isFrom=true;
+    if(st.to && drpFmt(st.to)===curStr) isTo=true;
+    let bg="transparent", col="var(--text)", fw="400", rad="6px";
+    if(inRange){ bg="rgba(45,108,223,.12)"; col="var(--blue2)"; }  // ★ علامة زرقاء خفيفة على الفترة
+    if(isFrom||isTo){ bg="var(--blue)"; col="#fff"; fw="700"; }
+    h+='<div onclick="drpPick(\''+which+'\',\''+curStr+'\',event)" style="text-align:center;padding:6px 0;font-size:11px;cursor:pointer;border-radius:'+rad+';background:'+bg+';color:'+col+';font-weight:'+fw+'" onmouseover="if(this.style.background===\'transparent\'||this.style.background===\'\')this.style.background=\'var(--bg3)\'" onmouseout="drpRerender(\''+which+'\')">'+day+'</div>';
+  }
+  h+='</div>';
+  return h;
+}
+function drpRerender(which){ /* خفيف: نعيد الرسم عند mouseout للحفاظ على الألوان */ renderDrp(which); }
+function renderDrp(which){
+  const wrap=document.getElementById("drp-"+which);
+  if(!wrap) return;
+  const st=_drpState[which];
+  const active=(st.from||st.to);
+  const isOpen=_drpState.open===which;
+  let h='';
+  // الزرار
+  h+='<button onclick="toggleDrp(\''+which+'\',event)" style="display:flex;align-items:center;gap:6px;background:'+(active?'rgba(45,108,223,.10)':'var(--bg3)')+';border:1px solid '+(active?'var(--blue)':'var(--border2)')+';border-radius:6px;height:32px;padding:0 10px;cursor:pointer;color:'+(active?'var(--blue2)':'var(--text2)')+';font-size:10px;font-weight:'+(active?'700':'500')+';white-space:nowrap">';
+  h+='<span style="font-size:12px">📅</span><span>'+drpLabel(which)+'</span>';
+  if(active) h+='<span onclick="drpClear(\''+which+'\',event)" style="margin-right:2px;color:var(--red);font-weight:700;font-size:13px">×</span>';
+  h+='</button>';
+  // الكلاندر المنبثق
+  if(isOpen){
+    h+='<div style="position:absolute;top:38px;right:0;z-index:100;background:var(--surface,#fff);border:1px solid var(--border2);border-radius:10px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);width:260px" onclick="event.stopPropagation()">';
+    h+='<div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:700">'+(which==="reg"?"تاريخ التسجيل":"تاريخ المتابعة")+(_drpState.picking[which]?' — اختر تاريخ النهاية':'')+'</div>';
+    h+=drpBuildCalendar(which);
+    h+='<div style="display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">';
+    h+='<button onclick="drpClear(\''+which+'\',event)" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:6px;cursor:pointer;font-size:11px;color:var(--text2)">مسح</button>';
+    h+='<button onclick="toggleDrp(\''+which+'\',event)" style="flex:1;background:var(--blue);border:none;border-radius:6px;padding:6px;cursor:pointer;font-size:11px;color:#fff;font-weight:700">تم</button>';
+    h+='</div></div>';
+  }
+  wrap.innerHTML=h;
+}
+// نقفل الكلاندر لو ضغطت برّه
+document.addEventListener("click",function(e){
+  if(_drpState.open && !e.target.closest("#drp-"+_drpState.open)){
+    _drpState.open=null; renderDrp("reg"); renderDrp("fu");
+  }
+});
+
+</script>
 <div style="position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:var(--text4);pointer-events:none;z-index:10;font-family:Outfit;letter-spacing:.04em">
   Developed by <strong style="color:var(--text3)">Straight Line Group</strong>
 </div>
