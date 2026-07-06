@@ -9582,6 +9582,77 @@ window.saveFieldEdit = async function(leadId, fieldKey){
     if(typeof showToast==="function") showToast("❌","خطأ: "+(e.message||"").slice(0,40));
   }
 };
+
+// ════════════════════════════════════════════════
+// تعديل الـ Coordinator (للأدمن فقط)
+// ════════════════════════════════════════════════
+window.openEditCoordinator = function(leadId){
+  const l = LEADS.find(x=>x.id==leadId); if(!l) return;
+  if(!curUser || curUser.role!=="admin"){ if(typeof showToast==="function") showToast("❌","للأدمن فقط"); return; }
+  closeDynModal("edit-coord-modal");
+
+  const coords = (typeof COORD_USERS!=="undefined" && COORD_USERS.length) ? COORD_USERS : (typeof USERS!=="undefined"? USERS.filter(u=>u.role==="coordinator"):[]);
+  const curById = l.byId;
+
+  let opts = '<option value="">— اختر المنسّق —</option>';
+  coords.forEach(function(c){
+    const selected = String(c.id)===String(curById) ? ' selected' : '';
+    opts += '<option value="'+c.id+'"'+selected+'>'+c.name+'</option>';
+  });
+
+  let h='<div class="mov open" id="edit-coord-modal" data-dynamic="1" onclick="if(event.target===this)closeDynModal(\'edit-coord-modal\')">';
+  h+='<div class="modal" style="max-width:440px">';
+  h+='<div class="mhdr"><h2 style="font-size:15px;margin:0">👤 تعديل المنسّق (Coordinator)</h2><button class="mx" onclick="closeDynModal(\'edit-coord-modal\')">×</button></div>';
+  h+='<div class="mbody">';
+  h+='<div style="font-size:11px;color:var(--text3);margin-bottom:8px">المنسّق الحالي: <strong style="color:var(--text2)">'+(l.by||"—")+'</strong></div>';
+  h+='<select id="ec-input" class="fsel" style="width:100%;height:38px">'+opts+'</select>';
+  h+='<div style="font-size:11px;color:var(--text3);margin-top:10px;background:var(--bg3);padding:8px 10px;border-radius:6px">ℹ️ سيتم تسجيل هذا التعديل في سجل النشاط.</div>';
+  h+='</div>';
+  h+='<div class="mftr"><button class="btn" onclick="closeDynModal(\'edit-coord-modal\')">إلغاء</button>';
+  h+='<button class="btn primary" onclick="saveCoordinatorEdit('+leadId+')">حفظ التعديل</button></div>';
+  h+='</div></div>';
+  const w=document.createElement("div"); w.innerHTML=h;
+  document.body.appendChild(w.firstChild);
+};
+
+window.saveCoordinatorEdit = async function(leadId){
+  const l = LEADS.find(x=>x.id==leadId); if(!l) return;
+  if(!curUser || curUser.role!=="admin"){ if(typeof showToast==="function") showToast("❌","للأدمن فقط"); return; }
+  const sel = document.getElementById("ec-input");
+  const newId = sel ? sel.value : "";
+  if(!newId){ if(typeof showToast==="function") showToast("⚠️","اختر منسّق"); return; }
+
+  const coords = (typeof COORD_USERS!=="undefined" && COORD_USERS.length) ? COORD_USERS : (typeof USERS!=="undefined"? USERS.filter(u=>u.role==="coordinator"):[]);
+  const newCoord = coords.find(c=>String(c.id)===String(newId));
+  if(!newCoord){ if(typeof showToast==="function") showToast("❌","منسّق غير صالح"); return; }
+  if(String(newCoord.id)===String(l.byId)){ closeDynModal("edit-coord-modal"); return; }
+
+  if(typeof supa==="undefined"||!supa){ if(typeof showToast==="function") showToast("❌","لا يوجد اتصال"); return; }
+
+  const oldName = l.by || "غير محدد";
+  try{
+    if(typeof showToast==="function") showToast("⏳","جاري الحفظ...");
+    // حدّث الـ DB
+    const {error} = await supa.from("leads").update({by_id:newCoord.id, by_name:newCoord.name}).eq("id", l._supaId||l.id);
+    if(error) throw error;
+    // سجّل في lead_log
+    try{
+      await supa.from("lead_log").insert({
+        lead_id: l._supaId||l.id,
+        user_name: curUser.name,
+        action: "غيّر المنسّق (Coordinator): "+oldName+" → "+newCoord.name
+      });
+    }catch(logErr){ console.warn("log failed", logErr); }
+    closeDynModal("edit-coord-modal");
+    if(typeof showToast==="function") showToast("✓","تم تغيير المنسّق");
+    if(typeof loadAllData==="function") await loadAllData();
+    if(typeof viewLead==="function") viewLead(leadId);
+  }catch(e){
+    console.error("[CoordEdit] save error", e);
+    if(typeof showToast==="function") showToast("❌","خطأ: "+(e.message||"").slice(0,40));
+  }
+};
+
 // ════════════════════════════════════════════════
 // عند التحويل لـ "عميل فعلي": كود + مبلغ + عملة
 // ════════════════════════════════════════════════
@@ -9767,15 +9838,19 @@ async function enhanceLeadView(leadId){
 
   // أضف صفاً للحقول الجوهرية غير المعروضة (الكمية/الوحدة/التخصص)
   if(!dataTab.querySelector("#fc-extra-row")){
-    const missing = [{key:"spec",label:"مجال التخصص"},{key:"qty",label:"الكمية"},{key:"unit",label:"الوحدة"}];
+    const missing = [{key:"nm",label:"اسم العميل"},{key:"spec",label:"مجال التخصص"},{key:"qty",label:"الكمية"},{key:"unit",label:"الوحدة"},{key:"by",label:"Coordinator",adminOnly:true}];
     const extraRow = document.createElement("div");
     extraRow.id="fc-extra-row";
     extraRow.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:9px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--border)";
     missing.forEach(function(m){
+      // Coordinator يظهر للأدمن فقط
+      if(m.adminOnly && u.role!=="admin") return;
       const changed = byField[m.key];
       const cell=document.createElement("div");
+      // قيمة العرض: للـ by نعرض الاسم
+      const displayVal = (m.key==="by") ? (l.by||"—") : (val2str(l[m.key])||"—");
       let inner='<div style="font-size:9px;color:var(--text4);margin-bottom:2px;text-transform:uppercase">'+m.label+'</div>';
-      inner+='<div style="font-size:12px;font-weight:500" data-fk="'+m.key+'">'+(val2str(l[m.key])||"—")+'</div>';
+      inner+='<div style="font-size:12px;font-weight:500" data-fk="'+m.key+'">'+displayVal+'</div>';
       cell.innerHTML=inner;
       const valDiv=cell.querySelector('[data-fk]');
       if(changed){
@@ -9786,14 +9861,21 @@ async function enhanceLeadView(leadId){
         mk.onclick=function(e){ e.stopPropagation(); showFieldHistory(leadId, m.key); };
         valDiv.appendChild(mk);
       }
-      if(canEdit){
+      // صلاحية التعديل: الـ by للأدمن فقط، الباقي حسب canEdit
+      const fieldCanEdit = (m.key==="by") ? (u.role==="admin") : canEdit;
+      if(fieldCanEdit){
         const eb=document.createElement("span");
         eb.className="fc-edit"; eb.title="تعديل";
         eb.style.cssText="display:inline-block;font-size:11px;color:var(--text3);margin-right:5px;cursor:pointer;vertical-align:middle;opacity:.6";
         eb.innerHTML="✎";
         eb.onmouseover=function(){this.style.opacity="1";this.style.color="var(--blue2)";};
         eb.onmouseout=function(){this.style.opacity=".6";this.style.color="var(--text3)";};
-        eb.onclick=function(e){ e.stopPropagation(); openEditField(leadId, m.key); };
+        // الـ by يفتح محرّر خاص لاختيار الكوردينتور
+        if(m.key==="by"){
+          eb.onclick=function(e){ e.stopPropagation(); openEditCoordinator(leadId); };
+        } else {
+          eb.onclick=function(e){ e.stopPropagation(); openEditField(leadId, m.key); };
+        }
         valDiv.appendChild(eb);
       }
       extraRow.appendChild(cell);
