@@ -929,6 +929,8 @@ async function doLogin(){
     try {
       await loadAllData();
       console.log("[Login] loadAllData completed");
+      // ★ فحص التحويل التلقائي لـ "لم يتم الرد" القديمة
+      if(typeof scheduleAutoConvert==="function") scheduleAutoConvert();
     } catch(loadErr) {
       console.error("[Login] loadAllData failed:", loadErr);
       // Continue anyway - we can still show the app
@@ -1136,6 +1138,9 @@ async function loadAllData(){
       reactivatedDate: l.reactivated_date||"",
       reactivatedBy: l.reactivated_by||"",
       reactivatedNote: l.reactivated_note||"",
+      recontactDate: l.recontact_date||"",
+      recontactNotes: l.recontact_notes||"",
+      recontactCount: l.recontact_count||0,
       log: []
     }));
     
@@ -1224,6 +1229,9 @@ function subscribeToChanges(){
       reactivatedDate: lead.reactivated_date||"",
       reactivatedBy: lead.reactivated_by||"",
       reactivatedNote: lead.reactivated_note||"",
+      recontactDate: lead.recontact_date||"",
+      recontactNotes: lead.recontact_notes||"",
+      recontactCount: lead.recontact_count||0,
       log: []
     };
   }
@@ -3997,6 +4005,25 @@ function viewLead(id){
     }
   }
   if(vmCancel)vmCancel.style.display=canCancelLead(l)?"flex":"none";
+
+  // ★ زر "تم التواصل معه مرة أخرى" للكوردينتور الأصلي + الأدمن (لما status = "لم يتم الرد")
+  let vmRecontact=$("vm-recontact");
+  if(!vmRecontact){
+    const ftr=$("vm-edit").parentElement;
+    if(ftr){
+      vmRecontact=document.createElement("button");
+      vmRecontact.id="vm-recontact";
+      vmRecontact.className="btn";
+      vmRecontact.style.background="rgba(245,146,74,.12)";
+      vmRecontact.style.color="var(--orange2)";
+      vmRecontact.style.border="1px solid rgba(245,146,74,.3)";
+      vmRecontact.innerHTML="📞 تم التواصل معه مرة أخرى";
+      vmRecontact.onclick=function(){openRecontact(curLeadId);};
+      ftr.insertBefore(vmRecontact,$("vm-edit"));
+    }
+  }
+  if(vmRecontact)vmRecontact.style.display=(typeof canRecontact==="function"&&canRecontact(l))?"flex":"none";
+
   $("vm-ttl").textContent=l.nm;
   function row(lbl,val){
     return '<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px;text-transform:uppercase;">'+lbl+'</div>'
@@ -10860,6 +10887,151 @@ document.addEventListener("click",function(e){
     _drpState.open=null; renderDrp("reg"); renderDrp("fu");
   }
 });
+
+</script>
+<script>
+// ═══════════════════════════════════════════════════════════
+// WORKFLOW "لم يتم الرد" — إعادة التواصل + التحويل التلقائي بعد 3 أيام عمل
+// ═══════════════════════════════════════════════════════════
+
+// ── حساب أيام العمل بين تاريخين (يستثني الجمعة والسبت) ──
+function workingDaysBetween(fromStr, toDate){
+  if(!fromStr) return 0;
+  const from = new Date(fromStr+"T00:00:00");
+  const to = toDate || new Date();
+  if(isNaN(from.getTime())) return 0;
+  let count = 0;
+  let cur = new Date(from);
+  cur.setDate(cur.getDate()+1); // نبدأ من اليوم اللي بعده
+  while(cur <= to){
+    const dow = cur.getDay(); // 0=أحد ... 5=جمعة، 6=سبت
+    if(dow !== 5 && dow !== 6) count++; // مش جمعة ولا سبت
+    cur.setDate(cur.getDate()+1);
+  }
+  return count;
+}
+
+// ── مين يقدر يعمل "تم التواصل مرة أخرى"؟ الكوردينتور الأصلي أو الأدمن ──
+function canRecontact(l){
+  if(!l || l.st !== "لم يتم الرد") return false;
+  if(!curUser) return false;
+  if(curUser.role === "admin") return true;
+  if(curUser.role === "coordinator" && l.by === curUser.name) return true;
+  return false;
+}
+
+// ── فتح نموذج "تم التواصل معه مرة أخرى" ──
+window.openRecontact = function(leadId){
+  const l = LEADS.find(x=>x.id==leadId); if(!l) return;
+  if(!canRecontact(l)){ if(typeof showToast==="function") showToast("❌","غير مسموح"); return; }
+  closeDynModal("recontact-modal");
+
+  const prevNotes = l.recontactNotes || "";
+  const prevDate = l.recontactDate || "";
+  const cnt = l.recontactCount || 0;
+
+  let h='<div class="mov open" id="recontact-modal" data-dynamic="1" onclick="if(event.target===this)closeDynModal(\'recontact-modal\')">';
+  h+='<div class="modal" style="max-width:460px">';
+  h+='<div class="mhdr"><h2 style="font-size:15px;margin:0">📞 تم التواصل معه مرة أخرى</h2><button class="mx" onclick="closeDynModal(\'recontact-modal\')">×</button></div>';
+  h+='<div class="mbody">';
+  h+='<div style="background:var(--orange-bg,rgba(245,146,74,.1));border:1px solid rgba(245,146,74,.3);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:var(--text2)">';
+  h+='<strong>'+l.nm+'</strong> · '+l.mob+'<br>';
+  if(cnt>0) h+='<span style="color:var(--text3)">آخر محاولة: '+prevDate+' (المحاولة رقم '+cnt+')</span>';
+  else h+='<span style="color:var(--text3)">أول محاولة إعادة تواصل</span>';
+  h+='</div>';
+  h+='<label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px">ملاحظات المحاولة (الفيدباك)</label>';
+  h+='<textarea id="rc-notes" rows="4" placeholder="ماذا حدث في محاولة التواصل؟" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:9px;color:var(--text);font-size:13px;resize:vertical">'+prevNotes+'</textarea>';
+  h+='<div style="font-size:11px;color:var(--text3);margin-top:10px;background:var(--bg3);padding:8px 10px;border-radius:6px">ℹ️ سيبقى العميل في حالة "لم يتم الرد" مع تسجيل المحاولة. إذا لم يتم استرداده خلال <strong>3 أيام عمل</strong> من هذه المحاولة، سيتحوّل تلقائياً إلى "لاغي".</div>';
+  h+='</div>';
+  h+='<div class="mftr"><button class="btn" onclick="closeDynModal(\'recontact-modal\')">إلغاء</button>';
+  h+='<button class="btn primary" onclick="saveRecontact('+leadId+')">💾 حفظ المحاولة</button></div>';
+  h+='</div></div>';
+  const w=document.createElement("div"); w.innerHTML=h;
+  document.body.appendChild(w.firstChild);
+  setTimeout(()=>document.getElementById("rc-notes")?.focus(),100);
+};
+
+// ── حفظ محاولة التواصل ──
+window.saveRecontact = async function(leadId){
+  const l = LEADS.find(x=>x.id==leadId); if(!l) return;
+  if(!canRecontact(l)){ if(typeof showToast==="function") showToast("❌","غير مسموح"); return; }
+  const notes = (document.getElementById("rc-notes")?.value||"").trim();
+  if(!notes){ if(typeof showToast==="function") showToast("⚠️","اكتب ملاحظات المحاولة"); return; }
+  if(typeof supa==="undefined"||!supa){ if(typeof showToast==="function") showToast("❌","لا يوجد اتصال"); return; }
+
+  const todayStr = (function(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); })();
+  const newCount = (l.recontactCount||0)+1;
+  // نضيف الملاحظة للسجل (نراكم الملاحظات مع التاريخ)
+  const stampedNote = "["+todayStr+"] "+notes;
+  const combinedNotes = l.recontactNotes ? (l.recontactNotes+"\n"+stampedNote) : stampedNote;
+
+  try{
+    if(typeof showToast==="function") showToast("⏳","جاري الحفظ...");
+    const {error} = await supa.from("leads").update({
+      recontact_date: todayStr,
+      recontact_notes: combinedNotes,
+      recontact_count: newCount
+    }).eq("id", l._supaId||l.id);
+    if(error) throw error;
+    // سجّل في lead_log
+    try{
+      await supa.from("lead_log").insert({
+        lead_id: l._supaId||l.id,
+        user_name: curUser.name,
+        action: "محاولة تواصل جديدة (لم يتم الرد): "+notes.slice(0,80)
+      });
+    }catch(e){}
+    closeDynModal("recontact-modal");
+    if(typeof showToast==="function") showToast("✓","تم تسجيل المحاولة");
+    if(typeof loadAllData==="function") await loadAllData();
+    if(typeof viewLead==="function") viewLead(leadId);
+  }catch(e){
+    console.error("[Recontact] save error", e);
+    if(typeof showToast==="function") showToast("❌","خطأ: "+(e.message||"").slice(0,40));
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// التحويل التلقائي: "لم يتم الرد" → "لاغي" بعد 3 أيام عمل من آخر محاولة
+// يتفحص عند تحميل السيستم
+// ═══════════════════════════════════════════════════════════
+async function autoConvertStaleNoReply(){
+  if(typeof supa==="undefined"||!supa) return;
+  if(!curUser || curUser.role==="sales") return; // الأدمن/الكوردينتور بس اللي يشغّل الفحص
+  try{
+    const candidates = LEADS.filter(l=>{
+      if(l.st !== "لم يتم الرد") return false;
+      // نحسب من آخر محاولة تواصل، أو من تاريخ دخوله لم يتم الرد لو مفيش محاولة
+      const baseDate = l.recontactDate || l.reactivatedDate || l.lcd || l.fuDate || l.dt;
+      if(!baseDate) return false;
+      const wd = workingDaysBetween(baseDate, new Date());
+      return wd >= 3;
+    });
+    if(candidates.length===0) return;
+    console.log("[AutoConvert] "+candidates.length+" ليد 'لم يتم الرد' عدى عليهم 3 أيام عمل → تحويل للاغي");
+    for(const l of candidates){
+      try{
+        await supa.from("leads").update({ st:"لاغي", fu_date:null }).eq("id", l._supaId||l.id);
+        await supa.from("lead_log").insert({
+          lead_id: l._supaId||l.id,
+          user_name: "النظام (تلقائي)",
+          action: "تحويل تلقائي للاغي (مر 3 أيام عمل بدون استرداد بعد محاولة التواصل)"
+        }).catch(()=>{});
+      }catch(e){ console.warn("auto-convert failed for", l.id, e); }
+    }
+    if(candidates.length>0){
+      if(typeof showToast==="function") showToast("♻️", candidates.length+" عميل 'لم يتم الرد' تحوّل تلقائياً للاغي");
+      if(typeof loadAllData==="function") await loadAllData();
+    }
+  }catch(e){ console.warn("[AutoConvert] error", e); }
+}
+// نشغّله بعد تحميل الداتا (بعد 3 ثواني من الفتح)
+window._autoConvertScheduled = window._autoConvertScheduled || false;
+function scheduleAutoConvert(){
+  if(window._autoConvertScheduled) return;
+  window._autoConvertScheduled = true;
+  setTimeout(()=>{ autoConvertStaleNoReply(); }, 3000);
+}
 
 </script>
 <div style="position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:var(--text4);pointer-events:none;z-index:10;font-family:Outfit;letter-spacing:.04em">
