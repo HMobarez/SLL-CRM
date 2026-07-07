@@ -2735,7 +2735,8 @@ function renderKanban(el){
       html+='<div class="pc-nm">'+l.nm+'</div>';
       html+='<div class="pc-meta">'+l.src+' · '+l.dt+' '+l.tm+'</div>';
       if(l.fuDate)html+='<div class="pc-meta" style="color:var(--orange)">📅 '+l.fuDate+'</div>';
-      html+='<div class="pc-foot">'+scoreBadge(score(l))+priBadge(l.priority)+slaBadge1(l)+slaBadge2(l)+'</div></div>';
+      const recontactB=(l.st==="لم يتم الرد"&&l.recontactCount>0)?'<span class="badge" style="background:rgba(245,146,74,.15);color:var(--orange2);font-size:9px" title="آخر محاولة: '+(l.recontactDate||"")+'">📞 تمت المحاولة'+(l.recontactCount>1?' ('+l.recontactCount+')':'')+'</span>':'';
+      html+='<div class="pc-foot">'+scoreBadge(score(l))+priBadge(l.priority)+slaBadge1(l)+slaBadge2(l)+recontactB+'</div></div>';
     });
     html+='</div></div>';
   });
