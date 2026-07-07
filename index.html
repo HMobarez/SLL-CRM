@@ -2112,7 +2112,24 @@ function renderLeadsPage(){
     </div>
   </div>
   <div class="fbar" style="flex-wrap:wrap;gap:6px">
-    <input class="fsearch" type="text" placeholder="بحث — اسم، شركة، موبايل، منتج..." id="ls-q" oninput="filterL()" style="min-width:200px;flex:1">
+    <select class="fsel" id="ls-qfield" onchange="filterL()" title="ابحث في" style="max-width:130px">
+      <option value="all">🔍 الكل</option>
+      <option value="nm">اسم العميل</option>
+      <option value="mob">الموبايل</option>
+      <option value="activeCode">كود العميل</option>
+      <option value="company">الشركة</option>
+      <option value="prod">المنتج</option>
+      <option value="nat">الجنسية</option>
+      <option value="imp">بلد الاستيراد</option>
+      <option value="by">المنسّق</option>
+      <option value="repName">السيلز</option>
+      <option value="src">المصدر</option>
+      <option value="cnotes">ملاحظات المنسّق</option>
+      <option value="snotes">ملاحظات السيلز</option>
+      <option value="cap">رأس المال</option>
+      <option value="cc">كود الليد</option>
+    </select>
+    <input class="fsearch" type="text" placeholder="بحث في كل البيانات..." id="ls-q" oninput="filterL()" style="min-width:180px;flex:1">
     <select class="fsel" id="ls-st" onchange="filterL()">
       <option value="">كل الحالات</option>
       <option value="جديد">🆕 جديد</option>
@@ -2169,7 +2186,21 @@ function filteredL(){
   const sc=$("ls-sc")?.value||"",pri=$("ls-pri")?.value||"";
   const dtFrom=$("ls-dt-from")?.value||"",dtTo=$("ls-dt-to")?.value||"";
   const fuFrom=$("ls-fu-from")?.value||"",fuTo=$("ls-fu-to")?.value||"";
-  if(q)l=l.filter(x=>(x.nm||"").toLowerCase().includes(q)||(x.mob||"").includes(q)||(x.prod||"").toLowerCase().includes(q)||(x.company||"").toLowerCase().includes(q));
+  if(q){
+    const qfield=$("ls-qfield")?.value||"all";
+    if(qfield==="all"){
+      // بحث في كل البيانات المهمة (شامل)
+      l=l.filter(x=>{
+        const svcStr = Array.isArray(x.svc)?x.svc.join(" "):(x.svc||"");
+        const hay=[x.nm,x.mob,x.mob2,x.activeCode,x.cc,x.company,x.prod,x.nat,x.imp,x.exp,x.spec,x.qty,x.unit,x.cap,x.sup,x.by,x.repName,x.src,x.cnotes,x.snotes,x.st,x.cr,svcStr,x.c1,x.c2,x.c3,x.recontactNotes,x.paidAmount,x.reactivatedNote]
+          .map(v=>(v||"").toString().toLowerCase()).join(" ");
+        return hay.includes(q);
+      });
+    } else {
+      // بحث في حقل محدد
+      l=l.filter(x=>((x[qfield]||"").toString().toLowerCase()).includes(q));
+    }
+  }
   if(st){
     if(st==="جديد")l=l.filter(x=>isNew(x));
     else if(st==="reactivated")l=l.filter(x=>isReactivated(x));
