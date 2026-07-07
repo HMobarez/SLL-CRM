@@ -1927,6 +1927,7 @@ function buildQuickCard(ld,isFU){
   const sc=score(ld);
   const newBadge=isNew(ld)?'<span class="badge b-new" style="font-size:9px">🆕 جديد</span>':'';
   const reactBadge=isReactivated(ld)?'<span class="badge b-restored" style="font-size:9px">♻️ '+ld.reactivated+'</span>':'';
+  const recontactBadge=(ld.st==="لم يتم الرد"&&ld.recontactCount>0)?'<span class="badge" style="background:rgba(245,146,74,.15);color:var(--orange2);font-size:9px" title="آخر محاولة: '+(ld.recontactDate||"")+'">📞 تمت المحاولة'+(ld.recontactCount>1?' ('+ld.recontactCount+')':'')+'</span>':'';
   const fuMeta=ld.fuDate?'<span style="color:var(--orange)">· متابعة: '+ld.fuDate+'</span>':'';
   const allowedStatuses=curUser.role==="sales"?SALES_STATUSES:DD.status;
   const stOpts=allowedStatuses.map(s=>'<option'+(s===ld.st?' selected':'')+'>'+s+'</option>').join('');
@@ -1945,7 +1946,7 @@ function buildQuickCard(ld,isFU){
   } else {
     h='<div class="qlc">';
     h+='<div class="qlc-hdr"><div class="qlc-av">'+(ld.nm[0]||'?')+'</div>';
-    h+='<div style="flex:1;min-width:0"><div class="qlc-nm">'+ld.nm+' '+newBadge+'</div>';
+    h+='<div style="flex:1;min-width:0"><div class="qlc-nm">'+ld.nm+' '+newBadge+' '+reactBadge+' '+recontactBadge+'</div>';
     h+='<div class="qlc-meta"><span>'+ld.src+'</span><span>·</span><span>📅 '+ld.dt+' '+ld.tm+'</span>'+fuMeta+'</div></div>';
     h+='<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">'+scoreBadge(sc)+priBadge(ld.priority)+slaBadge1(ld)+slaBadge2(ld);
     h+='<a href="'+waLink(ld.mob)+'" target="_blank" class="ract wa">💬</a></div></div>';
@@ -2240,6 +2241,10 @@ function getLeadColumnDefs(){
       let badges="";
       if(isNew(l)) badges+='<span class="badge b-new" style="font-size:9px;margin-right:4px">🆕</span>';
       if(isReactivated(l)) badges+='<span class="badge" style="background:rgba(168,85,247,.12);color:var(--purple2);font-size:9px;margin-right:4px">♻️</span>';
+      // ★ بادج "تمت محاولة تواصل" — للـ "لم يتم الرد" اللي اتعملهم محاولة
+      if(l.st==="لم يتم الرد" && l.recontactCount>0){
+        badges+='<span class="badge" style="background:rgba(245,146,74,.15);color:var(--orange2);font-size:9px;margin-right:4px;cursor:pointer" title="تمت '+l.recontactCount+' محاولة تواصل — آخرها '+(l.recontactDate||"")+'" onclick="event.stopPropagation();viewLead('+l.id+')">📞 تمت المحاولة'+(l.recontactCount>1?' ('+l.recontactCount+')':'')+'</span>';
+      }
       // ★ Duplicate badge — يعد كم Lead بنفس آخر 9 أرقام في mob أو mob2
       const phones=[];
       if(l.mob){const t=normalizePhoneTail(l.mob);if(t.length>=9)phones.push(t);}
