@@ -4114,8 +4114,8 @@ function viewLead(id){
   // Build the unified calls list: c1/c2/c3 legacy columns + extra_calls JSONB
   const calls=[];
   if(l.c1)calls.push({n:1,txt:l.c1,t:l.c1t||"",d:l.fcd||""});
-  if(l.c2)calls.push({n:2,txt:l.c2,t:l.c2t||"",d:""});
-  if(l.c3)calls.push({n:3,txt:l.c3,t:l.c3t||"",d:""});
+  if(l.c2)calls.push({n:2,txt:l.c2,t:l.c2t||"",d:l.c2t?"":(l.lcd||"")});
+  if(l.c3)calls.push({n:3,txt:l.c3,t:l.c3t||"",d:l.c3t?"":(l.lcd||"")});
   const extra=Array.isArray(l.extraCalls)?l.extraCalls:[];
   extra.forEach(function(c,i){
     calls.push({n:4+i,txt:c.txt||c.note||"",t:c.t||c.time||"",d:c.d||c.date||""});
@@ -4142,8 +4142,12 @@ function viewLead(id){
   } else {
     calls.forEach(function(c){
       const head=ordAr(c.n)+' مكالمة';
-      const meta=(c.d?c.d:"")+(c.t?(c.d?" · ":"")+c.t:"");
-      html+='<div style="margin-bottom:7px"><div style="font-size:10px;color:var(--orange);margin-bottom:3px;display:flex;align-items:center;justify-content:space-between;font-weight:600"><span>📞 '+head+'</span>'+(meta?'<span style="color:var(--text3);font-weight:400;font-family:Outfit">'+meta+'</span>':'')+'</div><div style="background:var(--bg3);border-radius:var(--r-sm);padding:8px;font-size:12px;color:var(--text2);line-height:1.5">'+c.txt+'</div></div>';
+      // نجمع التاريخ والوقت — c.t ممكن يكون فيه تاريخ+وقت مع بعض
+      let meta="";
+      if(c.d && c.t){ meta = c.d + " · " + c.t; }
+      else if(c.t){ meta = c.t; }
+      else if(c.d){ meta = c.d; }
+      html+='<div style="margin-bottom:7px"><div style="font-size:10px;color:var(--orange);margin-bottom:3px;display:flex;align-items:center;justify-content:space-between;font-weight:600;gap:8px"><span>📞 '+head+'</span>'+(meta?'<span style="color:var(--text3);font-weight:400;font-family:Outfit;font-size:10px;white-space:nowrap">🕐 '+meta+'</span>':'<span style="color:var(--text4);font-weight:400;font-size:9px">—</span>')+'</div><div style="background:var(--bg3);border-radius:var(--r-sm);padding:8px;font-size:12px;color:var(--text2);line-height:1.5">'+c.txt+'</div></div>';
     });
   }
   // Add-call button — UNLIMITED for Sales (or Admin) who owns the lead
