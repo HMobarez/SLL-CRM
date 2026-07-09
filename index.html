@@ -1141,6 +1141,7 @@ async function loadAllData(){
       recontactDate: l.recontact_date||"",
       recontactNotes: l.recontact_notes||"",
       recontactCount: l.recontact_count||0,
+      activatedDate: l.activated_date||"",
       log: []
     }));
     
@@ -1232,6 +1233,7 @@ function subscribeToChanges(){
       recontactDate: lead.recontact_date||"",
       recontactNotes: lead.recontact_notes||"",
       recontactCount: lead.recontact_count||0,
+      activatedDate: lead.activated_date||"",
       log: []
     };
   }
@@ -3570,7 +3572,16 @@ async function saveLead(){
           const ta=body?body.querySelector('[name="'+f+'"]'):null;
           if(ta && !ta.disabled){
             const v=get(f); 
-            if(v!==undefined) updates[f]=v;
+            if(v!==undefined){
+              updates[f]=v;
+              // ★ لو المكالمة اتكتبت جديد ومفيش توقيت متسجّل → نسجّل التوقيت الآن
+              const tKey=f+"t";  // c1t / c2t / c3t
+              const oldVal=(f==="c1"?l.c1:f==="c2"?l.c2:l.c3)||"";
+              const oldTime=(f==="c1"?l.c1t:f==="c2"?l.c2t:l.c3t)||"";
+              if(v && v.trim() && !oldTime){
+                updates[tKey]=new Date().toISOString();
+              }
+            }
           }
         });
       }
@@ -3826,7 +3837,7 @@ async function confirmAddCall(id, n){
       // Make sure slot is empty (otherwise use extra_calls)
       if(!l[fld]){
         updates[fld]=note;
-        updates[fldT]=tm;
+        updates[fldT]=new Date().toISOString();  // ★ timestamp كامل (تاريخ + وقت)
       } else {
         // Slot full somehow, fall back to extra_calls
         const ex=Array.isArray(l.extraCalls)?l.extraCalls.slice():[];
@@ -4099,7 +4110,11 @@ function viewLead(id){
   }
   html+='<div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:8px;">Coordinator Data</div>';
   html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:9px">';
-  html+=row("المصدر",l.src)+row("رقم الإعلان",l.ad_num?'<span style="color:var(--purple2);font-weight:600">'+l.ad_num+'</span>':"—")+row("التاريخ",l.dt+" "+l.tm);
+  html+=row("المصدر",l.src)+row("رقم الإعلان",l.ad_num?'<span style="color:var(--purple2);font-weight:600">'+l.ad_num+'</span>':"—")+row("تاريخ التسجيل",l.dt+" "+l.tm);
+  // ★ تاريخ التحويل لعميل فعلي (يظهر للعملاء الفعليين)
+  if(l.st==="عميل فعلي" && l.activatedDate){
+    html+=row("📅 تاريخ التفعيل",'<span style="color:var(--green);font-weight:700">'+l.activatedDate+'</span>');
+  }
   html+=row("Coordinator",l.by)+row("المنتج",l.prod)+row("الخدمات",svcStr(l));
   html+=row("رأس المال","$"+(l.cap||"—"))+row("بلد الاستيراد",l.imp)+row("بلد التصدير",l.exp);
   html+=row("مستورد/مصدر",l.ie)+row("توفر المورد",l.sup)+row("أولوية",l.priority);
@@ -4112,10 +4127,28 @@ function viewLead(id){
   html+='<div id="vt-sales" style="display:none">';
   html+='<div style="font-size:10px;font-weight:700;color:var(--orange);margin-bottom:8px;text-transform:uppercase;">Sales Data</div>';
   // Build the unified calls list: c1/c2/c3 legacy columns + extra_calls JSONB
+  // دالة تفصل الـ timestamp لتاريخ ووقت نظيفين
+  function _splitTS(ts){
+    if(!ts) return {d:"",t:""};
+    const s=String(ts);
+    // شكل: "2025-01-18 15:22:00+00" أو "2025-01-18T15:22:00"
+    const m=s.match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+    if(m) return {d:m[1], t:m[2]};
+    // لو تاريخ بس
+    const md=s.match(/(\d{4}-\d{2}-\d{2})/);
+    if(md) return {d:md[1], t:""};
+    return {d:"",t:s};
+  }
   const calls=[];
-  if(l.c1)calls.push({n:1,txt:l.c1,t:l.c1t||"",d:l.fcd||""});
-  if(l.c2)calls.push({n:2,txt:l.c2,t:l.c2t||"",d:l.c2t?"":(l.lcd||"")});
-  if(l.c3)calls.push({n:3,txt:l.c3,t:l.c3t||"",d:l.c3t?"":(l.lcd||"")});
+  if(l.c1){ const p=_splitTS(l.c1t); calls.push({n:1,txt:l.c1,t:p.t,d:p.d||l.fcd||""}); }
+  if(l.c2){ const p=_splitTS(l.c2t); calls.push({n:2,txt:l.c2,t:p.t,d:p.d}); }
+  if(l.c3){ const p=_splitTS(l.c3t); calls.push({n:3,txt:l.c3,t:p.t,d:p.d}); }
+  // ★ آخر مكالمة (اللي مالهاش توقيت خاص) تاخد تاريخ آخر اتصال lcd
+  const _lastNoDate = calls.filter(c=>!c.d && !c.t);
+  if(_lastNoDate.length && l.lcd){
+    const lastOne = _lastNoDate[_lastNoDate.length-1];
+    lastOne.d = l.lcd;
+  }
   const extra=Array.isArray(l.extraCalls)?l.extraCalls:[];
   extra.forEach(function(c,i){
     calls.push({n:4+i,txt:c.txt||c.note||"",t:c.t||c.time||"",d:c.d||c.date||""});
@@ -9867,6 +9900,11 @@ if(typeof window.saveQP==="function"){
 async function _saveActiveClientData(lead, acData){
   if(typeof supa==="undefined"||!supa) return;
   try{
+    // ★ سجّل تاريخ التحويل لعميل فعلي (النهارده) لو مش متسجّل قبل كده
+    if(!acData.activated_date && !lead.activatedDate){
+      const d=new Date();
+      acData.activated_date = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    }
     await supa.from("leads").update(acData).eq("id", lead._supaId||lead.id);
     // سجّل في اللوج العام
     await supa.from("lead_log").insert({
