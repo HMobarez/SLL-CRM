@@ -1142,6 +1142,10 @@ async function loadAllData(){
       recontactNotes: l.recontact_notes||"",
       recontactCount: l.recontact_count||0,
       activatedDate: l.activated_date||"",
+      leadNo: l.lead_no||null,
+      activeCode: l.active_code||"",
+      paidAmount: l.paid_amount||"",
+      paidCurrency: l.paid_currency||"",
       log: []
     }));
     
@@ -1234,6 +1238,10 @@ function subscribeToChanges(){
       recontactNotes: lead.recontact_notes||"",
       recontactCount: lead.recontact_count||0,
       activatedDate: lead.activated_date||"",
+      leadNo: lead.lead_no||null,
+      activeCode: lead.active_code||"",
+      paidAmount: lead.paid_amount||"",
+      paidCurrency: lead.paid_currency||"",
       log: []
     };
   }
@@ -2194,7 +2202,7 @@ function filteredL(){
       // بحث في كل البيانات المهمة (شامل)
       l=l.filter(x=>{
         const svcStr = Array.isArray(x.svc)?x.svc.join(" "):(x.svc||"");
-        const hay=[x.nm,x.mob,x.mob2,x.activeCode,x.cc,x.company,x.prod,x.nat,x.imp,x.exp,x.spec,x.qty,x.unit,x.cap,x.sup,x.by,x.repName,x.src,x.cnotes,x.snotes,x.st,x.cr,svcStr,x.c1,x.c2,x.c3,x.recontactNotes,x.paidAmount,x.reactivatedNote]
+        const hay=[x.nm,x.mob,x.mob2,x.activeCode,x.cc,x.company,x.prod,x.nat,x.imp,x.exp,x.spec,x.qty,x.unit,x.cap,x.sup,x.by,x.repName,x.src,x.cnotes,x.snotes,x.st,x.cr,svcStr,x.c1,x.c2,x.c3,x.recontactNotes,x.paidAmount,x.reactivatedNote,x.leadNo]
           .map(v=>(v||"").toString().toLowerCase()).join(" ");
         return hay.includes(q);
       });
@@ -2264,7 +2272,7 @@ function renderLeadsContent(){
 // users can toggle columns via the column picker — saved to localStorage.
 function getLeadColumnDefs(){
   return [
-    {key:"id", label:"#", width:50, role:"both", defaultFor:["admin","coordinator"], render:l=>'<span class="td-mono" style="color:var(--text3);font-size:10px">'+l.id+'</span>'},
+    {key:"id", label:"#", width:50, role:"both", defaultFor:["admin","coordinator"], render:l=>'<span class="td-mono" style="color:var(--text3);font-size:10px">'+(l.leadNo||l.id)+'</span>'},
     {key:"cc", label:"Code", width:90, role:"both", defaultFor:["admin"], render:l=>'<span class="td-mono" style="font-size:10px;color:var(--text2)">'+(l.cc||"—")+'</span>'},
     {key:"src", label:"المصدر", width:100, role:"coord", defaultFor:["admin","coordinator","sales"], render:l=>l.src||"—"},
     {key:"ad_num", label:"رقم الإعلان", width:100, role:"coord", defaultFor:["admin","coordinator"], render:l=>l.ad_num?'<span class="td-mono" style="font-size:10px;color:var(--purple2);background:rgba(168,85,247,.08);padding:2px 6px;border-radius:4px">'+l.ad_num+'</span>':"—"},
@@ -4108,13 +4116,30 @@ function viewLead(id){
     if(l.reactivatedNote)html+='<div style="margin-top:5px;padding:7px;background:var(--bg3);border-radius:6px;font-size:11px">📝 '+l.reactivatedNote+'</div>';
     html+='</div></div>';
   }
+  // ★ كارت بيانات التفعيل (عميل فعلي) — تاريخ التسجيل + تاريخ الدفع + المبلغ + الخدمة
+  if(l.st==="عميل فعلي"){
+    html+='<div style="background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.35);border-radius:10px;padding:12px;margin-bottom:11px">';
+    html+='<div style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--green);margin-bottom:9px"><span style="font-size:16px">✅</span><span>بيانات العميل الفعلي</span>';
+    if(l.activeCode)html+='<span style="margin-right:auto;background:rgba(34,197,94,.18);color:var(--green);font-size:10px;padding:2px 8px;border-radius:5px;font-weight:700">'+l.activeCode+'</span>';
+    html+='</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:9px">';
+    html+='<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px">تاريخ التسجيل</div><div style="font-weight:700;font-size:13px">'+(l.dt||"—")+'</div></div>';
+    // ★ تاريخ الدفع — بارز + عدد أيام التحويل
+    var _actD = l.activatedDate||"";
+    var _convDays = "";
+    if(_actD && l.dt){
+      var _dd = Math.round((new Date(_actD) - new Date(l.dt))/86400000);
+      if(_dd===0) _convDays = ' <span style="font-size:9px;background:rgba(34,197,94,.15);color:var(--green);padding:1px 6px;border-radius:4px;font-weight:600">نفس يوم التسجيل</span>';
+      else if(_dd>0) _convDays = ' <span style="font-size:9px;background:rgba(34,197,94,.15);color:var(--green);padding:1px 6px;border-radius:4px;font-weight:600">بعد '+_dd+' يوم</span>';
+    }
+    html+='<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px">📅 تاريخ الدفع / التفعيل</div><div style="font-weight:800;font-size:15px;color:var(--green)">'+(_actD||'<span style="color:var(--orange2);font-size:11px">⚠ غير مسجّل</span>')+'</div>'+(_convDays?'<div style="margin-top:2px">'+_convDays+'</div>':'')+'</div>';
+    html+='<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px">💰 المبلغ المدفوع</div><div style="font-weight:700;font-size:13px">'+(l.paidAmount||"—")+(l.paidAmount&&l.paidCurrency?' <span style="font-size:10px;color:var(--text3);font-weight:600">'+l.paidCurrency+'</span>':'')+'</div></div>';
+    html+='<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px">🛠 الخدمة</div><div style="font-weight:700;font-size:13px">'+(svcStr(l)||"—")+'</div></div>';
+    html+='</div></div>';
+  }
   html+='<div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:8px;">Coordinator Data</div>';
   html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:9px">';
   html+=row("المصدر",l.src)+row("رقم الإعلان",l.ad_num?'<span style="color:var(--purple2);font-weight:600">'+l.ad_num+'</span>':"—")+row("تاريخ التسجيل",l.dt+" "+l.tm);
-  // ★ تاريخ التحويل لعميل فعلي (يظهر للعملاء الفعليين)
-  if(l.st==="عميل فعلي" && l.activatedDate){
-    html+=row("📅 تاريخ التفعيل",'<span style="color:var(--green);font-weight:700">'+l.activatedDate+'</span>');
-  }
   html+=row("Coordinator",l.by)+row("المنتج",l.prod)+row("الخدمات",svcStr(l));
   html+=row("رأس المال","$"+(l.cap||"—"))+row("بلد الاستيراد",l.imp)+row("بلد التصدير",l.exp);
   html+=row("مستورد/مصدر",l.ie)+row("توفر المورد",l.sup)+row("أولوية",l.priority);
@@ -4569,9 +4594,14 @@ function showRT(id,btn){
   renderRT(id);
 }
 function rpL(){
-  // Use period-based filtering
+  // Use period-based filtering (بتاريخ التسجيل dt — للإجمالي ومعدل التحويل)
   const r=getPeriodRange(adminRptPeriod);
   return LEADS.filter(l=>l.dt>=r.fromStr&&l.dt<=r.toStr);
+}
+// ★ العملاء الفعليين ضمن الفترة — مفلترين بتاريخ الدفع (activatedDate) فقط
+function rpActives(){
+  const r=getPeriodRange(adminRptPeriod);
+  return LEADS.filter(l=>l.st==="عميل فعلي" && l.activatedDate && l.activatedDate>=r.fromStr && l.activatedDate<=r.toStr);
 }
 
 function donut(id,labels,data,colors,pos){
@@ -4803,8 +4833,9 @@ function checkDailyContactedReminders(){
 
 function renderRT(tab){
   const l=rpL();
+  const la=rpActives();  // ★ العملاء الفعليين ضمن الفترة بتاريخ الدفع
   if(tab==="overview"){
-    const tot=l.length,act=l.filter(x=>x.st==="عميل فعلي").length,can=l.filter(x=>x.st==="لاغي").length;
+    const tot=l.length,act=la.length,can=l.filter(x=>x.st==="لاغي").length;
     const hot=l.filter(x=>score(x)>=70).length,warm=l.filter(x=>score(x)>=40&&score(x)<70).length,cold=l.filter(x=>score(x)<40).length;
     const sla1b=l.filter(x=>sla1St(x)==="breach").length;
     const srcMap={};l.forEach(x=>{srcMap[x.src]=(srcMap[x.src]||0)+1;});
@@ -4864,12 +4895,12 @@ function renderRT(tab){
     const months=getMonthRange();
     const srcData=DD.source.map(src=>{
       const pot=l.filter(x=>x.src===src).length;
-      const act=l.filter(x=>x.src===src&&x.st==="عميل فعلي").length;
+      const act=la.filter(x=>x.src===src).length;
       const can=l.filter(x=>x.src===src&&x.st==="لاغي").length;
       const contacted=months.reduce((sum,{y,m})=>sum+(MC.channels[src]?.[y+"-"+m]||0),0);
       return{src,contacted,pot,act,can,conv:pct(act,pot),cancelRate:pct(can,pot)};
     }).filter(x=>x.pot>0||x.contacted>0);
-    const actuals=l.filter(x=>x.st==="عميل فعلي");
+    const actuals=la;
     const expMap={};actuals.forEach(x=>{const c=x.exp||"أخرى";expMap[c]=(expMap[c]||0)+1;});
     $("rpt-marketing").innerHTML=`
     <div class="card" style="margin-bottom:13px">
@@ -4891,9 +4922,9 @@ function renderRT(tab){
             <td style="padding:8px 10px">الإجمالي</td>
             <td style="padding:8px 10px;text-align:right;font-family:Outfit">${months.reduce((s,{y,m})=>s+DD.source.reduce((ss,ch)=>ss+(MC.channels[ch]?.[y+"-"+m]||0),0),0).toLocaleString()}</td>
             <td style="padding:8px 10px;text-align:right;color:var(--blue2)">${l.length}</td>
-            <td style="padding:8px 10px;text-align:right;color:var(--green)">${l.filter(x=>x.st==="عميل فعلي").length}</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--green)">${la.length}</td>
             <td style="padding:8px 10px;text-align:right;color:var(--red)">${l.filter(x=>x.st==="لاغي").length}</td>
-            <td style="padding:8px 10px;text-align:right">${pct(l.filter(x=>x.st==="عميل فعلي").length,l.length).toFixed(2)}%</td>
+            <td style="padding:8px 10px;text-align:right">${pct(la.length,l.length).toFixed(2)}%</td>
             <td style="padding:8px 10px;text-align:right">${pct(l.filter(x=>x.st==="لاغي").length,l.length).toFixed(2)}%</td>
           </tr></tbody>
         </table>
@@ -4953,12 +4984,12 @@ function renderRT(tab){
   else if(tab==="salesperf"){
     const sd=SALES_USERS.map(s=>{
       const m=l.filter(x=>x.repId===s.id);
-      const act=m.filter(x=>x.st==="عميل فعلي").length,can=m.filter(x=>x.st==="لاغي").length;
+      const act=la.filter(x=>x.repId===s.id).length,can=m.filter(x=>x.st==="لاغي").length;
       const slaOk=m.filter(x=>sla1St(x)==="ok").length;
       return{...s,total:m.length,act,can,conv:pct(act,m.length),cancelRate:pct(can,m.length),slaPct:m.length?pct(slaOk,m.length):100};
     }).sort((a,b)=>b.act-a.act);
     const top=sd[0]||{name:"—",act:0};const maxA=top.act||1;
-    const srvMap={};l.filter(x=>x.st==="عميل فعلي").forEach(x=>{svcStr(x).split("، ").filter(Boolean).forEach(v=>{srvMap[v]=(srvMap[v]||0)+1;});});
+    const srvMap={};la.forEach(x=>{svcStr(x).split("، ").filter(Boolean).forEach(v=>{srvMap[v]=(srvMap[v]||0)+1;});});
     const srvS=Object.entries(srvMap).sort((a,b)=>b[1]-a[1]),sm2=srvS[0]?.[1]||1;
     $("rpt-salesperf").innerHTML=`
     <div class="card" style="margin-bottom:13px;background:linear-gradient(135deg,rgba(245,200,74,.09),rgba(245,146,74,.06));border-color:rgba(245,200,74,.2)">
@@ -5001,7 +5032,7 @@ function renderRT(tab){
     const months=getMonthRange();
     const cd=COORD_USERS.map(c=>{
       const m=l.filter(x=>x.byId===c.id);
-      const act=m.filter(x=>x.st==="عميل فعلي").length,can=m.filter(x=>x.st==="لاغي").length;
+      const act=la.filter(x=>x.byId===c.id).length,can=m.filter(x=>x.st==="لاغي").length;
       const contacted=months.reduce((sum,{y:yi,m:mi})=>sum+(MC.coords[c.name]?.[yi+"-"+mi]||0),0);
       const quality=m.length?pct(m.filter(x=>x.src&&x.nm&&x.prod).length,m.length):0;
       const c2l=contacted>0?pct(m.length,contacted):0;
@@ -5351,8 +5382,8 @@ async function loadPDFLibs(){
 }
 
 function renderActiveClientsTab(){
-  const all = rpL();
-  const actives = all.filter(l => l.st === "عميل فعلي");
+  // ★ العملaء الفعليين مفلترين بتاريخ الدفع (activatedDate)
+  const actives = rpActives();
   
   if(actives.length === 0){
     $("rpt-active").innerHTML = '<div class="empty-st"><div class="empty-icon">📊</div><div class="empty-ttl">لا توجد عملاء فعليين</div><div class="empty-sub">ضمن الفترة المختارة</div></div>';
@@ -8677,8 +8708,11 @@ function computeReportData(){
   const period = P();
   const contacted = (typeof totalContactedInRange==="function") ? totalContactedInRange() : 0;
 
+  // ★ العملاء الفعليين ضمن الفترة = بتاريخ الدفع (activatedDate) — مصدر موحّد
+  const ACT = (typeof rpActives==="function") ? rpActives() : L.filter(x=>x.st==="عميل فعلي");
+
   const total = L.length;
-  const active = L.filter(x=>x.st==="عميل فعلي").length;
+  const active = ACT.length;
   const cancelled = L.filter(x=>x.st==="لاغي").length;
   const followup = L.filter(x=>x.st==="تحت المتابعة").length;
   const noReply = L.filter(x=>x.st==="لم يتم الرد").length;
@@ -8702,7 +8736,7 @@ function computeReportData(){
   ].filter(s=>s.val>0);
 
   // Active clients services
-  const actives = L.filter(x=>x.st==="عميل فعلي");
+  const actives = ACT;
   const ALL_SVC = (typeof DD!=="undefined" && DD.services) ? DD.services : [];
   const svcCount = {}; ALL_SVC.forEach(s=>svcCount[s]=0);
   actives.forEach(l=>{ (l.svc||[]).forEach(s=>{ svcCount[s]=(svcCount[s]||0)+1; }); });
@@ -8721,20 +8755,20 @@ function computeReportData(){
   const SU = (typeof SALES_USERS!=="undefined")?SALES_USERS:[];
   const sales = SU.map(s=>{
     const m=L.filter(x=>x.repId===s.id);
-    const a=m.filter(x=>x.st==="عميل فعلي").length;
+    const a=ACT.filter(x=>x.repId===s.id).length;
     let ok=0; m.forEach(x=>{ if((typeof sla1St==="function"?sla1St(x):"ok")==="ok") ok++; });
     return { name:s.name, total:m.length, active:a, conv:_pct(a,m.length), sla:m.length?_pct(ok,m.length):100 };
-  }).filter(s=>s.total>0).sort((a,b)=>b.active-a.active);
+  }).filter(s=>s.total>0||s.active>0).sort((a,b)=>b.active-a.active);
 
   // Coordinators
   const CU = (typeof COORD_USERS!=="undefined")?COORD_USERS:[];
   const months = (typeof getMonthRange==="function")?getMonthRange():[];
   const coords = CU.map(c=>{
     const m=L.filter(x=>x.byId===c.id);
-    const a=m.filter(x=>x.st==="عميل فعلي").length;
+    const a=ACT.filter(x=>x.byId===c.id).length;
     const cont = months.reduce((s,mv)=>s+((typeof MC!=="undefined"&&MC.coords[c.name]&&MC.coords[c.name][mv.m])||0),0);
     return { name:c.name, contacted:cont, leads:m.length, active:a, c2a:cont?_pct(a,cont):0 };
-  }).filter(c=>c.leads>0||c.contacted>0).sort((a,b)=>b.active-a.active);
+  }).filter(c=>c.leads>0||c.contacted>0||c.active>0).sort((a,b)=>b.active-a.active);
 
   // Velocity
   const convDays = [];
@@ -10073,24 +10107,7 @@ async function enhanceLeadView(leadId){
     else dataTab.appendChild(extraRow);
   }
 
-  // لو عميل فعلي وعنده كود → اعرض بيانات الحسابات
-  if(l.st==="عميل فعلي" && (l.activeCode||l.paidAmount)){
-    if(!dataTab.querySelector("#ac-info-box")){
-      const box=document.createElement("div");
-      box.id="ac-info-box";
-      box.style.cssText="margin-top:11px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:10px 12px";
-      let bh='<div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:6px">💰 بيانات الحسابات</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">';
-      bh+='<div><div style="font-size:9px;color:var(--text4)">كود عميل فعلي</div><div style="font-weight:700">'+(l.activeCode||"—")+'</div></div>';
-      bh+='<div><div style="font-size:9px;color:var(--text4)">المبلغ المدفوع</div><div style="font-weight:700">'+(l.paidAmount||"—")+'</div></div>';
-      bh+='<div><div style="font-size:9px;color:var(--text4)">العملة</div><div style="font-weight:700">'+(l.paidCurrency||"—")+'</div></div>';
-      bh+='</div>';
-      box.innerHTML=bh;
-      // نحطها بعد أول grid في الـ data tab
-      const firstGrid = dataTab.querySelector('div[style*="grid-template-columns"]');
-      if(firstGrid && firstGrid.parentNode) firstGrid.parentNode.insertBefore(box, firstGrid.nextSibling);
-      else dataTab.appendChild(box);
-    }
-  }
+  // بيانات الحسابات معروضة الآن في كارت "بيانات العميل الفعلي" الأخضر (أعلى تبويب البيانات)
 }
 
 // ════════════════════════════════════════════════
@@ -10452,8 +10469,9 @@ function patchActiveClients(){
       try{
         const container = document.getElementById("rpt-active");
         if(!container) return;
-        const all = (typeof rpL==="function")?rpL():[];
-        const actives = all.filter(l => l.st==="عميل فعلي");
+        // ★ نفس مصدر الـ KPIs: العملاء الفعليين بتاريخ الدفع (activatedDate)
+        const actives = (typeof rpActives==="function") ? rpActives()
+                        : ((typeof rpL==="function")?rpL():[]).filter(l => l.st==="عميل فعلي");
         if(!actives.length) return;
         // ندوّر على الجدول القديم (أول card فيه "Sales × Services Matrix")
         const cards = container.querySelectorAll(".card");
@@ -11118,4 +11136,3 @@ function scheduleAutoConvert(){
 </div>
 </body>
 </html>
- 
