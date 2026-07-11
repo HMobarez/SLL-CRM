@@ -632,7 +632,8 @@ let nextId=9419,rrIdx=0,curUser=null,curLeadId=null,pgLeads=1,PER=10,lView="tabl
 let dashPeriod="all", coordRptPeriod="month", salesRptPeriod="month";
 let msSelected={};
 // ═══ HELPERS ═══
-const today=()=>new Date().toISOString().slice(0,10);
+const localDS=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const today=()=>localDS(new Date());
 const nowTime=()=>new Date().toTimeString().slice(0,5);
 const nowDT=()=>new Date().toLocaleString("ar-EG");
 const pct=(a,b)=>b?Math.round(a/b*100*100)/100:0;
@@ -4686,7 +4687,7 @@ function getPeriodRange(period){
       from=new Date("2020-01-01");
       to=new Date("2099-12-31");
   }
-  return {from:from,to:to,fromStr:from.toISOString().slice(0,10),toStr:to.toISOString().slice(0,10)};
+  return {from:from,to:to,fromStr:localDS(from),toStr:localDS(to)};
 }
 function filterLeadsByPeriod(leads,period){
   if(period==="all"||!period)return leads;
@@ -4796,7 +4797,7 @@ function getMissingDays(coordName,daysBack){
     const d=new Date(t);d.setDate(t.getDate()-i);
     // Skip future dates and weekends if needed
     if(d.getFullYear()<2026)continue; // Don't check before our data
-    const ds=d.toISOString().slice(0,10);
+    const ds=localDS(d);
     if(!MC.daily[coordName]||MC.daily[coordName][ds]===undefined){
       missing.push(ds);
     }
@@ -8264,7 +8265,7 @@ function renderContactsUI(data){
   html += '</tr></thead><tbody>';
   
   // Days rows — use visible channels for inputs; day total counts ALL channels (visible+hidden)
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDS(new Date());
   for(let day=1; day<=daysCnt; day++){
     const dateStr = month + "-" + String(day).padStart(2,"0");
     const isToday = dateStr === today;
@@ -8792,7 +8793,7 @@ function computeReportData(){
   convDays.forEach(dd=>{ for(const b of cohort){ if(dd>=b.min&&dd<=b.max){ b.val++; break; } } });
 
   // Aging — stale 60d
-  const todayStr = (typeof today==="function")?today():new Date().toISOString().slice(0,10);
+  const todayStr = (typeof today==="function")?today():localDS(new Date());
   const openLeads = L.filter(x=>{ const s=x.st||""; return s!=="عميل فعلي"&&s!=="لاغي"&&s!=="لم يتم الرد"; });
   const aging = [
     {label:"0–7 يوم", min:0, max:7, val:0},
@@ -11136,4 +11137,3 @@ function scheduleAutoConvert(){
 </div>
 </body>
 </html>
- 
