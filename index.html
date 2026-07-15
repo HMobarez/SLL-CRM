@@ -437,6 +437,10 @@ tr.sla1-row .sticky-actions{background:rgba(245,82,82,0.06);}
 .col-pick-item:hover{background:var(--surface3)!important;border-color:var(--blue2)!important}
 .col-pick-item:active{cursor:grabbing!important}
 .col-pick-item button:hover:not(:disabled){background:var(--bg3)!important;border-radius:3px;opacity:1!important}
+.pshcol{transition:all .15s ease}
+.pshcol:hover{border-color:var(--blue2)!important;background:var(--surface3)!important}
+.pshcol:active{cursor:grabbing!important;opacity:.6}
+.pshcol .pshcol-x:hover{color:var(--red2)!important}
 
 /* ═══ PRINT MODE STYLES ═══ */
 .print-header{display:none;}
@@ -1144,6 +1148,8 @@ async function loadAllData(){
       recontactCount: l.recontact_count||0,
       activatedDate: l.activated_date||"",
       leadNo: l.lead_no||null,
+      coordEdited: l.coord_edited===true,
+      coordEditedBy: l.coord_edited_by||"",
       activeCode: l.active_code||"",
       paidAmount: l.paid_amount||"",
       paidCurrency: l.paid_currency||"",
@@ -1240,6 +1246,8 @@ function subscribeToChanges(){
       recontactCount: lead.recontact_count||0,
       activatedDate: lead.activated_date||"",
       leadNo: lead.lead_no||null,
+      coordEdited: lead.coord_edited===true,
+      coordEditedBy: lead.coord_edited_by||"",
       activeCode: lead.active_code||"",
       paidAmount: lead.paid_amount||"",
       paidCurrency: lead.paid_currency||"",
@@ -2168,15 +2176,17 @@ function renderLeadsPage(){
     </select>
     <div id="drp-reg" style="position:relative"></div>
     <div id="drp-fu" style="position:relative"></div>
+    <div id="drp-pay" style="position:relative"></div>
     <input type="hidden" id="ls-dt-from"><input type="hidden" id="ls-dt-to">
     <input type="hidden" id="ls-fu-from"><input type="hidden" id="ls-fu-to">
+    <input type="hidden" id="ls-pay-from"><input type="hidden" id="ls-pay-to">
     <button class="btn sm primary" onclick="setFUT()" title="اليوم: مسجلين اليوم + متابعة اليوم + لم يتم الرد + متابعات متأخرة">📅 اليوم</button>
     <button class="btn sm" onclick="clearFilters()" title="مسح">✖</button>
   </div>
   <div id="leads-content"></div>`;
   renderLeadsContent();
   // ★ هيّئ الـ date range pickers
-  if(typeof renderDrp==="function"){ renderDrp("reg"); renderDrp("fu"); }
+  if(typeof renderDrp==="function"){ renderDrp("reg"); renderDrp("fu"); renderDrp("pay"); }
 }
 function setFUT(){
   // "اليوم" = leads registered today OR with follow-up today
@@ -2185,6 +2195,7 @@ function setFUT(){
   // Clear all date inputs and use the OR flag
   $("ls-dt-from").value="";$("ls-dt-to").value="";
   $("ls-fu-from").value="";$("ls-fu-to").value="";
+  if($("ls-pay-from"))$("ls-pay-from").value="";if($("ls-pay-to"))$("ls-pay-to").value="";
   _todayFilterActive=t;
   // Visual indicator on the button
   const btn=document.querySelector('button[onclick="setFUT()"]');
@@ -2205,6 +2216,7 @@ function filteredL(){
   const sc=$("ls-sc")?.value||"",pri=$("ls-pri")?.value||"";
   const dtFrom=$("ls-dt-from")?.value||"",dtTo=$("ls-dt-to")?.value||"";
   const fuFrom=$("ls-fu-from")?.value||"",fuTo=$("ls-fu-to")?.value||"";
+  const payFrom=$("ls-pay-from")?.value||"",payTo=$("ls-pay-to")?.value||"";
   if(q){
     const qfield=$("ls-qfield")?.value||"all";
     if(qfield==="all"){
@@ -2234,6 +2246,8 @@ function filteredL(){
   if(dtTo)l=l.filter(x=>x.dt&&x.dt<=dtTo);
   if(fuFrom)l=l.filter(x=>(x.fuDate||"")>=fuFrom);
   if(fuTo)l=l.filter(x=>(x.fuDate||"")<=fuTo);
+  if(payFrom)l=l.filter(x=>(x.activatedDate||"")>=payFrom);
+  if(payTo)l=l.filter(x=>(x.activatedDate||"")<=payTo);
   // ★ "اليوم" filter — يعرض للسيلز ما يحتاج تواصل اليوم:
   //   A) Leads جديدة (status فاضي) من اليوم أو قبله — لسه ما اتعملوش
   //   B) Leads ميعاد متابعتها اليوم أو فات (لازم نكلمه)
@@ -2504,63 +2518,47 @@ function _colDragOver(e){
   if(!_draggedColKey) return;
   e.preventDefault();
   e.dataTransfer.dropEffect = "move";
-  // visual feedback — نضيف border أعلى الـ item
   const target = e.currentTarget;
   if(target && target.dataset.colkey !== _draggedColKey){
-    target.style.borderTopColor = "var(--blue2)";
-    target.style.borderTopWidth = "2px";
-    target.style.borderTopStyle = "solid";
+    target.style.borderRightColor = "var(--blue2)";
+    target.style.borderRightWidth = "3px";
+    target.style.borderRightStyle = "solid";
   }
 }
 
 function _colDragLeave(e){
   const target = e.currentTarget;
   if(target){
-    target.style.borderTopColor = "";
-    target.style.borderTopWidth = "";
-    target.style.borderTopStyle = "";
+    target.style.borderRightColor = "";
+    target.style.borderRightWidth = "";
+    target.style.borderRightStyle = "";
   }
 }
 
 function _colDrop(e, targetKey){
   e.preventDefault();
   e.stopPropagation();
-  
   const target = e.currentTarget;
   if(target){
-    target.style.borderTopColor = "";
-    target.style.borderTopWidth = "";
-    target.style.borderTopStyle = "";
+    target.style.borderRightColor = "";
+    target.style.borderRightWidth = "";
+    target.style.borderRightStyle = "";
   }
-  
-  if(!_draggedColKey || _draggedColKey === targetKey){
-    _draggedColKey = null;
-    return;
-  }
-  
-  // نلاقي مين قبل مين في الترتيب الحالي
+  if(!_draggedColKey || _draggedColKey === targetKey){ _draggedColKey = null; return; }
   const visible = getVisibleLeadCols();
   const fromIdx = visible.indexOf(_draggedColKey);
   const toIdx = visible.indexOf(targetKey);
-  
-  // لو الـ dragged كان قبل الـ target، نحطه قبله
-  // لو كان بعده، نحطه قبله برضه (السلوك المتوقع)
   const insertAfter = fromIdx < toIdx;
-  
   reorderLeadCol(_draggedColKey, targetKey, insertAfter);
   _draggedColKey = null;
 }
 
 function _colDragEnd(e){
   const target = e.currentTarget;
-  if(target){
-    target.style.opacity = "";
-  }
-  // امسح أي visual feedback متبقي
-  document.querySelectorAll(".col-pick-item").forEach(item => {
-    item.style.borderTopColor = "";
-    item.style.borderTopWidth = "";
-    item.style.borderTopStyle = "";
+  if(target){ target.style.opacity = ""; }
+  document.querySelectorAll(".col-pick-item,.pshcol").forEach(item => {
+    item.style.borderTopColor = ""; item.style.borderTopWidth = ""; item.style.borderTopStyle = "";
+    item.style.borderRightColor = ""; item.style.borderRightWidth = ""; item.style.borderRightStyle = "";
   });
   _draggedColKey = null;
 }
@@ -2621,56 +2619,45 @@ function renderTable(el){
   pickerHtml += '<button class="btn sm primary" onclick="toggleColPicker()">✓ تم</button>';
   pickerHtml += '</div></div>';
   
-  // ★ تنبيه عن Drag & Drop
-  pickerHtml += '<div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.25);border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px">';
-  pickerHtml += '<span style="font-size:14px">💡</span>';
-  pickerHtml += '<span>اسحب الأعمدة الظاهرة لإعادة ترتيبها، أو استخدم الأسهم ⬆️⬇️. الترتيب بيتحفظ تلقائياً لحسابك.</span>';
-  pickerHtml += '</div>';
   
-  // ★ القسم 1: الأعمدة الظاهرة (Visible) — قابلة للسحب
+  // ★ القسم 1: الأعمدة الظاهرة (Visible) — chips أفقية بشكل الـ ERP، قابلة للسحب
   const visibleCols = visKeys.map(k => colsMap[k]).filter(c => c);
   if(visibleCols.length){
-    pickerHtml += '<div style="margin-bottom:10px">';
-    pickerHtml += '<div style="font-size:10px;font-weight:800;color:var(--text2);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase">✓ الأعمدة الظاهرة في الجدول ('+visibleCols.length+') — اسحب للترتيب</div>';
-    pickerHtml += '<div id="col-picker-visible" style="display:flex;flex-direction:column;gap:4px">';
+    pickerHtml += '<div style="margin-bottom:12px">';
+    pickerHtml += '<div style="font-size:10px;font-weight:800;color:var(--text2);margin-bottom:8px;letter-spacing:.03em">✓ الأعمدة الظاهرة ('+visibleCols.length+') — اسحب لإعادة الترتيب</div>';
+    pickerHtml += '<div id="col-picker-visible" style="display:flex;flex-wrap:wrap;gap:7px">';
     visibleCols.forEach((c, idx) => {
-      const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text2)";
-      const isFirst = idx === 0;
-      const isLast = idx === visibleCols.length - 1;
-      pickerHtml += '<div class="col-pick-item" draggable="true"';
+      const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text3)";
+      pickerHtml += '<div class="pshcol" draggable="true"';
       pickerHtml += ' data-colkey="'+c.key+'"';
       pickerHtml += ' ondragstart="_colDragStart(event,\''+c.key+'\')"';
       pickerHtml += ' ondragover="_colDragOver(event)"';
       pickerHtml += ' ondrop="_colDrop(event,\''+c.key+'\')"';
       pickerHtml += ' ondragend="_colDragEnd(event)"';
       pickerHtml += ' ondragleave="_colDragLeave(event)"';
-      pickerHtml += ' style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:move;transition:all .15s">';
-      pickerHtml += '<span style="color:var(--text3);font-size:14px;cursor:grab" title="اسحب">⋮⋮</span>';
-      pickerHtml += '<span style="color:var(--text3);font-family:Outfit;font-size:9px;min-width:18px">'+(idx+1)+'.</span>';
-      pickerHtml += '<input type="checkbox" checked onchange="toggleLeadCol(\''+c.key+'\')" style="cursor:pointer" onclick="event.stopPropagation()">';
+      pickerHtml += ' style="display:inline-flex;align-items:center;gap:7px;padding:7px 11px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;font-size:11px;cursor:grab;transition:all .15s;user-select:none">';
       pickerHtml += '<span style="color:'+roleColor+';font-size:9px">●</span>';
-      pickerHtml += '<span style="flex:1">'+c.label+'</span>';
-      // أزرار ⬆️ ⬇️ للموبايل أو لو الـ drag صعب
-      pickerHtml += '<button onclick="event.stopPropagation();moveLeadCol(\''+c.key+'\',\'up\')" '+(isFirst?'disabled':'')+' title="تحريك لأعلى" style="background:none;border:none;cursor:'+(isFirst?'not-allowed':'pointer')+';opacity:'+(isFirst?'.3':'.7')+';font-size:12px;padding:2px 4px">⬆</button>';
-      pickerHtml += '<button onclick="event.stopPropagation();moveLeadCol(\''+c.key+'\',\'down\')" '+(isLast?'disabled':'')+' title="تحريك لأسفل" style="background:none;border:none;cursor:'+(isLast?'not-allowed':'pointer')+';opacity:'+(isLast?'.3':'.7')+';font-size:12px;padding:2px 4px">⬇</button>';
+      pickerHtml += '<span style="font-weight:500">'+c.label+'</span>';
+      pickerHtml += '<span class="pshcol-x" onclick="event.stopPropagation();toggleLeadCol(\''+c.key+'\')" style="color:var(--text4);cursor:pointer;font-size:12px;font-weight:700;padding:0 2px;line-height:1" title="إخفاء">✕</span>';
+      pickerHtml += '<span style="color:var(--text4);font-size:13px;cursor:grab" title="اسحب">⣿</span>';
       pickerHtml += '</div>';
     });
     pickerHtml += '</div></div>';
   }
   
-  // ★ القسم 2: الأعمدة المخفية (Hidden) — checkbox عادي
+  // ★ القسم 2: الأعمدة المخفية (Hidden) — chips للإضافة
   const hiddenCols = allCols.filter(c => !visKeys.includes(c.key));
   if(hiddenCols.length){
     pickerHtml += '<div>';
-    pickerHtml += '<div style="font-size:10px;font-weight:800;color:var(--text2);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase">✕ الأعمدة المخفية ('+hiddenCols.length+') — اضغط لإظهارها</div>';
-    pickerHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px">';
+    pickerHtml += '<div style="font-size:10px;font-weight:800;color:var(--text2);margin-bottom:8px;letter-spacing:.03em">＋ الأعمدة المخفية ('+hiddenCols.length+') — اضغط لإضافتها</div>';
+    pickerHtml += '<div style="display:flex;flex-wrap:wrap;gap:7px">';
     hiddenCols.forEach(c => {
-      const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text2)";
-      pickerHtml += '<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg);border:1px dashed var(--border);border-radius:6px;cursor:pointer;font-size:11px;opacity:.7">';
-      pickerHtml += '<input type="checkbox" onchange="toggleLeadCol(\''+c.key+'\')" style="cursor:pointer">';
+      const roleColor = c.role === "coord" ? "var(--green2)" : c.role === "sales" ? "var(--orange2)" : "var(--text3)";
+      pickerHtml += '<div onclick="toggleLeadCol(\''+c.key+'\')" style="display:inline-flex;align-items:center;gap:7px;padding:7px 11px;background:var(--bg);border:1px dashed var(--border2);border-radius:8px;cursor:pointer;font-size:11px;opacity:.75;transition:all .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.75">';
+      pickerHtml += '<span style="color:var(--text4);font-size:13px;font-weight:700;line-height:1">＋</span>';
       pickerHtml += '<span style="color:'+roleColor+';font-size:9px">●</span>';
       pickerHtml += '<span>'+c.label+'</span>';
-      pickerHtml += '</label>';
+      pickerHtml += '</div>';
     });
     pickerHtml += '</div></div>';
   }
@@ -4045,6 +4032,44 @@ async function cancelNoReplyLead(id){
 }
 
 // ═══ VIEW LEAD ═══
+// ★ تغيير المنسق (الكوردينيتور) — أدمن فقط
+function adminEditCoord(id){
+  if(curUser.role!=="admin"){showToast("❌","صلاحية الأدمن فقط");return;}
+  const l=LEADS.find(x=>x.id===id);
+  const box=$("vt-coord-"+id);
+  if(!l||!box)return;
+  if(box.querySelector("select"))return;
+  const opts=COORD_USERS.filter(c=>c.active!==false)
+    .map(c=>'<option value="'+c.id+'"'+(c.id===l.byId?' selected':'')+'>'+c.name+'</option>').join("");
+  box.innerHTML='<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'
+    +'<select id="vt-coord-in-'+id+'" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 6px;height:28px;color:var(--text);font-size:12px;outline:none">'+opts+'</select>'
+    +'<button class="btn primary" style="height:28px;padding:0 10px;font-size:11px" onclick="saveAdminCoord('+id+')">✓</button>'
+    +'<button class="btn" style="height:28px;padding:0 8px;font-size:11px" onclick="viewLead('+id+')">✕</button>'
+    +'</div>';
+}
+async function saveAdminCoord(id){
+  const l=LEADS.find(x=>x.id===id);
+  const sel=$("vt-coord-in-"+id);
+  if(!l||!sel)return;
+  const newId=sel.value;
+  const newCoord=COORD_USERS.find(c=>c.id===newId);
+  if(!newCoord){showToast("❌","اختر منسق");return;}
+  if(newId===l.byId){viewLead(id);return;}
+  if(!supa){showToast("❌","لا يوجد اتصال");return;}
+  const oldName=l.by||"—";
+  try{
+    const {error}=await supa.from("leads").update({
+      by_id:newId, by_name:newCoord.name,
+      coord_edited:true, coord_edited_by:curUser.name, coord_edited_date:today()
+    }).eq("id",l._supaId||l.id);
+    if(error)throw error;
+    await supa.from("lead_log").insert({lead_id:l._supaId||l.id,user_name:curUser.name,action:"✏️ غيّر المنسق: "+oldName+" ← "+newCoord.name});
+    l.byId=newId; l.by=newCoord.name; l.coordEdited=true; l.coordEditedBy=curUser.name;
+    showToast("✓","تم تغيير المنسق إلى "+newCoord.name);
+    viewLead(id);
+  }catch(err){showToast("❌","خطأ: "+err.message);}
+}
+
 // ★ تعديل تاريخ الدفع / التنفيذ — أدمن فقط
 async function adminEditPayDate(id){
   if(curUser.role!=="admin"){showToast("❌","صلاحية الأدمن فقط");return;}
@@ -4216,8 +4241,12 @@ function viewLead(id){
   }
   html+='<div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:8px;">Coordinator Data</div>';
   html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:9px">';
+  const _coordEdited = l.coordEdited ? ' <span style="background:rgba(139,92,246,.15);color:var(--purple2);font-size:8px;padding:1px 5px;border-radius:3px;font-weight:700" title="'+(l.coordEditedBy?'عدّله: '+l.coordEditedBy:'تم التعديل')+'">✏️ معدّل</span>' : '';
+  const _coordCell = '<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px;text-transform:uppercase;">Coordinator'
+    +(curUser.role==="admin"?' <span onclick="adminEditCoord('+l.id+')" style="cursor:pointer;font-size:10px" title="تغيير المنسق (أدمن)">✏️</span>':'')
+    +'</div><div id="vt-coord-'+l.id+'" style="font-size:12px;font-weight:500">'+(l.by||"—")+_coordEdited+'</div></div>';
   html+=row("المصدر",l.src)+row("رقم الإعلان",l.ad_num?'<span style="color:var(--purple2);font-weight:600">'+l.ad_num+'</span>':"—")+row("تاريخ التسجيل",l.dt+" "+l.tm);
-  html+=row("Coordinator",l.by)+row("المنتج",l.prod)+row("الخدمات",svcStr(l));
+  html+=_coordCell+row("المنتج",l.prod)+row("الخدمات",svcStr(l));
   html+=row("رأس المال","$"+(l.cap||"—"))+row("بلد الاستيراد",l.imp)+row("بلد التصدير",l.exp);
   html+=row("مستورد/مصدر",l.ie)+row("توفر المورد",l.sup)+row("أولوية",l.priority);
   html+=row("Sales Rep",l.rep+(l.repManual?' <span style="background:rgba(245,146,74,.15);color:var(--orange2);font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;margin-right:4px">👤 يدوي</span>':' <span style="background:rgba(75,124,245,.12);color:var(--blue2);font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;margin-right:4px">🔄 تلقائي</span>'))+row("الجنسية",l.nat)+row("الموبايل",l.mob);
@@ -10906,8 +10935,8 @@ function rebuildFilterBar(){
   const statusOpts = [{val:"جديد",txt:"🆕 جديد"},{val:"reactivated",txt:"♻️ مسترد"}];
   (DD.status||[]).forEach(s=>statusOpts.push(s));
   const srcOpts = (DD.source||[]).slice();
-  const repOpts = (typeof SALES_USERS!=="undefined"?SALES_USERS:[]).map(s=>s.name);
-  const coordOpts = (typeof COORD_USERS!=="undefined"?COORD_USERS:[]).map(c=>c.name);
+  const repOpts = (typeof SALES_USERS!=="undefined"?SALES_USERS:[]).filter(s=>s.active!==false).map(s=>s.name);
+  const coordOpts = (typeof COORD_USERS!=="undefined"?COORD_USERS:[]).filter(c=>c.active!==false).map(c=>c.name);
   const scOpts = ["Hot","Warm","Cold"];
   const priOpts = (DD.priority||[]).slice();
 
@@ -11006,7 +11035,7 @@ if(typeof window.clearFilters === "function"){
     if(mSel) mSel.value="";
     // 4) صفّر الـ Date Range Pickers (تسجيل + متابعة)
     try{
-      ["reg","fu"].forEach(function(w){
+      ["reg","fu","pay"].forEach(function(w){
         window._drpState[w]={from:null,to:null};
         window._drpState.picking[w]=false;
         if(typeof syncDrpToInputs==="function") syncDrpToInputs(w);
@@ -11025,7 +11054,7 @@ if(typeof window.clearFilters === "function"){
 // ═══════════════════════════════════════════════════════════
 // DATE RANGE PICKER — كلاندر موحّد (زي بوكينج) بعلامة زرقاء
 // ═══════════════════════════════════════════════════════════
-window._drpState = { reg:{from:null,to:null}, fu:{from:null,to:null}, open:null, viewMonth:null, viewYear:null, picking:{} };
+window._drpState = { reg:{from:null,to:null}, fu:{from:null,to:null}, pay:{from:null,to:null}, open:null, viewMonth:null, viewYear:null, picking:{} };
 
 function drpFmt(d){ // Date → "YYYY-MM-DD"
   if(!d) return "";
@@ -11035,7 +11064,7 @@ function drpFmt(d){ // Date → "YYYY-MM-DD"
 function drpParse(s){ if(!s) return null; const p=s.split("-"); return new Date(+p[0],+p[1]-1,+p[2]); }
 function drpLabel(which){
   const st=_drpState[which];
-  if(!st.from && !st.to) return which==="reg"?"تاريخ التسجيل":"تاريخ المتابعة";
+  if(!st.from && !st.to) return which==="reg"?"تاريخ التسجيل":which==="pay"?"تاريخ الدفع":"تاريخ المتابعة";
   const f=st.from?drpFmt(st.from):"…", t=st.to?drpFmt(st.to):"…";
   return f+" → "+t;
 }
@@ -11086,6 +11115,9 @@ function syncDrpToInputs(which){
   const st=_drpState[which];
   if(which==="reg"){
     const a=document.getElementById("ls-dt-from"), b=document.getElementById("ls-dt-to");
+    if(a) a.value=st.from?drpFmt(st.from):""; if(b) b.value=st.to?drpFmt(st.to):"";
+  } else if(which==="pay"){
+    const a=document.getElementById("ls-pay-from"), b=document.getElementById("ls-pay-to");
     if(a) a.value=st.from?drpFmt(st.from):""; if(b) b.value=st.to?drpFmt(st.to):"";
   } else {
     const a=document.getElementById("ls-fu-from"), b=document.getElementById("ls-fu-to");
@@ -11139,7 +11171,7 @@ function renderDrp(which){
   // الكلاندر المنبثق
   if(isOpen){
     h+='<div style="position:absolute;top:38px;right:0;z-index:100;background:var(--surface,#fff);border:1px solid var(--border2);border-radius:10px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);width:260px" onclick="event.stopPropagation()">';
-    h+='<div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:700">'+(which==="reg"?"تاريخ التسجيل":"تاريخ المتابعة")+(_drpState.picking[which]?' — اختر تاريخ النهاية':'')+'</div>';
+    h+='<div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:700">'+(which==="reg"?"تاريخ التسجيل":which==="pay"?"تاريخ الدفع / التنفيذ":"تاريخ المتابعة")+(_drpState.picking[which]?' — اختر تاريخ النهاية':'')+'</div>';
     h+=drpBuildCalendar(which);
     h+='<div style="display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">';
     h+='<button onclick="drpClear(\''+which+'\',event)" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:6px;cursor:pointer;font-size:11px;color:var(--text2)">مسح</button>';
@@ -11151,7 +11183,7 @@ function renderDrp(which){
 // نقفل الكلاندر لو ضغطت برّه
 document.addEventListener("click",function(e){
   if(_drpState.open && !e.target.closest("#drp-"+_drpState.open)){
-    _drpState.open=null; renderDrp("reg"); renderDrp("fu");
+    _drpState.open=null; renderDrp("reg"); renderDrp("fu"); renderDrp("pay");
   }
 });
 
