@@ -794,23 +794,105 @@ function clearSlaFilter(){
   pgLeads = 1;
   if(typeof renderLeadsContent === 'function') renderLeadsContent();
 }
+// ★ NEW: العملاء الفعليين اللي دفعوا اليوم — من كارت الداشبورد
+function applyActiveTodayFilter(){
+  window.SLA_FILTER = 'activeToday';
+  pgLeads = 1;
+  if(typeof showPg === 'function'){ showPg('leads'); }
+  else if(typeof renderLeadsContent === 'function'){ renderLeadsContent(); }
+  setTimeout(() => {
+    const tbl = document.querySelector('#leads-content, .leads-table, table');
+    if(tbl) tbl.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 200);
+}
+// ★ NEW: العملاء الفعليين حسب فترة التقرير — من كارت التقارير
+function applyActivePeriodFilter(){
+  window._activePeriodRange = adminRptPeriod || 'all';
+  window.SLA_FILTER = 'activePeriod';
+  pgLeads = 1;
+  if(typeof showPg === 'function'){ showPg('leads'); }
+  else if(typeof renderLeadsContent === 'function'){ renderLeadsContent(); }
+  setTimeout(() => {
+    const tbl = document.querySelector('#leads-content, .leads-table, table');
+    if(tbl) tbl.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 200);
+}
 // بيرجع true لو الـ lead لازم يظهر في الفلتر الحالي
 function passSlaFilter(l){
   if(!window.SLA_FILTER) return true;
+  // ★ النظام الموحّد للكروت الديناميك: {kind:'card', cond, scope, period, dateField}
+  if(typeof window.SLA_FILTER === 'object' && window.SLA_FILTER.kind === 'card'){
+    const f = window.SLA_FILTER;
+    // 1) فلتر النطاق الزمني (scope)
+    if(f.scope === 'today'){
+      const df = f.dateField || 'dt';
+      if((l[df]||'') !== today()) return false;
+    } else if(f.scope === 'period'){
+      const r = getPeriodRange(f.period || 'all');
+      const df = f.dateField || 'dt';
+      const dv = l[df] || '';
+      if(!dv || dv < r.fromStr || dv > r.toStr) return false;
+    }
+    // 2) فلتر الحالة/الشرط (cond)
+    switch(f.cond){
+      case 'active':      return l.st === 'عميل فعلي';
+      case 'activePaid':  return l.st === 'عميل فعلي' && !!l.activatedDate;
+      case 'leads':       return true; // كل الليدز ضمن النطاق
+      case 'cancelled':   return l.st === 'لاغي';
+      case 'new':         return isNew(l);
+      case 'followup':    return l.st === 'تحت المتابعة';
+      case 'noReply':     return l.st === 'لم يتم الرد';
+      case 'urgent':      return needsAction(l);
+      case 'hot':         return score(l) >= 70;
+      case 'warm':        return score(l) >= 40 && score(l) < 70;
+      case 'cold':        return score(l) < 40;
+      case 'sla1':        { const s=sla1St(l); return s==='warn'||s==='breach'; }
+      case 'sla2':        return sla2St(l) === 'late';
+      case 'todayFU':     return sla2St(l) === 'today';
+      default:            return true;
+    }
+  }
+  // القديم (string) — للتوافق
   if(window.SLA_FILTER === 'sla1'){
     const st = sla1St(l);
     return st === 'warn' || st === 'breach';
   }
   if(window.SLA_FILTER === 'sla2'){
     const st = sla2St(l);
-    // فقط الـ leads اللي فات تاريخ متابعتها (مش اللي ميعادهم اليوم)
     return st === 'late';
   }
-  // ★ NEW: "لم يتم الرد"
   if(window.SLA_FILTER === 'noReply'){
     return l.st === 'لم يتم الرد';
   }
+  if(window.SLA_FILTER === 'activeToday'){
+    return l.st === 'عميل فعلي' && l.activatedDate === today();
+  }
+  if(window.SLA_FILTER === 'activePeriod'){
+    if(l.st !== 'عميل فعلي' || !l.activatedDate) return false;
+    const r = getPeriodRange(window._activePeriodRange || adminRptPeriod || 'all');
+    return l.activatedDate >= r.fromStr && l.activatedDate <= r.toStr;
+  }
   return true;
+}
+// ★ الدالة الموحّدة لكل الكروت الديناميك
+// cond: نوع الشرط | scope: 'today'|'period'|'all' | opts: {period, dateField}
+function cardFilter(cond, scope, opts){
+  opts = opts || {};
+  const dateField = opts.dateField || ((cond==='active'||cond==='activePaid') ? 'activatedDate' : 'dt');
+  window.SLA_FILTER = {
+    kind: 'card',
+    cond: cond,
+    scope: scope || 'all',
+    period: opts.period || adminRptPeriod || 'all',
+    dateField: dateField
+  };
+  pgLeads = 1;
+  if(typeof showPg === 'function'){ showPg('leads'); }
+  else if(typeof renderLeadsContent === 'function'){ renderLeadsContent(); }
+  setTimeout(() => {
+    const tbl = document.querySelector('#leads-content, .leads-table, table');
+    if(tbl) tbl.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 200);
 }
 function waLink(mob){
   let m=String(mob).replace(/\D/g,"");
@@ -993,10 +1075,12 @@ async function loadAllData(){
       clr: p.role==="admin"?"var(--purple2)":p.role==="coordinator"?"var(--green2)":"var(--orange2)",
       bg: p.role==="admin"?"var(--admin-bg)":p.role==="coordinator"?"var(--coord-bg)":"var(--sales-bg)",
       active: p.active!==false,
-      inRotation: p.in_rotation!==false
+      inRotation: p.in_rotation!==false,
+      alsoSales: p.also_sales===true
     }));
     COORD_USERS = USERS.filter(u=>u.role==="coordinator");
-    SALES_USERS = USERS.filter(u=>u.role==="sales");
+    // السيلز = دور sales + أي أدمن معلّم also_sales (اختيار يدوي فقط)
+    SALES_USERS = USERS.filter(u=>u.role==="sales" || (u.role==="admin" && u.alsoSales));
     
     // Initialize MC structure
     MC = {coords:{}, channels:{}, daily:{}};
@@ -1073,30 +1157,35 @@ async function loadAllData(){
         MC.coords[d.coord_name][month] = (MC.coords[d.coord_name][month] || 0) + (parseInt(d.count) || 0);
       });
     }
-    
-    // Load all leads via PAGINATION (batches of 1000) — يتحمّل آلاف الليدز بأمان
-    console.log("[loadAllData] Fetching leads (paginated)...");
+    // Load leads via PAGINATION — ★ مفلترة حسب الدور لتقليل النقل (egress)
+    // الأدمن: كل الليدز (للتقارير) | السيلز: ليدزه | الكوردينيتور: اللي أدخلهم
+    console.log("[loadAllData] Fetching leads (paginated, role-scoped)...");
     let leads = [];
     {
       const BATCH = 1000;
       let from = 0;
+      const role = curUser.role;
       while(true){
         const to = from + BATCH - 1;
-        const {data:chunk, error:lerr} = await supa.from("leads")
-          .select("*")
-          .order("dt", {ascending:false})
-          .order("tm", {ascending:false})
-          .range(from, to);
+        let q = supa.from("leads").select("*");
+        if(role === "sales"){
+          q = q.eq("rep_id", curUser.id);
+        } else if(role === "coordinator"){
+          q = q.eq("by_id", curUser.id);
+        }
+        // admin: بدون فلتر (كل الليدز)
+        q = q.order("dt", {ascending:false}).order("tm", {ascending:false}).range(from, to);
+        const {data:chunk, error:lerr} = await q;
         if(lerr) throw lerr;
         if(!chunk || chunk.length===0) break;
         leads = leads.concat(chunk);
         console.log("[loadAllData] leads batch:", from, "→", from+chunk.length-1, "(total "+leads.length+")");
-        if(chunk.length < BATCH) break;  // آخر دفعة
+        if(chunk.length < BATCH) break;
         from += BATCH;
-        if(from > 200000) break;  // أمان: حد أقصى
+        if(from > 200000) break;
       }
     }
-    console.log("[loadAllData] Got", leads.length, "leads (done)");
+    console.log("[loadAllData] Got", leads.length, "leads (role:"+curUser.role+")");
     
     LEADS = (leads||[]).map(l => ({
       id: l.id,
@@ -1767,11 +1856,11 @@ function dashAdmin(){
   </div>
   <div class="kpi-row c6">
     ${kc("📞 Contacted اليوم",contToday.toLocaleString(),"var(--purple)","تواصلات الكوردينيتورز","")}
-    ${kc("📋 Leads اليوم",todayLeads.length,"var(--blue)","المسجلين النهاردة","")}
-    ${kc("✅ فعلي اليوم",actToday,"var(--green)","دفعوا / نُفّذ لهم اليوم","up")}
-    ${kcClick("🔁 لم يتم الرد",noReply,"var(--orange)","وضع حالي — يحتاج استرداد",noReply>0?"warn":"","applyNoReplyFilter()","Leads حالتها 'لم يتم الرد' — اضغط للفلتر")}
-    ${kcClick("SLA 1 — توقيت التواصل",sla1b,"var(--red)","+24h بدون حالة",sla1b>0?"dn":"","applySlaFilter('sla1')","الالتزام بتوقيت التواصل خلال 24 ساعة عمل — اضغط للفلتر")}
-    ${kcClick("SLA 2 — تاريخ المتابعة",sla2Late,"var(--red)","فات تاريخ المتابعة",sla2Late>0?"dn":"","applySlaFilter('sla2')","عملاء فات تاريخ متابعتهم ولم يتم التواصل — اضغط للفلتر")}
+    ${kcClick("📋 Leads اليوم",todayLeads.length,"var(--blue)","المسجلين النهاردة","","cardFilter('leads','today')","اضغط لعرض Leads اليوم في الجدول")}
+    ${kcClick("✅ فعلي اليوم",actToday,"var(--green)","دفعوا / نُفّذ لهم اليوم","up","cardFilter('activePaid','today',{dateField:'activatedDate'})","اضغط لعرض العملاء الفعليين اليوم في الجدول")}
+    ${kcClick("🔁 لم يتم الرد",noReply,"var(--orange)","وضع حالي — يحتاج استرداد",noReply>0?"warn":"","cardFilter('noReply','all')","Leads حالتها 'لم يتم الرد' — اضغط للفلتر")}
+    ${kcClick("SLA 1 — توقيت التواصل",sla1b,"var(--red)","+24h بدون حالة",sla1b>0?"dn":"","cardFilter('sla1','all')","الالتزام بتوقيت التواصل خلال 24 ساعة عمل — اضغط للفلتر")}
+    ${kcClick("SLA 2 — تاريخ المتابعة",sla2Late,"var(--red)","فات تاريخ المتابعة",sla2Late>0?"dn":"","cardFilter('sla2','all')","عملاء فات تاريخ متابعتهم ولم يتم التواصل — اضغط للفلتر")}
   </div>
   ${sla1b>0?`<div class="alert-banner ab-red">🚨 <strong>${sla1b} Lead</strong> تجاوزت 24h بدون حالة <button class="btn sm" style="margin-right:auto" onclick="applySlaFilter('sla1')">عرض</button></div>`:""}
   ${sla2Late>0?`<div class="alert-banner ab-red">⏰ <strong>${sla2Late} Lead</strong> فات تاريخ متابعتهم <button class="btn sm" style="margin-right:auto" onclick="applySlaFilter('sla2')">عرض</button></div>`:""}
@@ -1845,10 +1934,10 @@ function dashCoord(){
   // Today KPIs
   html+='<div class="kpi-row c5">';
   html+=kc("📞 تواصلات اليوم",(dailyCount!==null&&dailyCount!==undefined)?dailyCount:0,"var(--purple)",(dailyCount===null||dailyCount===undefined)?"⚠ لم تُسجَّل بعد":"مسجّلة من تاب Contacts",(dailyCount===null||dailyCount===undefined)?"warn":"");
-  html+=kc("📋 Leads اليوم",todayLeads.length,"var(--blue)","اللي أدخلته","");
-  html+=kc("🆕 جديد",todayNew,"var(--cyan)","لم يتم الرد بعد","");
-  html+=kc("📞 تحت المتابعة",todayFollowUp,"var(--orange)","نشط","");
-  html+=kc("✅ فعلي اليوم",todayActive,"var(--green)","دفعوا اليوم","up");
+  html+=kcClick("📋 Leads اليوم",todayLeads.length,"var(--blue)","اللي أدخلته","","cardFilter('leads','today')","اضغط لعرض Leads اليوم");
+  html+=kcClick("🆕 جديد",todayNew,"var(--cyan)","لم يتم الرد بعد","","cardFilter('new','today')","اضغط لعرض الجديد اليوم");
+  html+=kcClick("📞 تحت المتابعة",todayFollowUp,"var(--orange)","نشط","","cardFilter('followup','all')","اضغط لعرض تحت المتابعة");
+  html+=kcClick("✅ فعلي اليوم",todayActive,"var(--green)","دفعوا اليوم","up","cardFilter('activePaid','today',{dateField:'activatedDate'})","اضغط لعرض العملاء الفعليين اليوم");
   html+='</div>';
   
   // Today's leads table
@@ -1914,8 +2003,8 @@ function dashSales(){
   // SLA 2: عملاء فات تاريخ متابعتهم فقط (late) — اليوم لسه فرصة
   const sla2b=myLeads().filter(x=>sla2St(x)==="late");
   let html='<div class="kpi-row c4">';
-  html+=kc("🆕 عملاء جدد اليوم",newToday.length,"var(--cyan)","تم استلامهم اليوم",newToday.length>0?"warn":"");
-  html+=kc("📅 متابعات اليوم",tf.length,"var(--orange)",tf.length>0?"اليوم أو فات الميعاد":"لا يوجد",tf.length>0?"warn":"");
+  html+=kcClick("🆕 عملاء جدد اليوم",newToday.length,"var(--cyan)","تم استلامهم اليوم",newToday.length>0?"warn":"","cardFilter('new','today')","اضغط لعرض الجدد اليوم");
+  html+=kcClick("📅 متابعات اليوم",tf.length,"var(--orange)",tf.length>0?"اليوم أو فات الميعاد":"لا يوجد",tf.length>0?"warn":"","cardFilter('todayFU','all')","اضغط لعرض متابعات اليوم");
   html+=kcClick("⚠ SLA 1 — توقيت التواصل",sla1b.length,"var(--red)","+24h بدون حالة","","applySlaFilter('sla1')","الالتزام بتوقيت التواصل خلال 24 ساعة عمل — اضغط للفلتر");
   html+=kcClick("⏰ SLA 2 — تاريخ المتابعة",sla2b.length,"var(--red)","فات تاريخ المتابعة","","applySlaFilter('sla2')","عملاء فات تاريخ متابعتهم ولم يتم التواصل — اضغط للفلتر");
   html+='</div>';
@@ -1924,10 +2013,10 @@ function dashSales(){
   const myTodayLeads=myLeads().filter(x=>x.dt===tdS);
   const actTodayS=myLeads().filter(x=>x.st==="عميل فعلي" && x.activatedDate===tdS).length;
   const followups=myLeads().filter(x=>x.st==="تحت المتابعة").length;
-  html+=kc("📋 Leads اليوم",myTodayLeads.length,"var(--blue)","اتوزعت عليك النهاردة","");
-  html+=kc("✅ فعلي اليوم",actTodayS,"var(--green)","دفعوا / نُفّذ لهم اليوم","up");
-  html+=kc("📞 تحت المتابعة",followups,"var(--purple)","وضع حالي — يحتاجون متابعة","");
-  html+=kc("⚡ أولوية عاجلة",pl.length,"var(--orange)","تحتاج تحرك النهاردة",pl.length>0?"warn":"");
+  html+=kcClick("📋 Leads اليوم",myTodayLeads.length,"var(--blue)","اتوزعت عليك النهاردة","","cardFilter('leads','today')","اضغط لعرض Leads اليوم");
+  html+=kcClick("✅ فعلي اليوم",actTodayS,"var(--green)","دفعوا / نُفّذ لهم اليوم","up","cardFilter('activePaid','today',{dateField:'activatedDate'})","اضغط لعرض العملاء الفعليين اليوم");
+  html+=kcClick("📞 تحت المتابعة",followups,"var(--purple)","وضع حالي — يحتاجون متابعة","","cardFilter('followup','all')","اضغط لعرض تحت المتابعة");
+  html+=kcClick("⚡ أولوية عاجلة",pl.length,"var(--orange)","تحتاج تحرك النهاردة",pl.length>0?"warn":"","cardFilter('urgent','all')","اضغط لعرض الأولوية العاجلة");
   html+='</div>';
   if(sla1b.length>0)html+='<div class="alert-banner ab-red">🚨 <strong>'+sla1b.length+' Lead</strong> تجاوزت 24h بدون حالة! <button class="btn sm" style="margin-right:auto" onclick="applySlaFilter(\'sla1\')">عرضهم فقط</button></div>';
   if(lf.length>0)html+='<div class="alert-banner ab-orange">⚠ <strong>'+lf.length+' Lead</strong> تأخرت عن تاريخ المتابعة <button class="btn sm" style="margin-right:auto" onclick="applySlaFilter(\'sla2\')">عرضهم فقط</button></div>';
@@ -2582,22 +2671,68 @@ function renderTable(el){
   // ★ SLA Filter Banner — يظهر لما اليوزر فعّل فلتر من Dashboard
   let slaBanner = '';
   if(window.SLA_FILTER){
+    // ★ النظام الموحّد للكروت (object)
+    if(typeof window.SLA_FILTER === 'object' && window.SLA_FILTER.kind === 'card'){
+      const f = window.SLA_FILTER;
+      const condLbl = {
+        active:'العملاء الفعليين', activePaid:'العملاء الفعليين (دفعوا)', leads:'كل الـ Leads',
+        cancelled:'العملاء الملغيين', new:'Leads جديدة', followup:'تحت المتابعة',
+        noReply:'لم يتم الرد', urgent:'أولوية عاجلة', hot:'Hot Leads', warm:'Warm Leads',
+        cold:'Cold Leads', sla1:'SLA 1 — تجاوز 24 ساعة', sla2:'SLA 2 — فات تاريخ المتابعة',
+        todayFU:'متابعات اليوم'
+      }[f.cond] || 'الفلتر';
+      const scopeLbl = f.scope==='today' ? ' — اليوم' : f.scope==='period' ? ' — حسب الفترة المختارة' : '';
+      const isActive = (f.cond==='active'||f.cond==='activePaid');
+      const clr = isActive ? 'var(--green)' : (f.cond==='sla1'||f.cond==='sla2'||f.cond==='cancelled'||f.cond==='noReply') ? 'var(--red)' : 'var(--blue2)';
+      const rgb = isActive ? '34,197,94' : (f.cond==='sla1'||f.cond==='sla2'||f.cond==='cancelled'||f.cond==='noReply') ? '245,82,82' : '45,108,223';
+      slaBanner = `
+      <div style="background:linear-gradient(135deg,rgba(${rgb},.12) 0%,rgba(${rgb},.04) 100%);border:1.5px solid ${clr};border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:22px;flex-shrink:0;">${isActive?'✅':(f.cond==='sla1'||f.cond==='sla2')?'⚠️':'🔍'}</span>
+        <div style="flex:1;min-width:200px;">
+          <div style="font-weight:800;font-size:13px;color:${clr};margin-bottom:2px;">فلتر نشط: ${condLbl}${scopeLbl}</div>
+          <div style="font-size:11px;color:var(--text2);"><strong style="font-family:Outfit;color:${clr}">${tot}</strong> نتيجة</div>
+        </div>
+        <button class="btn sm" onclick="clearSlaFilter()" style="background:${clr};color:#fff;border-color:${clr};font-weight:700;">✕ إلغاء الفلتر</button>
+      </div>`;
+    } else
+    // فلاتر العملاء الفعليين — بانر أخضر
+    if(window.SLA_FILTER === 'activeToday' || window.SLA_FILTER === 'activePeriod'){
+      const actTitle = window.SLA_FILTER === 'activeToday'
+        ? '✅ العملاء الفعليين — دفعوا اليوم'
+        : '✅ العملاء الفعليين — حسب فترة التقرير المختارة';
+      const actDesc = window.SLA_FILTER === 'activeToday'
+        ? 'يعرض العملاء اللي تحوّلوا لفعليين بتاريخ دفع اليوم'
+        : 'يعرض العملاء الفعليين بتاريخ دفع ضمن الفترة المختارة في التقارير';
+      slaBanner = `
+      <div style="background:linear-gradient(135deg,rgba(34,197,94,.12) 0%,rgba(34,197,94,.04) 100%);border:1.5px solid var(--green);border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:22px;flex-shrink:0;">✅</span>
+        <div style="flex:1;min-width:200px;">
+          <div style="font-weight:800;font-size:13px;color:var(--green);margin-bottom:2px;">فلتر نشط: ${actTitle}</div>
+          <div style="font-size:11px;color:var(--text2);">${actDesc} · <strong style="font-family:Outfit;color:var(--green)">${tot}</strong> عميل فعلي</div>
+        </div>
+        <button class="btn sm" onclick="clearSlaFilter()" style="background:var(--green);color:#fff;border-color:var(--green);font-weight:700;">✕ إلغاء الفلتر</button>
+      </div>
+    `;
+    } else {
     const slaTitle = window.SLA_FILTER === 'sla1' 
       ? 'SLA 1 — الالتزام بتوقيت التواصل (24 ساعة)'
+      : window.SLA_FILTER === 'noReply' ? 'لم يتم الرد — يحتاجون استرداد'
       : 'SLA 2 — الالتزام بتاريخ المتابعة';
     const slaDesc = window.SLA_FILTER === 'sla1'
       ? 'يعرض فقط العملاء اللي تجاوزوا 24 ساعة بدون تسجيل حالة'
+      : window.SLA_FILTER === 'noReply' ? 'يعرض العملاء بحالة "لم يتم الرد"'
       : 'يعرض فقط العملاء اللي فات تاريخ متابعتهم ولم يتم التواصل';
     slaBanner = `
       <div style="background:linear-gradient(135deg,rgba(245,82,82,.12) 0%,rgba(245,82,82,.04) 100%);border:1.5px solid var(--red);border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <span style="font-size:22px;flex-shrink:0;">⚠️</span>
         <div style="flex:1;min-width:200px;">
           <div style="font-weight:800;font-size:13px;color:var(--red);margin-bottom:2px;">فلتر نشط: ${slaTitle}</div>
-          <div style="font-size:11px;color:var(--text2);">${slaDesc} · <strong style="font-family:Outfit;color:var(--red)">${tot}</strong> Lead متأخر</div>
+          <div style="font-size:11px;color:var(--text2);">${slaDesc} · <strong style="font-family:Outfit;color:var(--red)">${tot}</strong> Lead</div>
         </div>
         <button class="btn sm" onclick="clearSlaFilter()" style="background:var(--red);color:#fff;border-color:var(--red);font-weight:700;">✕ إلغاء الفلتر</button>
       </div>
     `;
+    }
   }
 
   // Build column picker UI
@@ -3075,7 +3210,7 @@ function buildForm(l){
         </div>
         <select name="rep_id_change" id="rep-id-change-sel" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;min-width:180px" onchange="onRepChangeSelect(this)">
           <option value="">${l?'— احتفظ بالحالي —':'— تلقائي (Auto Round Robin) —'}</option>
-          ${SALES_USERS.filter(s=>s.inRotation!==false).map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+          ${SALES_USERS.filter(s=>s.active!==false).map(s=>`<option value="${s.id}">${s.name}${s.role==="admin"?" (أدمن)":""}</option>`).join('')}
         </select>
         <input type="hidden" name="rep" value="${l?.rep||rr?.name||""}">
         <input type="hidden" name="repId" value="${l?.repId||rr?.id||0}">
@@ -3733,7 +3868,7 @@ function openReactivate(id){
     '<div class="ff" style="margin-bottom:10px"><label>👤 تغيير السيلز (Admin فقط - اختياري)</label>'
     +'<select id="react-new-rep" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:0 8px;height:33px;color:var(--text);font-size:12px;outline:none;width:100%">'
     +'<option value="">— احتفظ بـ '+(l.rep||"الحالي")+' —</option>'
-    +SALES_USERS.filter(s=>s.inRotation!==false).map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('')
+    +SALES_USERS.filter(s=>s.active!==false).map(s=>'<option value="'+s.id+'">'+s.name+(s.role==="admin"?" (أدمن)":"")+'</option>').join('')
     +'</select></div>'
   ) : '';
   // Build mini modal
@@ -4433,9 +4568,9 @@ function renderCoordReports(){
   // Top KPIs
   html+='<div class="kpi-row c4">';
   html+=kc("📞 Contacted",contacted.toLocaleString(),"var(--purple)","تواصل","");
-  html+=kc("📋 Leads",tot,"var(--blue)",c2l.toFixed(2)+"% Conv","up");
-  html+=kc("✅ Active",act,"var(--green)",l2a.toFixed(2)+"% من Leads","up");
-  html+=kc("❌ Cancelled",can,"var(--red)",cancelRate.toFixed(2)+"%","");
+  html+=kcClick("📋 Leads",tot,"var(--blue)",c2l.toFixed(2)+"% Conv","up","cardFilter('leads','period',{period:'"+period+"'})","اضغط لعرض الـ Leads في الجدول");
+  html+=kcClick("✅ Active",act,"var(--green)",l2a.toFixed(2)+"% من Leads","up","cardFilter('activePaid','period',{period:'"+period+"',dateField:'activatedDate'})","اضغط لعرض العملاء الفعليين");
+  html+=kcClick("❌ Cancelled",can,"var(--red)",cancelRate.toFixed(2)+"%","","cardFilter('cancelled','period',{period:'"+period+"'})","اضغط لعرض الملغيين");
   html+='</div>';
   
   // Funnel
@@ -4566,18 +4701,18 @@ function renderSalesReports(){
   
   // Top KPIs
   html+='<div class="kpi-row c4">';
-  html+=kc("📋 إجمالي Leads",tot,"var(--blue)","المحالة لي","");
-  html+=kc("✅ Active Clients",act,"var(--green)",conv.toFixed(2)+"% Conversion","up");
-  html+=kc("❌ Cancelled",can,"var(--red)",cancelRate.toFixed(2)+"%","");
+  html+=kcClick("📋 إجمالي Leads",tot,"var(--blue)","المحالة لي","","cardFilter('leads','period',{period:'"+period+"'})","اضغط لعرض الـ Leads في الجدول");
+  html+=kcClick("✅ Active Clients",act,"var(--green)",conv.toFixed(2)+"% Conversion","up","cardFilter('activePaid','period',{period:'"+period+"',dateField:'activatedDate'})","اضغط لعرض العملاء الفعليين");
+  html+=kcClick("❌ Cancelled",can,"var(--red)",cancelRate.toFixed(2)+"%","","cardFilter('cancelled','period',{period:'"+period+"'})","اضغط لعرض الملغيين");
   html+=kc("⚡ SLA Score",slaScore.toFixed(2)+"%","var(--purple)","الالتزام بـ SLA","up");
   html+='</div>';
   
   // SLA stats row
   html+='<div class="kpi-row c4">';
-  html+=kc("🆕 جديد",news,"var(--cyan)","يحتاج رد","");
-  html+=kc("📞 تحت المتابعة",fol,"var(--blue)","نشط","");
-  html+=kc("⚠ SLA #1 Breach",sla1Breach,"var(--red)","+24h","");
-  html+=kc("📅 SLA #2 Late",sla2Late,"var(--orange)","فات الميعاد","");
+  html+=kcClick("🆕 جديد",news,"var(--cyan)","يحتاج رد","","cardFilter('new','all')","اضغط لعرض الجديد");
+  html+=kcClick("📞 تحت المتابعة",fol,"var(--blue)","نشط","","cardFilter('followup','all')","اضغط لعرض تحت المتابعة");
+  html+=kcClick("⚠ SLA #1 Breach",sla1Breach,"var(--red)","+24h","","cardFilter('sla1','all')","اضغط لعرض تجاوزات SLA 1");
+  html+=kcClick("📅 SLA #2 Late",sla2Late,"var(--orange)","فات الميعاد","","cardFilter('sla2','all')","اضغط لعرض تأخيرات SLA 2");
   html+='</div>';
   
   // Status breakdown + Source charts
@@ -4993,8 +5128,8 @@ function renderRT(tab){
     const topSrc=Object.entries(srcMap).sort((a,b)=>b[1]-a[1]).slice(0,8),sm=topSrc[0]?.[1]||1;
     $("rpt-overview").innerHTML=`
     <div class="g4">
-      ${[["📞 Contacted",totalContactedInRange().toLocaleString(),"var(--purple)"],["📋 Total Leads",tot,"var(--blue)"],["✅ Active Clients",act,"var(--green)"],["Cancellation Rate",pct(can,tot).toFixed(2)+"%","var(--red)"]].map(([lbl,val,clr])=>`
-      <div class="kc"><div class="kc-acc" style="background:${clr}"></div><div class="kc-lbl">${lbl}</div><div class="kc-val" style="color:${clr}">${val}</div></div>`).join("")}
+      ${[["📞 Contacted",totalContactedInRange().toLocaleString(),"var(--purple)",""],["📋 Total Leads",tot,"var(--blue)","cardFilter('leads','period',{period:adminRptPeriod})"],["✅ Active Clients",act,"var(--green)","cardFilter('activePaid','period',{period:adminRptPeriod,dateField:'activatedDate'})"],["Cancellation Rate",pct(can,tot).toFixed(2)+"%","var(--red)",""]].map(([lbl,val,clr,onclick])=>`
+      <div class="kc"${onclick?' onclick="'+onclick+'" style="cursor:pointer" title="اضغط لعرض في الجدول حسب الفترة المختارة"':''}><div class="kc-acc" style="background:${clr}"></div><div class="kc-lbl">${lbl}${onclick?' <span style="font-size:9px;color:var(--text4)">↗</span>':''}</div><div class="kc-val" style="color:${clr}">${val}</div></div>`).join("")}
     </div>
     <div class="g4">
       ${[["Hot Leads",hot,"var(--red)"],["Warm Leads",warm,"var(--orange)"],["SLA #1 Breach",sla1b,"var(--orange)"],["Leads جديدة",l.filter(x=>isNew(x)).length,"var(--cyan)"]].map(([lbl,val,clr])=>`
@@ -5628,7 +5763,7 @@ function renderActiveClientsTab(){
   
   // ─── Hero KPIs ───
   html += '<div class="kpi-row c5" style="margin-bottom:14px">';
-  html += kc("✅ إجمالي العملاء الفعليين", totalActive, "var(--green)", "ضمن الفترة المختارة", "up");
+  html += kcClick("✅ إجمالي العملاء الفعليين", totalActive, "var(--green)", "ضمن الفترة المختارة", "up", "cardFilter('activePaid','period',{period:adminRptPeriod,dateField:'activatedDate'})", "اضغط لعرض العملاء الفعليين في الجدول");
   html += kc("👥 سيلز نشطين", salesArr.length, "var(--orange)", "حقّقوا تحويلات", "");
   html += kc("📋 كوردينتورز", coordArr.length, "var(--blue)", "ساهموا", "");
   html += kc("🛒 خدمات مطلوبة", serviceArr.length, "var(--purple2)", "متنوعة", "");
@@ -5874,8 +6009,8 @@ function renderViolationsTab(){
   // ─── KPIs ───
   html += '<div class="kpi-row c4" style="margin-bottom:14px">';
   html += kc("⚠️ إجمالي المخالفات", totalViolations, "var(--red)", "ضمن الفترة", totalViolations > 0 ? "warn" : "");
-  html += kc("🚨 SLA 1 (توقيت التواصل)", totalSla1, "var(--red)", "+24h بدون حالة", totalSla1 > 0 ? "warn" : "");
-  html += kc("⏰ SLA 2 (تاريخ المتابعة)", totalSla2, "var(--orange)", "متأخر عن المتابعة", totalSla2 > 0 ? "warn" : "");
+  html += kcClick("🚨 SLA 1 (توقيت التواصل)", totalSla1, "var(--red)", "+24h بدون حالة", totalSla1 > 0 ? "warn" : "", "cardFilter('sla1','all')", "اضغط لعرض تجاوزات SLA 1");
+  html += kcClick("⏰ SLA 2 (تاريخ المتابعة)", totalSla2, "var(--orange)", "متأخر عن المتابعة", totalSla2 > 0 ? "warn" : "", "cardFilter('sla2','all')", "اضغط لعرض تأخيرات SLA 2");
   html += kc("👥 سيلز عليهم مخالفات", salesWithViolations + "/" + SALES_USERS.length, "var(--purple)", "من إجمالي السيلز", "");
   html += '</div>';
   
