@@ -3375,26 +3375,50 @@ async function checkDuplicateMobile(mobile){
   if(!mobile||!supa)return;
   const tail=normalizePhoneTail(mobile);
   if(tail.length<9){hideDuplicateWarning();return;}
-  
-  // ★ ابحث في mob و mob2 المحلية
-  const matches=LEADS.filter(l=>{
-    const tail1=l.mob?normalizePhoneTail(l.mob):"";
-    const tail2=l.mob2?normalizePhoneTail(l.mob2):"";
-    return (tail1.length>=9 && tail1===tail) || (tail2.length>=9 && tail2===tail);
+
+  // ★ ابحث في قاعدة البيانات مباشرة (كل الليدز) — مش الـ LEADS المحلية
+  // لأن التحميل بقى مفلتر حسب الدور (الكوردينيتور يشوف ليدزه بس)
+  // فلازم نفحص التكرار على مستوى كل الشركة
+  let dbMatches=[];
+  try{
+    const {data, error}=await supa.from("leads")
+      .select("id,lead_no,nm,mob,mob2,company,st,by_name,rep_name,dt,src,active_code")
+      .or("mob.ilike.%"+tail+"%,mob2.ilike.%"+tail+"%")
+      .limit(50);
+    if(error) throw error;
+    dbMatches=data||[];
+  }catch(err){
+    console.warn("[dup] DB check failed, fallback to local:", err.message);
+    // fallback للبحث المحلي لو فشل الاستعلام
+    dbMatches=LEADS.filter(l=>{
+      const t1=l.mob?normalizePhoneTail(l.mob):"";
+      const t2=l.mob2?normalizePhoneTail(l.mob2):"";
+      return (t1.length>=9&&t1===tail)||(t2.length>=9&&t2===tail);
+    });
+  }
+
+  // نتأكد من المطابقة الدقيقة (آخر 9 أرقام) — الـ ilike ممكن يجيب نتائج أوسع
+  const matches=dbMatches.filter(l=>{
+    const t1=l.mob?normalizePhoneTail(l.mob):"";
+    const t2=l.mob2?normalizePhoneTail(l.mob2):"";
+    return (t1.length>=9&&t1===tail)||(t2.length>=9&&t2===tail);
   }).map(l=>{
-    // أضف معلومة أي حقل ماتش
-    const tail1=l.mob?normalizePhoneTail(l.mob):"";
-    const tail2=l.mob2?normalizePhoneTail(l.mob2):"";
-    const matchedField = tail1===tail ? "mob" : "mob2";
-    return Object.assign({}, l, {_matchedField: matchedField});
+    const t1=l.mob?normalizePhoneTail(l.mob):"";
+    const matchedField = t1===tail ? "mob" : "mob2";
+    // نطبّع أسماء الحقول للعرض (DB → local shape)
+    return {
+      id:l.id, leadNo:l.lead_no, nm:l.nm, mob:l.mob, mob2:l.mob2,
+      company:l.company, st:l.st, by:l.by_name, rep:l.rep_name,
+      dt:l.dt, src:l.src, activeCode:l.active_code,
+      _matchedField: matchedField
+    };
   });
-  
+
   if(matches.length===0){
     hideDuplicateWarning();
     return;
   }
-  
-  // اعرض الكارت التحذيري
+
   showDuplicateWarning(matches, mobile);
 }
 function hideDuplicateWarning(){
@@ -3479,9 +3503,15 @@ function acknowledgeDuplicate(){
   showToast("✓","تم التأكيد — أكمل الحفظ");
 }
 function viewDuplicateLead(id){
-  // قفل الفورم الحالي وافتح الـ lead القديم
-  closeM("lead-modal");
-  setTimeout(()=>viewLead(id), 200);
+  // لو الليد موجود محلياً (تبع نفس المستخدم أو أدمن) — نفتحه عادي
+  const localLead=LEADS.find(x=>x.id===id||x._supaId===id);
+  if(localLead){
+    closeM("lead-modal");
+    setTimeout(()=>viewLead(id), 200);
+    return;
+  }
+  // الليد تبع مستخدم تاني — الكوردينيتور مش المفروض يشوف تفاصيله
+  showToast("ℹ️","هذا العميل مسجّل لدى مستخدم آخر — لا يمكن عرض تفاصيله");
 }
 async function logDuplicateAttempt(mobile, matches, proceeded){
   if(!supa)return;
