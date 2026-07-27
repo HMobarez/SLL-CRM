@@ -613,7 +613,7 @@ let USERS=[];
 let SALES_USERS=[];
 let COORD_USERS=[];
 const DD={
-  source:["Facebook","Whatsapp","Instagram","Linkedin","Phone call","Website","Google","FB Lead Generation","IG Lead Generation","Google map","China","Germany","Turkiye","Personal wp","Google Ger","Google Ch","Saudi"],
+  source:["Facebook EGY","Whatsapp 368","Instgram EGY","Linkedin EGY","Phone call","Website 360","Google EGY","FB Lead Generation","IG Lead Generation","Whatsapp 646","Whatsapp Ch","Whatsapp Gm","Whatsapp Tu","Whatsapp KSA","Whatsapp 903","Personal wp","Google Ger","Google Ch","China","Turkiye","Germany","Saudi","Google map"],
   nat:["مصر","السعودية","الامارات","العراق","اليمن","الاردن","سوريا","المغرب","عمان","ليبيا","الكويت","قطر","البحرين","تونس","الجزائر"],
   country:["مصر","السعودية","الامارات","العراق","اليمن","الاردن","سوريا","المغرب","عمان","ليبيا","الكويت","قطر","البحرين","تونس","الجزائر","الصين","تركيا","ألمانيا","فرنسا","إيطاليا","الهند","أمريكا","أوروبا","إفريقيا","أخرى"],
   ie:["مستورد فعلي","يرغب في الاستيراد","مصدر فعلي","يرغب في التصدير","Canton Fair visit"],
@@ -8600,14 +8600,14 @@ function renderContactsUI(data){
   }
   html += '</div>';
   
-  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;direction:rtl">';
+  html += '<div style="overflow:auto;max-height:70vh;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px;direction:rtl">';
   // Header — use visible channels only
-  html += '<thead><tr style="background:var(--bg2);border-bottom:2px solid var(--border)">';
-  html += '<th style="text-align:center;padding:8px 10px;font-weight:700;color:var(--text2);font-size:10px;width:60px;border-left:1px solid var(--border)">اليوم</th>';
+  html += '<thead><tr style="background:var(--bg2)">';
+  html += '<th style="text-align:center;padding:8px 10px;font-weight:700;color:var(--text2);font-size:10px;width:60px;border-left:1px solid var(--border);border-bottom:2px solid var(--border);position:sticky;top:0;right:0;z-index:3;background:var(--bg2)">اليوم</th>';
   visChannels.forEach(c=>{
-    html += '<th style="text-align:center;padding:8px 10px;font-weight:700;color:var(--text2);font-size:10px;min-width:90px;border-left:1px solid var(--border)">'+c.name+'</th>';
+    html += '<th style="text-align:center;padding:8px 10px;font-weight:700;color:var(--text2);font-size:10px;min-width:90px;border-left:1px solid var(--border);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:2;background:var(--bg2)">'+c.name+'</th>';
   });
-  html += '<th style="text-align:center;padding:8px 10px;font-weight:700;color:var(--blue2);font-size:10px;min-width:80px;background:rgba(75,124,245,.04)">إجمالي اليوم</th>';
+  html += '<th style="text-align:center;padding:8px 10px;font-weight:700;color:var(--blue2);font-size:10px;min-width:80px;background:rgba(75,124,245,.04);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:2">إجمالي اليوم</th>';
   html += '</tr></thead><tbody>';
   
   // Days rows — use visible channels for inputs; day total counts ALL channels (visible+hidden)
@@ -8620,7 +8620,7 @@ function renderContactsUI(data){
     Object.values(dayData).forEach(v=>{dayTotal += parseInt(v)||0;});
     
     html += '<tr style="border-bottom:1px solid var(--border);'+(isToday?'background:rgba(75,124,245,.05)':'')+'">';
-    html += '<td style="padding:6px 10px;text-align:center;font-weight:700;color:'+(isToday?'var(--blue2)':'var(--text2)')+';font-size:11px;border-left:1px solid var(--border)">'+day+(isToday?' 🔵':'')+'</td>';
+    html += '<td style="padding:6px 10px;text-align:center;font-weight:700;color:'+(isToday?'var(--blue2)':'var(--text2)')+';font-size:11px;border-left:1px solid var(--border);position:sticky;right:0;z-index:1;background:'+(isToday?'#eaf0fd':'var(--surface)')+'">'+day+(isToday?' 🔵':'')+'</td>';
     visChannels.forEach(c=>{
       const val = dayData[c.name] || 0;
       html += '<td style="padding:2px 4px;text-align:center;border-left:1px solid var(--border)">';
@@ -8633,7 +8633,7 @@ function renderContactsUI(data){
   
   // Footer (totals) — visible channels totals + monthTotal for all
   html += '<tr style="background:var(--bg2);border-top:2px solid var(--border);font-weight:700">';
-  html += '<td style="padding:8px 10px;text-align:center;color:var(--text);font-size:11px;border-left:1px solid var(--border)">الإجمالي</td>';
+  html += '<td style="padding:8px 10px;text-align:center;color:var(--text);font-size:11px;border-left:1px solid var(--border);position:sticky;right:0;z-index:1;background:var(--bg2)">الإجمالي</td>';
   visChannels.forEach(c=>{
     html += '<td style="padding:8px 10px;text-align:center;color:var(--orange);font-size:13px;border-left:1px solid var(--border)">'+channelTotals[c.name]+'</td>';
   });
