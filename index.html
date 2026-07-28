@@ -10885,7 +10885,8 @@ function injectPersonalMatrix(){
       if(l.st!=="عميل فعلي") return false;
       const own = isCoord ? (l.byId===curUser.id) : (l.repId===curUser.id);
       if(!own) return false;
-      if(rng && l.dt){ return l.dt>=rng.fromStr && l.dt<=rng.toStr; }
+      // ★ بتاريخ الدفع (زي كل التقارير) — مش بتاريخ التسجيل
+      if(rng){ return !!l.activatedDate && l.activatedDate>=rng.fromStr && l.activatedDate<=rng.toStr; }
       return true;
     });
     const axis = isCoord ? "by" : "rep";
