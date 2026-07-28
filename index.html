@@ -1186,6 +1186,11 @@ async function loadAllData(){
       }
     }
     console.log("[loadAllData] Got", leads.length, "leads (role:"+curUser.role+")");
+    // ★ أمان: إزالة أي تكرار بالـ id (لو ليد اتضاف أثناء التحميل المقسّم وظهر في دفعتين)
+    {
+      const _seen = {};
+      leads = leads.filter(l => { if(_seen[l.id]) return false; _seen[l.id] = true; return true; });
+    }
     
     LEADS = (leads||[]).map(l => ({
       id: l.id,
@@ -3607,21 +3612,32 @@ function validateLead(body, get, isNew2){
   return errs;
 }
 async function saveLead(){
+  // ★ منع الضغط المزدوج — أهم حماية ضد تسجيل الليد مرتين
+  if(window._savingLead) return;
+  window._savingLead = true;
+  const _saveBtn = document.querySelector('#lead-modal .mftr .btn.primary');
+  if(_saveBtn){ _saveBtn.disabled = true; _saveBtn.style.opacity = '.55'; _saveBtn.textContent = '⏳ جاري الحفظ...'; }
+  const _releaseSave = ()=>{
+    window._savingLead = false;
+    if(_saveBtn){ _saveBtn.disabled = false; _saveBtn.style.opacity = ''; _saveBtn.textContent = '💾 حفظ'; }
+  };
   const body=$("lm-body");
   const get=n=>{const e=body?body.querySelector('[name="'+n+'"]'):null;return e?e.value:"";};
   const isNew2=!curLeadId,u=curUser;
   const errs=validateLead(body, get, isNew2);
   if(errs.length>0){
     showToast("❌","الحقول المطلوبة: "+errs.slice(0,3).join("، ")+(errs.length>3?` (و ${errs.length-3} أخرى)`:""));
+    _releaseSave();
     return;
   }
-  if(!supa){showToast("❌","لا يوجد اتصال بالسيرفر");return;}
+  if(!supa){showToast("❌","لا يوجد اتصال بالسيرفر");_releaseSave();return;}
   
   // ★ DUPLICATE CHECK GUARD — لا يمكن الحفظ إلا بعد التأكيد على الـ duplicate
   if(isNew2 && window._duplicateMatches && window._duplicateMatches.length>0 && !window._duplicateAcknowledged){
     showToast("⚠️","موبايل مكرر — اضغط 'أكمل على مسؤوليتي' أو غيّر الرقم");
     const warn=$("dup-warning");
     if(warn)warn.scrollIntoView({behavior:"smooth",block:"center"});
+    _releaseSave();
     return;
   }
   
@@ -3673,7 +3689,7 @@ async function saveLead(){
         // لو الـ trigger رفع error (مفيش active sales)
         if(error.message && error.message.includes("No active sales")){
           showToast("❌", "لا يوجد سيلز مفعّل — تأكد من Settings");
-          return;
+          _releaseSave();return;
         }
         throw error;
       }
@@ -3750,7 +3766,7 @@ async function saveLead(){
           if(effSt==="عميل فعلي" && !payV && !l.activatedDate){
             showToast("❌","💰 تاريخ الدفع / التنفيذ إجباري للعميل الفعلي");
             payEl.focus();
-            return;
+            _releaseSave();return;
           }
           if(!payEl.disabled && payV && payV!==(l.activatedDate||"")){
             updates.activated_date=payV;
@@ -3854,9 +3870,11 @@ async function saveLead(){
     await loadAllData();
     renderLeadsContent();
     if($("pg-dashboard").classList.contains("active")) renderDash();
+    _releaseSave();
   } catch(err) {
     console.error("Save error:", err);
     showToast("❌","خطأ: "+err.message);
+    _releaseSave();
   }
 }
 
@@ -4562,7 +4580,8 @@ function renderCoordReports(){
   
   // Counts
   const tot=l.length;
-  const act=l.filter(function(x){return x.st==="عميل فعلي";}).length;
+  // ★ العملاء الفعليين بتاريخ الدفع (زي تقرير الأدمن بالظبط) — مش بتاريخ التسجيل
+  const act=allMyLeads.filter(function(x){return x.st==="عميل فعلي" && x.activatedDate && x.activatedDate>=r.fromStr && x.activatedDate<=r.toStr;}).length;
   const can=l.filter(function(x){return x.st==="لاغي";}).length;
   const fol=l.filter(function(x){return x.st==="تحت المتابعة";}).length;
   const rev=l.filter(function(x){return x.st==="تواصل مرة أخرى";}).length;
@@ -4696,7 +4715,8 @@ function renderSalesReports(){
   const l=allMyLeads.filter(function(ld){return ld.dt>=r.fromStr&&ld.dt<=r.toStr;});
   
   const tot=l.length;
-  const act=l.filter(function(x){return x.st==="عميل فعلي";}).length;
+  // ★ العملاء الفعليين بتاريخ الدفع (زي تقرير الأدمن بالظبط) — مش بتاريخ التسجيل
+  const act=allMyLeads.filter(function(x){return x.st==="عميل فعلي" && x.activatedDate && x.activatedDate>=r.fromStr && x.activatedDate<=r.toStr;}).length;
   const can=l.filter(function(x){return x.st==="لاغي";}).length;
   const fol=l.filter(function(x){return x.st==="تحت المتابعة";}).length;
   const rev=l.filter(function(x){return x.st==="تواصل مرة أخرى";}).length;
