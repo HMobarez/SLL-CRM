@@ -5562,7 +5562,6 @@ function renderRT(tab){
     </div>
     <div class="g2">
       <div class="card"><div class="card-title">Cancellation Reasons</div><div class="card-sub">أسباب الإلغاء</div><canvas id="r-cancel" height="200"></canvas></div>
-      <div class="card"><div class="card-title">Conversion Period</div><div class="card-sub">مدة التحويل لعميل فعلي</div><canvas id="r-period" height="200"></canvas></div>
     </div>`;
     setTimeout(()=>{
       const clrs=["#4B7CF5","#F5924A","#22C997","#A855F7","#F55252","#F5C84A","#22D4F5","#6B72A0","#F55252","#22C997"];
@@ -5571,7 +5570,7 @@ function renderRT(tab){
         charts[id]=new Chart(ctx,{type:"doughnut",data:{labels:Object.keys(data),datasets:[{data:Object.values(data),backgroundColor:clrs,borderWidth:0}]},
           options:{responsive:true,plugins:{legend:{labels:{color:"#6B72A0",font:{size:10}},position:"right"}},cutout:"45%"}});
       }
-      dn("r-cancel",cancelMap);dn("r-period",{"نفس اليوم":sD,"أقل من 7 أيام":u7,"7-30 يوم":u30,"أكثر من شهر":ov30});
+      dn("r-cancel",cancelMap);
     },50);
   }
   if(tab==="active"){
@@ -6085,6 +6084,103 @@ function renderActiveClientsTab(){
   html += '<div style="height:250px;margin-top:10px"><canvas id="ac-mom"></canvas></div>';
   html += '</div>';
   
+  // ★ رحلة العميل الفعلي — تحليل المسار (يحترم فلتر الفترة)
+  {
+    const jr = actives.map(function(l){
+      const calls = (l.c1 && String(l.c1).trim() ? 1:0)
+                  + (l.c2 && String(l.c2).trim() ? 1:0)
+                  + (l.c3 && String(l.c3).trim() ? 1:0)
+                  + (Array.isArray(l.extraCalls) ? l.extraCalls.length : 0);
+      let days = null;
+      if(l.activatedDate && l.dt){
+        const d1 = new Date(l.dt + "T00:00:00");
+        const d2 = new Date(l.activatedDate + "T00:00:00");
+        if(!isNaN(d1) && !isNaN(d2)) days = Math.round((d2 - d1) / 86400000);
+      }
+      const restored = !!(l.reactivated && String(l.reactivated).trim());
+      return {calls:calls, days:days, restored:restored};
+    });
+    const jTot = jr.length;
+    const nRestored = jr.filter(function(x){return x.restored;}).length;
+    const nDirect   = jr.filter(function(x){return !x.restored && x.calls<=1;}).length;
+    const nFollow   = jr.filter(function(x){return !x.restored && x.calls>1;}).length;
+    const avgCalls  = jTot ? (jr.reduce(function(s,x){return s+x.calls;},0) / jTot) : 0;
+    const okDays    = jr.filter(function(x){return x.days!==null && x.days>=0;})
+                        .map(function(x){return x.days;}).sort(function(a,b){return a-b;});
+    const badDays   = jr.filter(function(x){return x.days!==null && x.days<0;}).length;
+    const noDate    = jr.filter(function(x){return x.days===null;}).length;
+    let medDays = 0;
+    if(okDays.length){
+      const n = okDays.length;
+      medDays = (n % 2) ? okDays[(n-1)/2]
+                        : Math.round((okDays[n/2 - 1] + okDays[n/2]) / 2);
+    }
+    const avgDays = okDays.length ? Math.round(okDays.reduce(function(s,v){return s+v;},0) / okDays.length) : 0;
+
+    const paths = [
+      {lbl:"⚡ تحويل مباشر",   sub:"مكالمة واحدة",        n:nDirect,   clr:"var(--green)"},
+      {lbl:"📞 تحويل بمتابعة", sub:"مكالمتان أو أكثر",    n:nFollow,   clr:"var(--blue)"},
+      {lbl:"♻️ بعد استرداد",   sub:"رجع بعد إلغاء/عدم رد", n:nRestored, clr:"var(--orange)"}
+    ].sort(function(a,b){return b.n - a.n;});
+    const mxP = Math.max(paths[0].n, 1);
+
+    html += '<div class="card" style="margin-top:13px">';
+    html += '<div class="card-title">🛣️ رحلة العميل الفعلي</div>';
+    html += '<div class="card-sub">كيف وصل العميل إلى التحويل — حسب الفترة المختارة · المسار مُستنتج من عدد المكالمات المسجّلة</div>';
+    html += '<div class="bar-list" style="margin-top:12px">';
+    paths.forEach(function(p){
+      const pc = jTot ? (p.n / jTot * 100) : 0;
+      html += '<div class="bar-row">';
+      html += '<div class="bar-nm">'+p.lbl+'<div style="font-size:9px;color:var(--text4);font-weight:400">'+p.sub+'</div></div>';
+      html += '<div class="bar-track"><div class="bar-fill" style="width:'+(p.n ? (p.n/mxP*100) : 0)+'%;background:'+p.clr+'"></div></div>';
+      html += '<div class="bar-v" style="color:'+p.clr+'">'+p.n+'</div>';
+      html += '<div style="width:46px;flex-shrink:0;text-align:left;font-size:10px;font-weight:600;color:var(--text3);font-family:Outfit">'+pc.toFixed(1)+'%</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // ── توزيع مدة التحويل (منقول من Clients Analysis بشكل أوضح) ──
+    const dBuckets = [
+      {lbl:"نفس اليوم",      n: okDays.filter(function(d){return d===0;}).length,            clr:"var(--green)"},
+      {lbl:"خلال أسبوع",     n: okDays.filter(function(d){return d>=1 && d<=6;}).length,     clr:"var(--blue)"},
+      {lbl:"من 7 إلى 30 يوم", n: okDays.filter(function(d){return d>=7 && d<=30;}).length,   clr:"var(--orange)"},
+      {lbl:"أكثر من شهر",    n: okDays.filter(function(d){return d>30;}).length,             clr:"var(--purple2)"}
+    ];
+    const mxD = Math.max.apply(null, dBuckets.map(function(b){return b.n;}).concat([1]));
+    const dBase = okDays.length;
+    html += '<div style="margin-top:15px;padding-top:14px;border-top:1px solid var(--border)">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:9px">⏱️ مدة التحويل — من التسجيل حتى الدفع</div>';
+    html += '<div class="bar-list">';
+    dBuckets.forEach(function(b){
+      const pc = dBase ? (b.n / dBase * 100) : 0;
+      html += '<div class="bar-row">';
+      html += '<div class="bar-nm">'+b.lbl+'</div>';
+      html += '<div class="bar-track"><div class="bar-fill" style="width:'+(b.n ? (b.n/mxD*100) : 0)+'%;background:'+b.clr+'"></div></div>';
+      html += '<div class="bar-v" style="color:'+b.clr+'">'+b.n+'</div>';
+      html += '<div style="width:46px;flex-shrink:0;text-align:left;font-size:10px;font-weight:600;color:var(--text3);font-family:Outfit">'+pc.toFixed(1)+'%</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:15px;padding-top:14px;border-top:1px solid var(--border)">';
+    function jStat(v, lbl, note, clr){
+      return '<div style="text-align:center">'
+        +'<div style="font-size:22px;font-weight:800;font-family:Outfit;color:'+clr+';line-height:1.15">'+v+'</div>'
+        +'<div style="font-size:10px;color:var(--text2);margin-top:3px">'+lbl+'</div>'
+        +(note ? '<div style="font-size:9px;color:var(--text4);margin-top:2px">'+note+'</div>' : '')
+        +'</div>';
+    }
+    html += jStat(jTot, "إجمالي العملاء الفعليين", "بتاريخ الدفع", "var(--green)");
+    html += jStat(avgCalls.toFixed(2), "متوسط المكالمات", "حتى التحويل", "var(--blue2)");
+    html += jStat(medDays + " يوم", "وسيط مدة التحويل",
+                  "المتوسط الحسابي: " + avgDays + " يوم"
+                  + (badDays ? " · " + badDays + " تاريخ غير منطقي (مستبعد)" : "")
+                  + (noDate ? " · " + noDate + " بدون تاريخ" : ""),
+                  "var(--purple2)");
+    html += '</div>';
+    html += '</div>';
+  }
+  
   $("rpt-active").innerHTML = html;
   
   // Render charts
@@ -6258,7 +6354,9 @@ function renderViolationsTab(){
     html += '<div style="font-size:14px;font-weight:700;color:var(--green)">لا توجد مخالفات!</div>';
     html += '<div style="font-size:11px;color:var(--text2);margin-top:5px">كل السيلز ملتزمين بمواعيد التواصل والمتابعة</div>';
     html += '</div>';
+    html += '<div id="viol-daily-matrix" style="margin-top:14px"></div>';
     $("rpt-violations").innerHTML = html;
+    if(typeof loadViolationsDailyMatrix === "function") loadViolationsDailyMatrix();
     return;
   }
   
@@ -6354,7 +6452,12 @@ function renderViolationsTab(){
     html += '</div></div>';
   }
   
+  // ★ المصفوفة اليومية (من السجل الدائم sla_violations)
+  html += '<div id="viol-daily-matrix" style="margin-top:14px"></div>';
+  
   $("rpt-violations").innerHTML = html;
+  
+  if(typeof loadViolationsDailyMatrix === "function") loadViolationsDailyMatrix();
   
   // ─── Render Charts ───
   setTimeout(() => {
@@ -9977,6 +10080,211 @@ async function openSlaLogReport(){
 }
 window.openSlaLogReport = openSlaLogReport;
 
+// ═══════════════════════════════════════════════════════
+// 📅 المصفوفة اليومية للمخالفات — السيلز × الأيام
+// المصدر: جدول sla_violations (سجل دائم) · يحترم فلتر الفترة
+// ═══════════════════════════════════════════════════════
+window._vdmType = "all";   // all | sla1 | sla2
+window._vdmRows = [];
+
+async function loadViolationsDailyMatrix(){
+  const box = document.getElementById("viol-daily-matrix");
+  if(!box) return;
+  if(typeof supa === "undefined" || !supa){
+    box.innerHTML = ""; return;
+  }
+  const r = getPeriodRange(adminRptPeriod || "all");
+  box.innerHTML = '<div class="card"><div style="padding:20px;text-align:center;color:var(--text3);font-size:12px">⏳ جاري تحميل سجل المخالفات...</div></div>';
+  try{
+    const {data, error} = await supa.from("sla_violations")
+      .select("lead_id,rep_id,rep_name,type,breach_date,breach_days")
+      .gte("breach_date", r.fromStr)
+      .lte("breach_date", r.toStr)
+      .order("breach_date", {ascending:true});
+    if(error) throw error;
+    let rows = data || [];
+    const u = curUser;
+    if(u && u.role === "sales")            rows = rows.filter(function(x){return String(x.rep_id)===String(u.id);});
+    else if(u && u.role === "coordinator") rows = [];  // المخالفات مسؤولية السيلز
+    window._vdmRows = rows;
+    box.innerHTML = buildViolationsDailyMatrix(rows);
+  }catch(e){
+    box.innerHTML = '<div class="card"><div style="padding:16px;color:var(--red);font-size:12px">تعذّر تحميل سجل المخالفات: '+(e.message||"")+'</div></div>';
+  }
+}
+window.loadViolationsDailyMatrix = loadViolationsDailyMatrix;
+
+function buildViolationsDailyMatrix(rows){
+  const type = window._vdmType || "all";
+  const src  = (type === "all") ? rows : rows.filter(function(x){return x.type === type;});
+
+  // الأيام (تصاعدي) + السيلز
+  const daySet = {};
+  src.forEach(function(x){ if(x.breach_date) daySet[x.breach_date] = true; });
+  const days = Object.keys(daySet).sort();
+
+  const repMap = {};
+  src.forEach(function(x){
+    const key = x.rep_id || x.rep_name || "—";
+    if(!repMap[key]) repMap[key] = {id:x.rep_id||"", name:x.rep_name||"غير محدد", d:{}, sla1:0, sla2:0, total:0};
+    const rec = repMap[key];
+    rec.d[x.breach_date] = (rec.d[x.breach_date] || 0) + 1;
+    if(x.type === "sla1") rec.sla1++; else rec.sla2++;
+    rec.total++;
+  });
+  const reps = Object.keys(repMap).map(function(k){return repMap[k];}).sort(function(a,b){return b.total - a.total;});
+
+  let h = '<div class="card">';
+  h += '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:9px">';
+  h += '<div><div class="card-title">📅 المصفوفة اليومية للمخالفات</div>';
+  h += '<div class="card-sub">كل سيلز × كل يوم — من السجل الدائم · المخالفة تفضل مسجّلة حتى لو اتعالجت بعدين</div></div>';
+  h += '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">';
+  [["all","الكل"],["sla1","🚨 SLA1"],["sla2","⏰ SLA2"]].forEach(function(t){
+    h += '<button class="btn sm'+(type===t[0]?" primary":"")+'" style="font-size:10px;padding:6px 12px" onclick="switchVdm(\''+t[0]+'\')">'+t[1]+'</button>';
+  });
+  h += '<button class="btn sm" style="font-size:10px;padding:6px 12px" onclick="exportVdmExcel()">📥 Excel</button>';
+  h += '</div></div>';
+
+  if(!days.length || !reps.length){
+    h += '<div style="padding:26px;text-align:center;color:var(--text3);font-size:12px">لا توجد مخالفات مسجّلة من هذا النوع في الفترة المختارة</div></div>';
+    return h;
+  }
+
+  h += '<div style="overflow:auto;max-height:60vh;border:1px solid var(--border);border-radius:8px;margin-top:11px">';
+  h += '<table style="border-collapse:separate;border-spacing:0;font-size:11px;direction:rtl;min-width:'+(210 + days.length*44)+'px">';
+  // الرأس
+  h += '<thead><tr>';
+  h += '<th style="position:sticky;top:0;right:0;z-index:3;background:var(--bg2);padding:9px 11px;text-align:right;font-weight:700;color:var(--text2);font-size:10px;min-width:150px;border-left:1px solid var(--border);border-bottom:2px solid var(--border)">السيلز \\ اليوم</th>';
+  days.forEach(function(d){
+    h += '<th style="position:sticky;top:0;z-index:2;background:var(--bg2);padding:7px 4px;text-align:center;font-weight:700;color:var(--text3);font-size:9px;min-width:40px;border-left:1px solid var(--border);border-bottom:2px solid var(--border)" title="'+d+'">'+d.slice(8,10)+'/'+d.slice(5,7)+'</th>';
+  });
+  h += '<th style="position:sticky;top:0;z-index:2;background:rgba(245,82,82,.09);padding:7px 8px;text-align:center;font-weight:800;color:var(--red);font-size:10px;min-width:50px;border-bottom:2px solid var(--border)">الإجمالي</th>';
+  h += '</tr></thead><tbody>';
+
+  // الصفوف
+  reps.forEach(function(rep, i){
+    const medal = i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
+    h += '<tr style="border-bottom:1px solid var(--border)">';
+    h += '<td style="position:sticky;right:0;z-index:1;background:var(--surface);padding:7px 11px;font-weight:700;font-size:11px;border-left:1px solid var(--border);white-space:nowrap">'
+       + medal+' '+rep.name
+       + '<div style="font-size:9px;color:var(--text4);font-weight:400">🚨'+rep.sla1+' · ⏰'+rep.sla2+'</div></td>';
+    days.forEach(function(d){
+      const c = rep.d[d] || 0;
+      if(!c){
+        h += '<td style="padding:5px 4px;text-align:center;color:var(--text4);border-left:1px solid var(--border)">·</td>';
+      } else {
+        const bg  = c>=5 ? "rgba(245,82,82,.22)" : c>=3 ? "rgba(245,82,82,.13)" : c===2 ? "rgba(245,146,74,.15)" : "rgba(245,146,74,.08)";
+        const col = c>=3 ? "var(--red)" : "var(--orange2)";
+        h += '<td style="padding:3px 4px;text-align:center;border-left:1px solid var(--border)">'
+           + '<span onclick="showVdmCell(\''+(rep.id||"")+'\',\''+d+'\')" title="اضغط للتفاصيل" '
+           + 'style="display:inline-block;min-width:21px;padding:3px 5px;border-radius:5px;background:'+bg+';color:'+col+';font-weight:800;font-size:11px;cursor:pointer">'+c+'</span></td>';
+      }
+    });
+    h += '<td style="padding:7px 8px;text-align:center;background:rgba(245,82,82,.07);color:var(--red);font-weight:800;font-size:13px">'+rep.total+'</td>';
+    h += '</tr>';
+  });
+
+  // إجمالي اليوم
+  h += '<tr style="background:var(--bg2);border-top:2px solid var(--border);font-weight:800">';
+  h += '<td style="position:sticky;right:0;z-index:1;background:var(--bg2);padding:8px 11px;font-size:11px;border-left:1px solid var(--border)">إجمالي اليوم</td>';
+  let grand = 0;
+  days.forEach(function(d){
+    let t = 0; reps.forEach(function(rep){ t += rep.d[d] || 0; });
+    grand += t;
+    h += '<td style="padding:7px 4px;text-align:center;color:var(--blue2);font-weight:800;font-size:11px;border-left:1px solid var(--border)">'+(t||"·")+'</td>';
+  });
+  h += '<td style="padding:8px 8px;text-align:center;background:rgba(245,82,82,.12);color:var(--red);font-weight:800;font-size:14px">'+grand+'</td>';
+  h += '</tr></tbody></table></div>';
+
+  h += '<div style="margin-top:9px;font-size:10px;color:var(--text3);display:flex;gap:13px;flex-wrap:wrap;align-items:center">';
+  h += '<span><span style="background:rgba(245,146,74,.08);padding:2px 7px;border-radius:4px">1</span> مخالفة</span>';
+  h += '<span><span style="background:rgba(245,146,74,.15);padding:2px 7px;border-radius:4px">2</span></span>';
+  h += '<span><span style="background:rgba(245,82,82,.13);padding:2px 7px;border-radius:4px">3-4</span></span>';
+  h += '<span><span style="background:rgba(245,82,82,.22);padding:2px 7px;border-radius:4px">5+</span></span>';
+  h += '<span style="margin-right:auto;color:var(--text4)">اضغط أي رقم لعرض تفاصيل مخالفات اليوم</span>';
+  h += '</div></div>';
+  return h;
+}
+
+window.switchVdm = function(t){
+  window._vdmType = t;
+  const box = document.getElementById("viol-daily-matrix");
+  if(box) box.innerHTML = buildViolationsDailyMatrix(window._vdmRows || []);
+};
+
+// تفاصيل خلية (سيلز × يوم)
+window.showVdmCell = function(repId, date){
+  const type = window._vdmType || "all";
+  let cell = (window._vdmRows||[]).filter(function(x){
+    return String(x.rep_id||"") === String(repId) && x.breach_date === date;
+  });
+  if(type !== "all") cell = cell.filter(function(x){return x.type === type;});
+  if(!cell.length) return;
+  const repName = cell[0].rep_name || "غير محدد";
+  function leadNm(id){
+    try{ const l = LEADS.find(function(x){return (x._supaId||x.id)===id || x.id===id;}); return l ? l.nm : ("Lead #"+id); }
+    catch(e){ return "Lead #"+id; }
+  }
+  let h = '<div class="mov open" id="vdm-modal" onclick="if(event.target===this)document.getElementById(\'vdm-modal\').remove()">';
+  h += '<div class="modal" style="max-width:470px">';
+  h += '<div class="mhdr"><h2 style="font-size:14px;margin:0">📅 '+repName+' — '+date+'</h2>';
+  h += '<button class="mx" onclick="document.getElementById(\'vdm-modal\').remove()">×</button></div>';
+  h += '<div class="mbody" style="max-height:62vh;overflow-y:auto">';
+  h += '<div style="font-size:12px;color:var(--text2);margin-bottom:11px"><strong style="color:var(--red)">'+cell.length+'</strong> مخالفة في هذا اليوم</div>';
+  cell.forEach(function(x){
+    const tag = x.type==="sla1"
+      ? '<span style="background:rgba(245,82,82,.12);color:var(--red);padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700">🚨 توقيت التواصل</span>'
+      : '<span style="background:rgba(245,146,74,.12);color:var(--orange);padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700">⏰ تاريخ المتابعة</span>';
+    h += '<div style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:7px;cursor:pointer" onclick="document.getElementById(\'vdm-modal\').remove();goLead('+x.lead_id+')">';
+    h += '<div style="font-weight:700;font-size:12px;margin-bottom:4px">'+leadNm(x.lead_id)+'</div>';
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+tag+'<span style="color:var(--red);font-weight:700;font-size:10px">تأخير '+(x.breach_days||0)+' يوم عمل</span></div>';
+    h += '</div>';
+  });
+  h += '</div><div class="mftr"><button class="btn" onclick="document.getElementById(\'vdm-modal\').remove()">إغلاق</button></div></div></div>';
+  const w = document.createElement("div"); w.innerHTML = h;
+  const old = document.getElementById("vdm-modal"); if(old) old.remove();
+  document.body.appendChild(w.firstChild);
+};
+
+// تصدير Excel
+window.exportVdmExcel = function(){
+  const rows = window._vdmRows || [];
+  const type = window._vdmType || "all";
+  const src  = (type==="all") ? rows : rows.filter(function(x){return x.type===type;});
+  if(!src.length){ showToast("⚠","لا توجد بيانات للتصدير"); return; }
+  const daySet={}; src.forEach(function(x){ daySet[x.breach_date]=true; });
+  const days=Object.keys(daySet).sort();
+  const repMap={};
+  src.forEach(function(x){
+    const k=x.rep_id||x.rep_name||"—";
+    if(!repMap[k]) repMap[k]={name:x.rep_name||"غير محدد",d:{},sla1:0,sla2:0,total:0};
+    repMap[k].d[x.breach_date]=(repMap[k].d[x.breach_date]||0)+1;
+    if(x.type==="sla1") repMap[k].sla1++; else repMap[k].sla2++;
+    repMap[k].total++;
+  });
+  const reps=Object.keys(repMap).map(function(k){return repMap[k];}).sort(function(a,b){return b.total-a.total;});
+  const aoa=[];
+  aoa.push(["السيلز"].concat(days).concat(["الإجمالي","SLA1","SLA2"]));
+  reps.forEach(function(r){
+    aoa.push([r.name].concat(days.map(function(d){return r.d[d]||0;})).concat([r.total,r.sla1,r.sla2]));
+  });
+  const totRow=["إجمالي اليوم"].concat(days.map(function(d){
+    let t=0; reps.forEach(function(r){t+=r.d[d]||0;}); return t;
+  }));
+  totRow.push(reps.reduce(function(s,r){return s+r.total;},0));
+  totRow.push(reps.reduce(function(s,r){return s+r.sla1;},0));
+  totRow.push(reps.reduce(function(s,r){return s+r.sla2;},0));
+  aoa.push(totRow);
+  try{
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb,ws,"Violations");
+    const lbl = type==="all"?"All":(type==="sla1"?"SLA1":"SLA2");
+    XLSX.writeFile(wb,"SLL_Violations_Daily_"+lbl+"_"+today()+".xlsx");
+    showToast("✓","تم تصدير التقرير");
+  }catch(e){ showToast("❌","تعذّر التصدير: "+(e.message||"")); }
+};
+
 function renderSlaLogModal(rows){
   const u = curUser;
   const isAdmin = u && u.role==="admin";
@@ -10872,11 +11180,28 @@ function primaryGroup(svcArr){
 }
 
 // ─── بناء الجدول الذكي ───
+// ★ فتح/طي أقسام المصفوفة الذكية (السيلز / الكوردينيتور)
+window.toggleSmartSection = function(k){
+  const sec = document.getElementById("sm-sec-" + k);
+  const btn = document.getElementById("sm-btn-" + k);
+  if(!sec) return;
+  const isOpen = sec.style.display !== "none";
+  sec.style.display = isOpen ? "none" : "block";
+  if(btn){
+    const icon  = (k === "rep") ? "👤" : "👥";
+    const label = (k === "rep") ? "عرض التفصيل حسب السيلز" : "عرض التفصيل حسب الكوردينيتور";
+    btn.innerHTML = icon + " " + label + " " + (isOpen ? "▾" : "▴");
+    if(isOpen) btn.classList.remove("primary"); else btn.classList.add("primary");
+  }
+  if(!isOpen) setTimeout(function(){ sec.scrollIntoView({behavior:"smooth", block:"nearest"}); }, 30);
+};
+
 window.buildSmartMatrix = function(actives, axis){
-  // axis: "rep" (السيلز) أو "by" (الكوordinator)
+  // axis: "rep" (السيلز) أو "by" (الكوordinator) أو "total" (إجماليات فقط بدون تقسيم)
   axis = axis || "rep";
+  const totalsOnly = (axis === "total");
   const axisField = axis;
-  const axisLabel = axis==="by" ? "الكوردينتور" : "السيلز";
+  const axisLabel = totalsOnly ? "البيان" : (axis==="by" ? "الكوردينتور" : "السيلز");
   // perSales[name] = { total, groups, svc }
   const perSales = {};
   // إجمالي عام لكل خدمة (للصف الأخير) — لكن فقط للعميل المُصنّف في مجموعتها
@@ -10917,7 +11242,7 @@ window.buildSmartMatrix = function(actives, axis){
 
   // ─── HTML ───
   let h = '<div class="card" style="margin-bottom:14px">';
-  h += '<div class="card-title">🏆 مصفوفة '+axisLabel+' × الخدمات (ذكية)</div>';
+  h += '<div class="card-title">🏆 '+(totalsOnly ? 'مصفوفة الخدمات (ذكية)' : 'مصفوفة '+axisLabel+' × الخدمات (ذكية)')+'</div>';
   h += '<div class="card-sub">كل عميل فعلي يُحسب في مجموعة واحدة فقط — حسب الأولوية: Trading ← Freight</div>';
   h += '<div style="overflow-x:auto;margin-top:12px"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:640px">';
 
@@ -10941,8 +11266,8 @@ window.buildSmartMatrix = function(actives, axis){
   });
   h += '</tr></thead><tbody>';
 
-  // ── صفوف السيلز ──
-  salesArr.forEach(([rep, d]) => {
+  // ── صفوف السيلز (تُخفى في وضع الإجماليات) ──
+  if(!totalsOnly) salesArr.forEach(([rep, d]) => {
     h += '<tr style="border-bottom:1px solid var(--border)">';
     h += '<td style="padding:7px 10px;font-weight:700;border-left:1px solid var(--border)">'+rep+'</td>';
     h += '<td style="padding:7px 10px;text-align:center;font-weight:800;color:var(--blue2);background:rgba(75,124,245,.05);border-left:2px solid var(--border);font-size:13px">'+d.total+'</td>';
@@ -10963,7 +11288,7 @@ window.buildSmartMatrix = function(actives, axis){
 
   // ── صف الإجمالي ──
   h += '<tr style="border-top:2px solid var(--border);background:var(--bg2);font-weight:800">';
-  h += '<td style="padding:9px 10px;font-weight:800;color:var(--text);border-left:1px solid var(--border)">الإجمالي</td>';
+  h += '<td style="padding:9px 10px;font-weight:800;color:var(--text);border-left:1px solid var(--border)">'+(totalsOnly ? 'إجمالي العملاء الفعليين' : 'الإجمالي')+'</td>';
   h += '<td style="padding:9px 10px;text-align:center;font-weight:800;color:var(--blue2);background:rgba(75,124,245,.12);border-left:2px solid var(--border);font-size:14px">'+grandTotal+'</td>';
   activeSvcByGroup.forEach(g => {
     h += '<td style="padding:9px 8px;text-align:center;font-weight:800;color:#000;background:'+hexA(g.color,.22)+';border-left:1px dashed var(--border)">'+(grandGroup[g.key]||0)+'</td>';
@@ -11010,13 +11335,17 @@ function patchActiveClients(){
           const t = c.querySelector(".card-title");
           if(t && t.textContent.includes("Sales × Services Matrix")) oldCard = c;
         });
-        // جدول السيلز + جدول الكوordinator (الاتنين)
-        const smartHtmlRep = buildSmartMatrix(actives, "rep");
-        const smartHtmlBy  = buildSmartMatrix(actives, "by");
+        // ★ مصفوفة الإجماليات + قسمين مطويّين (السيلز / الكوردينيتور)
+        let combined = buildSmartMatrix(actives, "total");
+        combined += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:-6px 0 13px">';
+        combined += '<button class="btn sm" id="sm-btn-rep" onclick="toggleSmartSection(\'rep\')">👤 عرض التفصيل حسب السيلز ▾</button>';
+        combined += '<button class="btn sm" id="sm-btn-by" onclick="toggleSmartSection(\'by\')">👥 عرض التفصيل حسب الكوردينيتور ▾</button>';
+        combined += '</div>';
+        combined += '<div id="sm-sec-rep" style="display:none">' + buildSmartMatrix(actives, "rep") + '</div>';
+        combined += '<div id="sm-sec-by"  style="display:none">' + buildSmartMatrix(actives, "by")  + '</div>';
         if(oldCard){
           const wrap = document.createElement("div");
-          wrap.innerHTML = smartHtmlRep + smartHtmlBy;
-          // نستبدل الكارت القديم بالاتنين
+          wrap.innerHTML = combined;
           const frag = document.createDocumentFragment();
           while(wrap.firstElementChild) frag.appendChild(wrap.firstElementChild);
           oldCard.replaceWith(frag);
