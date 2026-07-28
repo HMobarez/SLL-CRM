@@ -476,6 +476,94 @@ tr.sla1-row .sticky-actions{background:rgba(245,82,82,0.06);}
   body{margin:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
   .sidebar,.topbar,#notif-dropdown,button:not(.print-keep){display:none !important;}
 }
+
+/* ══════════════════════════════════════════════════
+   📱 MOBILE RESPONSIVE LAYER — طبقة الموبايل
+   لا تغيّر أي وظيفة — تعيد ترتيب العرض للشاشات الصغيرة
+   ══════════════════════════════════════════════════ */
+#mob-menu-btn{display:none;}
+#mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99;}
+
+@media (max-width:900px){
+  /* ── زر القائمة + الطبقة المعتمة ── */
+  #mob-menu-btn{display:inline-flex!important;align-items:center;justify-content:center;
+    font-size:19px;width:40px;height:40px;padding:0;flex-shrink:0;line-height:1;}
+  body.mob-nav-open #mob-overlay{display:block;}
+  body.mob-nav-open{overflow:hidden;}
+
+  /* ── الشريط الجانبي يتحوّل لدرج منزلق ── */
+  .sidebar{width:262px;transform:translateX(100%);
+    transition:transform .26s cubic-bezier(.4,0,.2,1);
+    box-shadow:-10px 0 34px rgba(0,0,0,.4);z-index:100;}
+  body.mob-nav-open .sidebar{transform:translateX(0);}
+  .main{margin-right:0!important;}
+  .sb-item{padding:13px 16px;font-size:13px;}
+
+  /* ── التوب بار ── */
+  .topbar{padding:0 11px;gap:7px;height:54px;}
+  .topbar-title{font-size:13px;}
+  .topbar-acts{gap:5px;}
+  #theme-label{display:none;}
+
+  /* ── الصفحات والشبكات ── */
+  .page{padding:11px;}
+  .kpi-row.c3,.kpi-row.c4,.kpi-row.c5,.kpi-row.c6{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .g2,.g3,.g4{grid-template-columns:1fr;gap:10px;}
+  .card{padding:12px;}
+  .kc{padding:11px 12px;}
+  .kc-val{font-size:21px;}
+  .kc-lbl{font-size:9.5px;}
+
+  /* ── شريط الفلاتر ── */
+  .fbar{padding:9px;gap:6px;}
+  .fbar .fsel{min-width:0;flex:1 1 42%;}
+  .fbar input[type="text"],.fbar input[type="search"]{flex:1 1 100%;min-width:0;}
+
+  /* ── لمس مريح: أزرار وحقول أكبر ── */
+  .btn{height:38px;padding:0 14px;}
+  .btn.sm{height:34px;padding:0 11px;}
+  .fsel{height:36px;}
+  .ff input,.ff select,.ff textarea{height:40px;font-size:16px;}
+  .modal input[type="text"],.modal input[type="tel"],.modal input[type="email"],
+  .modal input[type="date"],.modal select,.modal textarea{font-size:16px;}
+
+  /* ── الجداول: تمرير أفقي سلس ── */
+  .tbl-scroll{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
+  .tbl-scroll table{font-size:11px;}
+  .tbl-scroll td,.tbl-scroll th{white-space:nowrap;}
+
+  /* ── المودالات: ملء الشاشة من تحت ── */
+  .mov{padding:0;align-items:flex-end;}
+  .modal{max-width:100%!important;width:100%;max-height:95vh;
+    border-radius:18px 18px 0 0;animation:mdup .24s cubic-bezier(.4,0,.2,1);}
+  @keyframes mdup{from{transform:translateY(40px);opacity:.6}to{transform:translateY(0);opacity:1}}
+  .mhdr{padding:14px 16px;}
+  .mhdr h2{font-size:16px;}
+  .mhdr h2#vm-ttl{font-size:17px;}
+  .mbody{padding:14px;}
+  .mftr{padding:11px 14px;gap:8px;}
+  .mftr .btn{flex:1;justify-content:center;}
+
+  /* ── نماذج الإدخال: عمود واحد ── */
+  .fg{grid-template-columns:1fr!important;gap:11px;}
+
+  /* ── الكانبان: عمود واحد ── */
+  .pipeline{grid-template-columns:1fr!important;}
+
+  /* ── الرسوم البيانية ── */
+  canvas{max-height:240px!important;}
+
+  /* ── تسجيل الدخول ── */
+  .login-box{width:100%!important;max-width:96vw;}
+}
+
+@media (max-width:520px){
+  .kpi-row.c3,.kpi-row.c4,.kpi-row.c5,.kpi-row.c6{grid-template-columns:1fr;}
+  .page{padding:9px;}
+  .topbar-title{font-size:12px;}
+  .kc-val{font-size:23px;}
+  canvas{max-height:210px!important;}
+}
 </style>
 </head>
 <body>
@@ -11597,5 +11685,73 @@ function scheduleAutoConvert(){
 <div style="position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:var(--text4);pointer-events:none;z-index:10;font-family:Outfit;letter-spacing:.04em">
   Developed by <strong style="color:var(--text3)">Straight Line Group</strong>
 </div>
+<script>
+/* ══════════════════════════════════════════════════
+   📱 MOBILE NAV — درج القائمة الجانبية للموبايل
+   يضيف زر ☰ في التوب بار + طبقة معتمة للإغلاق
+   لا يمسّ أي وظيفة قائمة
+   ══════════════════════════════════════════════════ */
+(function(){
+  window.toggleMobSidebar = function(){
+    document.body.classList.toggle("mob-nav-open");
+  };
+  window.closeMobSidebar = function(){
+    document.body.classList.remove("mob-nav-open");
+  };
+
+  function initMobileNav(){
+    if(document.getElementById("mob-menu-btn")) return true;
+    var tb = document.querySelector(".topbar");
+    if(!tb) return false;
+
+    // زر القائمة
+    var btn = document.createElement("button");
+    btn.id = "mob-menu-btn";
+    btn.className = "btn sm";
+    btn.type = "button";
+    btn.innerHTML = "☰";
+    btn.title = "القائمة";
+    btn.setAttribute("aria-label","فتح القائمة");
+    btn.onclick = function(e){ e.stopPropagation(); toggleMobSidebar(); };
+    tb.insertBefore(btn, tb.firstChild);
+
+    // الطبقة المعتمة
+    if(!document.getElementById("mob-overlay")){
+      var ov = document.createElement("div");
+      ov.id = "mob-overlay";
+      ov.onclick = closeMobSidebar;
+      document.body.appendChild(ov);
+    }
+
+    // اقفل الدرج بعد اختيار صفحة
+    var nav = document.getElementById("sb-nav");
+    if(nav){
+      nav.addEventListener("click", function(e){
+        if(e.target && e.target.closest && e.target.closest(".sb-item")) closeMobSidebar();
+      });
+    }
+
+    // اقفل بزر Escape
+    document.addEventListener("keydown", function(e){
+      if(e.key === "Escape") closeMobSidebar();
+    });
+
+    // اقفل لو الشاشة كبرت (تدوير الجهاز / تكبير النافذة)
+    window.addEventListener("resize", function(){
+      if(window.innerWidth > 900) closeMobSidebar();
+    });
+
+    return true;
+  }
+
+  // نستنى ظهور الواجهة بعد تسجيل الدخول
+  var tries = 0;
+  var iv = setInterval(function(){
+    tries++;
+    if(initMobileNav() || tries > 200) clearInterval(iv);
+  }, 300);
+  document.addEventListener("DOMContentLoaded", initMobileNav);
+})();
+</script>
 </body>
 </html>
