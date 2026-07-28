@@ -5185,6 +5185,11 @@ function renderRT(tab){
       ${[["Hot Leads",hot,"var(--red)"],["Warm Leads",warm,"var(--orange)"],["SLA #1 Breach",sla1b,"var(--orange)"],["Leads جديدة",l.filter(x=>isNew(x)).length,"var(--cyan)"]].map(([lbl,val,clr])=>`
       <div class="kc"><div class="kc-acc" style="background:${clr}"></div><div class="kc-lbl">${lbl}</div><div class="kc-val" style="color:${clr}">${val}</div></div>`).join("")}
     </div>
+    <div class="card" style="margin-bottom:13px">
+      <div class="card-title">📈 Month over Month — الاتجاه الشهري</div>
+      <div class="card-sub">Contacted · Leads · Active Clients — من يناير حتى الشهر الحالي (الشهر الجاري يُعرض حتى لو لم يُقفل)</div>
+      <div style="height:280px;margin-top:10px"><canvas id="r-mom"></canvas></div>
+    </div>
     <div class="g2">
       <div class="card"><div class="card-title">Source Distribution</div><div class="card-sub">توزيع المصادر</div>
         <div class="bar-list">${topSrc.map(([s,c])=>`<div class="bar-row"><div class="bar-nm">${s}</div><div class="bar-track"><div class="bar-fill" style="width:${pct(c,sm)}%;background:var(--blue)"></div></div><div class="bar-v" style="color:var(--blue2)">${c}</div></div>`).join("")}</div>
@@ -5225,6 +5230,7 @@ function renderRT(tab){
       donut("r-st",sts,[l.filter(x=>isNew(x)).length,...["تحت المتابعة","تواصل مرة أخرى","عميل فعلي","لاغي"].map(s=>l.filter(x=>x.st===s).length)],["#22D4F5","#4B7CF5","#F5924A","#22C997","#F55252"]);
       const sOk=l.filter(x=>sla1St(x)==="ok").length,sW=l.filter(x=>sla1St(x)==="warn").length;
       donut("r-sla",["On Time","Warning","Breach"],[sOk,sW,sla1b],["#22C997","#F5924A","#F55252"]);
+      drawMomOverview();
     },50);
   }
   else if(tab==="marketing"){
@@ -5748,6 +5754,67 @@ async function loadPDFLibs(){
   });
 }
 
+// ★ Month over Month — سلسلة شهرية من يناير السنة الحالية حتى الشهر الحالي
+function momSeries(){
+  const now=new Date(), y=now.getFullYear();
+  const MN=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+  const labels=[],contacts=[],leadsArr=[],actives=[];
+  for(let m=0;m<=now.getMonth();m++){
+    const mm=String(m+1).padStart(2,"0");
+    const from=y+"-"+mm+"-01";
+    const lastD=new Date(y,m+1,0).getDate();
+    const to=y+"-"+mm+"-"+String(lastD).padStart(2,"0");
+    labels.push(MN[m]);
+    leadsArr.push(LEADS.filter(l=>l.dt>=from&&l.dt<=to).length);
+    actives.push(LEADS.filter(l=>l.st==="عميل فعلي"&&l.activatedDate&&l.activatedDate>=from&&l.activatedDate<=to).length);
+    let c=0;
+    Object.keys((typeof MC!=="undefined"&&MC.daily)||{}).forEach(nm=>{
+      const obj=MC.daily[nm]||{};
+      Object.keys(obj).forEach(d=>{ if(d>=from&&d<=to) c+=(parseInt(obj[d])||0); });
+    });
+    contacts.push(c);
+  }
+  return {labels,contacts,leads:leadsArr,actives};
+}
+// رسم خط MoM ثلاثي (Contacted محور يسار، Leads+Active محور يمين لاختلاف المقاييس)
+function drawMomOverview(){
+  const ctx=$("r-mom"); if(!ctx||typeof Chart==="undefined") return;
+  const s=momSeries();
+  if(charts["r-mom"]) charts["r-mom"].destroy();
+  charts["r-mom"]=new Chart(ctx,{type:"line",
+    data:{labels:s.labels,datasets:[
+      {label:"📞 Contacted",data:s.contacts,borderColor:"#A855F7",backgroundColor:"rgba(168,85,247,.08)",yAxisID:"yC",tension:.3,pointRadius:3,borderWidth:2,fill:true},
+      {label:"📋 Leads",data:s.leads,borderColor:"#4B7CF5",backgroundColor:"transparent",yAxisID:"yL",tension:.3,pointRadius:3,borderWidth:2},
+      {label:"✅ Active Clients",data:s.actives,borderColor:"#22C997",backgroundColor:"transparent",yAxisID:"yL",tension:.3,pointRadius:3,borderWidth:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+      plugins:{legend:{labels:{color:"#6B72A0",font:{size:10}}}},
+      scales:{
+        x:{ticks:{color:"#6B72A0",font:{size:10}},grid:{color:"rgba(107,114,160,.08)"}},
+        yC:{position:"left",beginAtZero:true,ticks:{color:"#A855F7",font:{size:9}},grid:{color:"rgba(107,114,160,.08)"},title:{display:true,text:"Contacted",color:"#A855F7",font:{size:9}}},
+        yL:{position:"right",beginAtZero:true,ticks:{color:"#6B72A0",font:{size:9}},grid:{drawOnChartArea:false},title:{display:true,text:"Leads / Active",color:"#6B72A0",font:{size:9}}}
+      }
+    }});
+}
+// رسم خط MoM للعملاء الفعليين فقط
+function drawMomActives(){
+  const ctx=$("ac-mom"); if(!ctx||typeof Chart==="undefined") return;
+  const s=momSeries();
+  if(charts["ac-mom"]) charts["ac-mom"].destroy();
+  charts["ac-mom"]=new Chart(ctx,{type:"line",
+    data:{labels:s.labels,datasets:[
+      {label:"✅ Active Clients",data:s.actives,borderColor:"#22C997",backgroundColor:"rgba(34,201,151,.10)",tension:.3,pointRadius:4,borderWidth:2.5,fill:true,
+       pointBackgroundColor:"#22C997"}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{}}},
+      scales:{
+        x:{ticks:{color:"#6B72A0",font:{size:10}},grid:{color:"rgba(107,114,160,.08)"}},
+        y:{beginAtZero:true,ticks:{color:"#6B72A0",font:{size:10},precision:0},grid:{color:"rgba(107,114,160,.08)"}}
+      }
+    }});
+}
+
 function renderActiveClientsTab(){
   // ★ العملaء الفعليين مفلترين بتاريخ الدفع (activatedDate)
   const actives = rpActives();
@@ -5923,10 +5990,18 @@ function renderActiveClientsTab(){
   
   html += '</div>';
   
+  // ★ Month over Month — العملاء الفعليين شهرياً (يناير → الشهر الحالي)
+  html += '<div class="card" style="margin-top:13px">';
+  html += '<div class="card-title">📈 Active Clients — Month over Month</div>';
+  html += '<div class="card-sub">عدد العملاء الفعليين شهرياً (بتاريخ الدفع) — من يناير حتى الشهر الحالي، الشهر الجاري يُعرض حتى لو لم يُقفل</div>';
+  html += '<div style="height:250px;margin-top:10px"><canvas id="ac-mom"></canvas></div>';
+  html += '</div>';
+  
   $("rpt-active").innerHTML = html;
   
   // Render charts
   setTimeout(() => {
+    drawMomActives();
     const colors = ["#22C997","#4B7CF5","#F5924A","#A855F7","#22D4F5","#F5C84A","#F55252","#6B72A0"];
     
     // Services pie
