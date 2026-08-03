@@ -4493,7 +4493,13 @@ function viewLead(id){
   if(l.st==="عميل فعلي"){
     html+='<div style="background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.35);border-radius:10px;padding:12px;margin-bottom:11px">';
     html+='<div style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--green);margin-bottom:9px"><span style="font-size:16px">✅</span><span>بيانات العميل الفعلي</span>';
-    if(l.activeCode)html+='<span style="margin-right:auto;background:rgba(34,197,94,.18);color:var(--green);font-size:10px;padding:2px 8px;border-radius:5px;font-weight:700">'+l.activeCode+'</span>';
+    // ★ كود العميل — يظهر دائماً (حتى لو فاضي) + زر تعديل للأدمن
+    html+='<span id="vt-accode-'+l.id+'" style="margin-right:auto;display:inline-flex;align-items:center;gap:5px">';
+    html+= l.activeCode
+      ? '<span style="background:rgba(34,197,94,.18);color:var(--green);font-size:10px;padding:2px 8px;border-radius:5px;font-weight:700">'+l.activeCode+'</span>'
+      : '<span style="background:rgba(245,146,74,.15);color:var(--orange2);font-size:10px;padding:2px 8px;border-radius:5px;font-weight:700">⚠ بدون كود</span>';
+    if(curUser.role==="admin") html+='<span onclick="adminEditActiveData('+l.id+')" style="cursor:pointer;font-size:11px" title="تعديل كود العميل والمبلغ (أدمن)">✏️</span>';
+    html+='</span>';
     html+='</div>';
     html+='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:9px">';
     html+='<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px">تاريخ التسجيل</div><div style="font-weight:700;font-size:13px">'+(l.dt||"—")+'</div></div>';
@@ -4506,7 +4512,7 @@ function viewLead(id){
       else if(_dd>0) _convDays = ' <span style="font-size:9px;background:rgba(34,197,94,.15);color:var(--green);padding:1px 6px;border-radius:4px;font-weight:600">بعد '+_dd+' يوم</span>';
     }
     html+='<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px">📅 تاريخ الدفع / التنفيذ'+(curUser.role==="admin"?' <span onclick="adminEditPayDate('+l.id+')" style="cursor:pointer;font-size:10px" title="تعديل (أدمن)">✏️</span>':'')+'</div><div id="vt-payd-'+l.id+'" style="font-weight:800;font-size:15px;color:var(--green)">'+(_actD||'<span style="color:var(--orange2);font-size:11px">⚠ غير مسجّل</span>')+'</div>'+(_convDays?'<div style="margin-top:2px">'+_convDays+'</div>':'')+'</div>';
-    html+='<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px">💰 المبلغ المدفوع</div><div style="font-weight:700;font-size:13px">'+(l.paidAmount||"—")+(l.paidAmount&&l.paidCurrency?' <span style="font-size:10px;color:var(--text3);font-weight:600">'+l.paidCurrency+'</span>':'')+'</div></div>';
+    html+='<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px">💰 المبلغ المدفوع</div><div style="font-weight:700;font-size:13px">'+(l.paidAmount?(l.paidAmount+(l.paidCurrency?' <span style="font-size:10px;color:var(--text3);font-weight:600">'+l.paidCurrency+'</span>':'')):'<span style="color:var(--orange2);font-size:11px">⚠ غير مسجّل</span>')+'</div></div>';
     html+='<div><div style="font-size:9px;color:var(--text4);margin-bottom:2px">🛠 الخدمة</div><div style="font-weight:700;font-size:13px">'+(svcStr(l)||"—")+'</div></div>';
     html+='</div></div>';
   }
@@ -10704,6 +10710,73 @@ window.saveCoordinatorEdit = async function(leadId){
     console.error("[CoordEdit] save error", e);
     if(typeof showToast==="function") showToast("❌","خطأ: "+(e.message||"").slice(0,40));
   }
+};
+
+// ════════════════════════════════════════════════
+// ★ تعديل بيانات العميل الفعلي (كود/مبلغ/عملة) — أدمن فقط
+// ════════════════════════════════════════════════
+window.adminEditActiveData = function(leadId){
+  if(!curUser || curUser.role!=="admin"){ showToast("❌","صلاحية الأدمن فقط"); return; }
+  const l = LEADS.find(x=>x.id==leadId); if(!l) return;
+  closeDynModal("admin-ac-modal");
+  const esc = s => String(s||"").replace(/"/g,"&quot;");
+
+  let h='<div class="mov open" id="admin-ac-modal" onclick="if(event.target===this)closeDynModal(\'admin-ac-modal\')">';
+  h+='<div class="modal" style="max-width:460px">';
+  h+='<div class="mhdr" style="background:linear-gradient(135deg,rgba(34,197,94,.10),rgba(58,57,58,.04))"><h2 style="font-size:15px;margin:0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✏️</span><span>تعديل بيانات العميل الفعلي</span></h2><button class="mx" onclick="closeDynModal(\'admin-ac-modal\')">×</button></div>';
+  h+='<div class="mbody">';
+  h+='<div style="font-size:12px;color:var(--text2);margin-bottom:14px">العميل: <strong style="color:var(--text)">'+(l.nm||"")+'</strong>'+(l.leadNo?' <span style="color:var(--text4);font-size:11px">· كود الليد '+l.leadNo+'</span>':'')+'</div>';
+  h+='<div style="margin-bottom:13px"><label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px">كود عميل فعلي</label>';
+  h+='<input id="aac-code" type="text" value="'+esc(l.activeCode)+'" placeholder="كود الحسابات" style="width:100%;height:38px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:0 10px;color:var(--text);font-size:13px">';
+  h+='<div id="aac-warn" style="display:none;font-size:11px;margin-top:5px;color:var(--orange2)"></div></div>';
+  h+='<div style="margin-bottom:13px"><label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px">المبلغ المدفوع <span style="color:var(--text3);font-weight:400">— اختياري</span></label>';
+  h+='<input id="aac-amount" type="text" inputmode="decimal" value="'+esc(l.paidAmount)+'" placeholder="0.00" oninput="this.value=this.value.replace(/[^0-9.]/g,\'\').replace(/(\\..*)\\./g,\'$1\')" style="width:100%;height:38px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:0 10px;color:var(--text);font-size:13px"></div>';
+  h+='<div style="margin-bottom:6px"><label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px">العملة <span style="color:var(--text4);font-weight:400">(اختياري)</span></label>';
+  h+='<select id="aac-currency" class="fsel" style="width:100%;height:38px"><option value="">— اختر العملة —</option>'+
+     (typeof CURRENCIES!=="undefined"?CURRENCIES:[]).map(c=>'<option'+(c===l.paidCurrency?' selected':'')+'>'+c+'</option>').join("")+'</select></div>';
+  h+='</div>';
+  h+='<div class="mftr"><button class="btn" onclick="closeDynModal(\'admin-ac-modal\')">إلغاء</button><button class="btn primary" onclick="saveAdminActiveData('+leadId+')">💾 حفظ</button></div>';
+  h+='</div></div>';
+  const w=document.createElement("div"); w.innerHTML=h;
+  document.body.appendChild(w.firstChild);
+
+  // تحذير فوري لو الكود مستخدم مع عميل تاني
+  const inp=document.getElementById("aac-code");
+  if(inp) inp.addEventListener("input", function(){
+    const v=(this.value||"").trim().toLowerCase();
+    const warn=document.getElementById("aac-warn");
+    if(!warn) return;
+    if(!v){ warn.style.display="none"; return; }
+    const dup=LEADS.find(x=>x.id!=leadId && (x.activeCode||"").trim().toLowerCase()===v);
+    if(dup){ warn.style.display="block"; warn.innerHTML="⚠ هذا الكود مستخدم بالفعل مع: <strong>"+dup.nm+"</strong>"; }
+    else { warn.style.display="none"; }
+  });
+};
+
+window.saveAdminActiveData = async function(leadId){
+  if(!curUser || curUser.role!=="admin"){ showToast("❌","صلاحية الأدمن فقط"); return; }
+  const l = LEADS.find(x=>x.id==leadId); if(!l) return;
+  if(typeof supa==="undefined" || !supa){ showToast("❌","لا يوجد اتصال"); return; }
+  const code=((document.getElementById("aac-code")||{}).value||"").trim();
+  const amount=((document.getElementById("aac-amount")||{}).value||"").trim();
+  const currency=((document.getElementById("aac-currency")||{}).value||"");
+  const oldCode=l.activeCode||"—", oldAmt=l.paidAmount||"—";
+  try{
+    const {error}=await supa.from("leads").update({
+      active_code: code, paid_amount: amount, paid_currency: currency
+    }).eq("id", l._supaId||l.id);
+    if(error) throw error;
+    const parts=[];
+    if(code!==(l.activeCode||"")) parts.push("الكود: "+oldCode+" ← "+(code||"—"));
+    if(amount!==(l.paidAmount||"")) parts.push("المبلغ: "+oldAmt+" ← "+(amount||"—")+(currency?" "+currency:""));
+    if(parts.length){
+      try{ await supa.from("lead_log").insert({lead_id:l._supaId||l.id,user_name:curUser.name,action:"✏️ تعديل بيانات العميل الفعلي · "+parts.join(" · ")}); }catch(e){}
+    }
+    l.activeCode=code; l.paidAmount=amount; l.paidCurrency=currency;
+    closeDynModal("admin-ac-modal");
+    showToast("✓","تم تحديث بيانات العميل الفعلي");
+    if(typeof viewLead==="function") viewLead(leadId);
+  }catch(e){ showToast("❌","خطأ: "+(e.message||"").slice(0,50)); }
 };
 
 // ════════════════════════════════════════════════
